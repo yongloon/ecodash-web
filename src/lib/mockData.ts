@@ -1,180 +1,155 @@
-// src/lib/mockData.ts
-import { TimeSeriesDataPoint, IndicatorMetadata } from './indicators';
+// src/lib/mockData.ts (Now acts as main data fetcher)
+import { TimeSeriesDataPoint, IndicatorMetadata, CalculationType } from './indicators';
 import { subYears, format, eachDayOfInterval, eachMonthOfInterval, eachQuarterOfInterval, parseISO } from 'date-fns';
+import { fetchFredSeries } from './api'; // Import the real FRED fetcher
+import {
+    calculateYoYPercent,
+    calculateMoMPercent,
+    calculateQoQPercent,
+    calculateMoMChange
+} from './calculations'; // Import calculation functions
 
-// Simple pseudo-random number generator for deterministic mocks based on indicator ID
-function seededPseudoRandom(seedStr: string): () => number {
-    let seed = 0;
-    for (let i = 0; i < seedStr.length; i++) {
-        seed = (seed * 31 + seedStr.charCodeAt(i)) | 0; // Simple hash
-    }
-    return () => {
-        seed = (seed * 16807) % 2147483647; // LCG parameters
-        return (seed - 1) / 2147483646; // Normalize to [0, 1)
-    };
-}
-
-
-// Generate mock time series data
+// --- Mock Data Generation (Keep for fallback/other sources) ---
 export function generateMockData(indicator: IndicatorMetadata, years = 5): TimeSeriesDataPoint[] {
-  const random = seededPseudoRandom(indicator.id); // Seed PRNG with indicator ID
-  const endDate = new Date(); // Today
+  const random = seededPseudoRandom(indicator.id);
+  const endDate = new Date();
   const startDate = subYears(endDate, years);
   const data: TimeSeriesDataPoint[] = [];
 
   let intervalGenerator: (interval: Interval) => Date[];
-  let dateFormat = "yyyy-MM-dd"; // Default daily/monthly
+  let dateFormat = "yyyy-MM-dd";
 
   switch (indicator.frequency) {
-    case 'Quarterly':
-      intervalGenerator = eachQuarterOfInterval;
-      dateFormat = "yyyy-MM-dd"; // FRED uses first day of quarter
-      break;
-    case 'Monthly':
-      intervalGenerator = eachMonthOfInterval;
-      dateFormat = "yyyy-MM-dd"; // FRED uses first day of month
-      break;
-    case 'Weekly': // Add weekly case if needed
-       // Custom logic or find a library function for weekly intervals
-       // For simplicity, we might approximate with monthly here for mock
-       intervalGenerator = eachMonthOfInterval; // Approximation
-       dateFormat = "yyyy-MM-dd";
-       break;
-    case 'Daily':
-    default: // Assume daily if not specified
-      intervalGenerator = eachDayOfInterval;
-      dateFormat = "yyyy-MM-dd";
-      break;
+    case 'Quarterly': intervalGenerator = eachQuarterOfInterval; break;
+    case 'Monthly': intervalGenerator = eachMonthOfInterval; break;
+    case 'Weekly': intervalGenerator = eachDayOfInterval; break; // Approx
+    case 'Daily': default: intervalGenerator = eachDayOfInterval; break;
   }
 
-  // Adjust start date slightly for interval functions if needed
   const adjustedStartDate = new Date(startDate);
   if (indicator.frequency === 'Monthly' || indicator.frequency === 'Quarterly') {
-      adjustedStartDate.setDate(1); // Start from the first day of the month/quarter start month
+      adjustedStartDate.setDate(1);
   }
 
   let dates: Date[];
    try {
        dates = intervalGenerator({ start: adjustedStartDate, end: endDate });
+       if(indicator.frequency === 'Weekly') { dates = dates.filter((_d, i) => i % 7 === 0); }
    } catch (e) {
-       console.error(`Error generating dates for ${indicator.id} (${indicator.frequency}):`, e);
-       // Fallback to daily if interval generation fails
+       console.error(`Error generating dates for mock ${indicator.id} (${indicator.frequency}):`, e);
        dates = eachDayOfInterval({ start: adjustedStartDate, end: endDate });
-       dateFormat = "yyyy-MM-dd";
    }
 
-
-  // Base value and volatility based on unit/type
-  let baseValue = 100;
-  let volatility = 5;
-  if (indicator.unit.includes('%')) {
-      baseValue = (random() - 0.5) * 10; // Start around -5% to 5%
-      volatility = 0.5;
-  } else if (indicator.unit.includes('Index')) {
-      baseValue = 100 + random() * 20;
-      volatility = 1;
-  } else if (indicator.unit.includes('Thousands') || indicator.unit.includes('Millions') || indicator.unit.includes('Billions')) {
-      baseValue = 1000 + random() * 5000;
+  let baseValue = 100; let volatility = 5;
+  // S&P 500 Mock data adjustment
+  if (indicator.id === 'SP500') {
+      baseValue = 4500 + random() * 1000; // More realistic S&P range
       volatility = 50;
+  } else if (indicator.unit.includes('%')) { baseValue = (random() - 0.5) * 10; volatility = 0.5; }
+  else if (indicator.unit.includes('Index')) { baseValue = 100 + random() * 20; volatility = 1; }
+  else if (indicator.unit.includes('Thousands') || indicator.unit.includes('Millions') || indicator.unit.includes('Billions')) {
+      baseValue = 1000 + random() * 5000; volatility = 50;
        if (indicator.unit.includes('Millions')) baseValue *= 1000;
        if (indicator.unit.includes('Billions')) baseValue *= 1000000;
-  } else if (indicator.unit.includes('Number')) {
-       baseValue = 300000 + random() * 100000; // e.g., Jobless Claims
-       volatility = 10000;
-  }
-
+  } else if (indicator.unit.includes('Number')) { baseValue = 300000 + random() * 100000; volatility = 10000; }
+  else if (indicator.unit.includes('USD per')) { baseValue = 50 + random() * 50; volatility = 2;}
+  else if (indicator.unit.includes('per USD')) { baseValue = 0.8 + random() * 0.4; volatility = 0.02;}
 
   let currentValue = baseValue;
-
   for (const date of dates) {
-    // Simulate some trend and noise
-    const trend = 0.01 * volatility * (random() - 0.4); // Slight positive bias
+    const trend = 0.01 * volatility * (random() - 0.4);
     const noise = (random() - 0.5) * volatility;
     currentValue += trend + noise;
-
-    // Ensure value stays somewhat reasonable
-     if (!indicator.unit.includes('%') && !indicator.id.includes('BALANCE')) { // Allow negative for balance
-        currentValue = Math.max(currentValue, 0); // Prevent negative values unless it's a % change or balance
-     }
-     if (indicator.id === 'PMI') {
-         currentValue = Math.max(30, Math.min(70, currentValue)); // Keep PMI in reasonable range
-     }
-     if (indicator.id === 'UNRATE') {
-         currentValue = Math.max(1, Math.min(15, currentValue)); // Keep Unemployment Rate in reasonable range
-     }
-
-
-    // Simulate occasional missing data points (e.g., 2% chance)
+    if (!indicator.unit.includes('%') && !indicator.id.includes('BALANCE') && !indicator.id.includes('SPREAD')) { currentValue = Math.max(currentValue, 0); }
+    if (indicator.id === 'PMI') { currentValue = Math.max(30, Math.min(70, currentValue)); }
+    if (indicator.id === 'UNRATE') { currentValue = Math.max(1, Math.min(15, currentValue)); }
     const value = random() > 0.02 ? parseFloat(currentValue.toFixed(2)) : null;
-
-    data.push({
-      date: format(date, dateFormat),
-      value: value,
-    });
+    data.push({ date: format(date, dateFormat), value: value });
   }
-
-   // Ensure the last point has a value for display purposes
    if (data.length > 0 && data[data.length - 1].value === null) {
        const lastValidValue = data.slice().reverse().find(d => d.value !== null)?.value;
        data[data.length - 1].value = lastValidValue ?? parseFloat((baseValue + (random() - 0.5) * volatility).toFixed(2));
    }
-
-
-  // console.log(`Generated ${data.length} mock data points for ${indicator.id}`);
   return data;
 }
-
-// --- TODO: Implement Real API Fetching Logic ---
-// Example placeholder for FRED API call
-// import { getDateRange } from './utils';
-// async function fetchFredSeries(seriesId: string, years: number = 5): Promise<TimeSeriesDataPoint[]> {
-//     const apiKey = process.env.FRED_API_KEY;
-//     if (!apiKey) {
-//         console.warn(`FRED API Key not found for ${seriesId}. Returning empty array.`);
-//         return [];
-//     }
-//     const { startDate, endDate } = getDateRange(years);
-//     const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&observation_end=${endDate}`;
-
-//     try {
-//         const response = await fetch(url);
-//         if (!response.ok) throw new Error(`FRED API Error (${response.status})`);
-//         const data = await response.json();
-//         return data.observations.map((obs: { date: string; value: string }) => ({
-//             date: obs.date,
-//             value: obs.value === '.' ? null : parseFloat(obs.value),
-//         })).filter((d: TimeSeriesDataPoint) => d.value !== null && !isNaN(d.value));
-//     } catch (error) {
-//         console.error(`Error fetching FRED series ${seriesId}:`, error);
-//         return []; // Return empty on error
-//     }
-// }
+// Helper for mock data
+function seededPseudoRandom(seedStr: string): () => number {
+    let seed = 0;
+    for (let i = 0; i < seedStr.length; i++) { seed = (seed * 31 + seedStr.charCodeAt(i)) | 0; }
+    return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+}
 
 
-// Function to fetch data - currently only uses mock data
-// In a real app, this would check indicator.apiSource and call the appropriate API function
-export async function fetchIndicatorData(indicator: IndicatorMetadata, years = 5): Promise<TimeSeriesDataPoint[]> {
-  console.log(`Fetching data for ${indicator.id} (Source: ${indicator.apiSource})`);
+// --- Main Data Fetching Function ---
+export async function fetchIndicatorData(
+    indicator: IndicatorMetadata,
+    years: number = 5
+): Promise<TimeSeriesDataPoint[]> {
+  console.log(`Fetching data for ${indicator.id} (Source specified: ${indicator.apiSource}, Calc: ${indicator.calculation || 'NONE'})`);
 
-  // --- API Integration Point ---
-  // if (indicator.apiSource === 'FRED' && indicator.apiIdentifier) {
-  //   try {
-  //     // const fredData = await fetchFredSeries(indicator.apiIdentifier, years);
-  //     // console.log(`Fetched ${fredData.length} points from FRED for ${indicator.id}`);
-  //     // return fredData;
-  //      console.warn(`FRED API call for ${indicator.apiIdentifier} not implemented yet. Using mock data.`);
-  //      return generateMockData(indicator, years); // Use mock as fallback during dev
-  //   } catch (error) {
-  //     console.error(`Error fetching FRED data for ${indicator.id}:`, error);
-  //      return generateMockData(indicator, years); // Fallback to mock on error
-  //   }
-  // } else if (indicator.apiSource === 'AlphaVantage' && indicator.apiIdentifier) {
-  //    // TODO: Implement Alpha Vantage fetching logic
-  //    console.warn(`AlphaVantage API call for ${indicator.apiIdentifier} not implemented. Using mock data.`);
-  //    return generateMockData(indicator, years);
-  // }
+  let rawFetchedData: TimeSeriesDataPoint[] = [];
 
-  // Default to mock data
-  // console.log(`Using mock data for ${indicator.id}`);
-  return generateMockData(indicator, years);
+  try {
+    switch (indicator.apiSource) {
+      case 'FRED':
+        if (indicator.apiIdentifier) {
+          // For YoY calculations, we might need more than `years` of data to calculate the first few points.
+          // Fetch an extra year of data if YoY is needed.
+          const fetchYears = indicator.calculation === 'YOY_PERCENT' ? years + 1 : years;
+          rawFetchedData = await fetchFredSeries(indicator.apiIdentifier, fetchYears);
+        } else {
+          console.warn(`FRED source for ${indicator.id} but no apiIdentifier.`);
+        }
+        break;
+      // ... (other API source cases)
+      case 'Mock':
+      case 'Other':
+      default:
+        break; // Will use mock data below
+    }
+  } catch (error) {
+      console.error(`Error during API fetch for ${indicator.id}:`, error);
+      rawFetchedData = [];
+  }
+
+  if (rawFetchedData.length === 0 && indicator.apiSource !== 'Mock') {
+    console.log(`API fetch for ${indicator.id} returned no data or failed. Falling back to mock data.`);
+    rawFetchedData = generateMockData(indicator, years);
+     // If mock data is generated for something that needs calculation, it won't be accurate.
+     // The calculation below will still run but on potentially meaningless mock "levels".
+  } else if (rawFetchedData.length === 0 && indicator.apiSource === 'Mock') {
+     rawFetchedData = generateMockData(indicator, years);
+  }
+
+
+  // --- Apply Calculations ---
+  let processedData = rawFetchedData;
+  if (indicator.calculation && indicator.calculation !== 'NONE' && rawFetchedData.length > 0) {
+    console.log(`Applying calculation: ${indicator.calculation} for ${indicator.id}`);
+    switch (indicator.calculation) {
+      case 'YOY_PERCENT':
+        // Determine lookback periods based on frequency for YoY
+        let lookback = 12; // Default for monthly
+        if (indicator.frequency === 'Quarterly') lookback = 4;
+        else if (indicator.frequency === 'Weekly') lookback = 52;
+        // Add other frequencies if necessary
+        processedData = calculateYoYPercent(rawFetchedData, lookback);
+        break;
+      case 'MOM_PERCENT':
+        processedData = calculateMoMPercent(rawFetchedData);
+        break;
+      case 'QOQ_PERCENT': // Assumes data is already quarterly
+        processedData = calculateQoQPercent(rawFetchedData);
+        break;
+      case 'MOM_CHANGE':
+        processedData = calculateMoMChange(rawFetchedData);
+        break;
+      // Add 'QOQ_CHANGE' if needed
+      default:
+        console.warn(`Unknown calculation type: ${indicator.calculation} for ${indicator.id}`);
+    }
+    console.log(`Data points after ${indicator.calculation} for ${indicator.id}: ${processedData.length}`);
+  }
+
+  return processedData;
 }
