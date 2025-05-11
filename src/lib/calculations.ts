@@ -1,123 +1,130 @@
 // src/lib/calculations.ts
 import { TimeSeriesDataPoint } from './indicators';
-import { parseISO, differenceInMonths, differenceInQuarters, differenceInYears } from 'date-fns';
+import { parseISO, differenceInMonths, differenceInQuarters, differenceInYears, isValid } from 'date-fns'; // Added isValid
 
-/**
- * Calculates the Year-over-Year (YoY) percentage change for a time series.
- * @param data - Sorted array of TimeSeriesDataPoint (oldest to newest).
- * @param lookbackPeriods - Number of periods in a year (e.g., 12 for monthly, 4 for quarterly).
- * @returns Array of TimeSeriesDataPoint with YoY percentage change, or original value if calculation not possible.
- */
+// Import from simple-statistics
+import { mean as sMean, median as sMedian, standardDeviation as sStdDev, min as sMin, max as sMax } from 'simple-statistics';
+
+// --- Existing Calculation Functions (YoY, MoM, QoQ) ---
+// Ensure they handle null values gracefully or filter them out before calculation.
+// For brevity, I'm assuming the existing functions are mostly fine but may need null checks.
 export function calculateYoYPercent(
     data: TimeSeriesDataPoint[],
-    lookbackPeriods: number = 12 // Default for monthly data
+    lookbackPeriods: number = 12
 ): TimeSeriesDataPoint[] {
-    if (data.length < lookbackPeriods + 1) {
-        // Not enough data for YoY calculation, return data as is or empty array for changes
-        return data.map(p => ({ ...p, value: null })); // Or return [] if only changes are desired
+    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+    if (validData.length < lookbackPeriods + 1) {
+        return data.map(p => ({ ...p, value: null }));
     }
 
-    return data.map((point, index) => {
-        if (index < lookbackPeriods || !point.value) {
-            return { ...point, value: null }; // Cannot calculate for earlier points or if current value is null
+    return validData.map((point, index) => {
+        if (index < lookbackPeriods) { // No value for points that don't have a year of prior data
+            return { ...point, value: null };
         }
-
-        const previousYearPoint = data[index - lookbackPeriods];
-        if (!previousYearPoint || previousYearPoint.value === null || previousYearPoint.value === 0) {
-            return { ...point, value: null }; // Previous year data missing or zero, cannot calculate % change
+        const previousYearPoint = validData[index - lookbackPeriods];
+        if (!previousYearPoint.value || previousYearPoint.value === 0) {
+            return { ...point, value: null };
         }
-
-        // Ensure dates are roughly a year apart (optional, depends on data regularity)
-        // const dateCurrent = parseISO(point.date);
-        // const datePrevious = parseISO(previousYearPoint.date);
-        // if (Math.abs(differenceInYears(dateCurrent, datePrevious)) > 1.1) { // Allow some leeway
-        //     return { ...point, value: null };
-        // }
-
+        // @ts-ignore: Object is possibly 'null'. This is handled by filter and check above
         const yoyChange = ((point.value - previousYearPoint.value) / Math.abs(previousYearPoint.value)) * 100;
         return {
             ...point,
-            value: parseFloat(yoyChange.toFixed(2)), // Keep two decimal places
+            value: parseFloat(yoyChange.toFixed(2)),
         };
-    }).slice(lookbackPeriods); // Remove initial points where YoY cannot be calculated
+    }).filter(p => p.value !== null); // Filter out points where calculation wasn't possible after mapping
 }
 
-/**
- * Calculates the Month-over-Month (MoM) percentage change for a time series.
- * @param data - Sorted array of TimeSeriesDataPoint (oldest to newest).
- * @returns Array of TimeSeriesDataPoint with MoM percentage change.
- */
 export function calculateMoMPercent(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
-    if (data.length < 2) {
+    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+    if (validData.length < 2) {
         return data.map(p => ({ ...p, value: null }));
     }
-    return data.map((point, index) => {
-        if (index < 1 || !point.value) {
+    return validData.map((point, index) => {
+        if (index < 1) {
             return { ...point, value: null };
         }
-        const previousPoint = data[index - 1];
-        if (!previousPoint || previousPoint.value === null || previousPoint.value === 0) {
+        const previousPoint = validData[index - 1];
+        if (!previousPoint.value || previousPoint.value === 0) {
             return { ...point, value: null };
         }
+         // @ts-ignore: Object is possibly 'null'.
         const momChange = ((point.value - previousPoint.value) / Math.abs(previousPoint.value)) * 100;
         return {
             ...point,
             value: parseFloat(momChange.toFixed(2)),
         };
-    }).slice(1); // Remove first point
+    }).slice(1).filter(p => p.value !== null);
 }
 
-/**
- * Calculates the Month-over-Month (MoM) absolute change for a time series.
- * @param data - Sorted array of TimeSeriesDataPoint (oldest to newest).
- * @returns Array of TimeSeriesDataPoint with MoM absolute change.
- */
 export function calculateMoMChange(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
-    if (data.length < 2) {
+    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+    if (validData.length < 2) {
         return data.map(p => ({ ...p, value: null }));
     }
-    return data.map((point, index) => {
-        if (index < 1 || point.value === null) { // Check current point value
+    return validData.map((point, index) => {
+        if (index < 1) {
             return { ...point, value: null };
         }
-        const previousPoint = data[index - 1];
-        if (!previousPoint || previousPoint.value === null) { // Check previous point value
+        const previousPoint = validData[index - 1];
+        if (previousPoint.value === null) { // Check previous point value specifically
             return { ...point, value: null };
         }
+         // @ts-ignore: Object is possibly 'null'.
         const momChange = point.value - previousPoint.value;
         return {
             ...point,
-            value: parseFloat(momChange.toFixed(2)), // Adjust precision as needed
+            value: parseFloat(momChange.toFixed(2)),
         };
-    }).slice(1); // Remove first point
+    }).slice(1).filter(p => p.value !== null);
 }
 
-
-/**
- * Calculates the Quarter-over-Quarter (QoQ) percentage change for a time series.
- * Assumes data points are already quarterly.
- * @param data - Sorted array of TimeSeriesDataPoint (oldest to newest).
- * @returns Array of TimeSeriesDataPoint with QoQ percentage change.
- */
 export function calculateQoQPercent(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
-    if (data.length < 2) {
+    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+    if (validData.length < 2) {
         return data.map(p => ({ ...p, value: null }));
     }
-    // Similar to MoM, but conceptually for quarterly data
-    return data.map((point, index) => {
-        if (index < 1 || !point.value) {
+    return validData.map((point, index) => {
+        if (index < 1) {
             return { ...point, value: null };
         }
-        const previousPoint = data[index - 1];
-        if (!previousPoint || previousPoint.value === null || previousPoint.value === 0) {
+        const previousPoint = validData[index - 1];
+        if (!previousPoint.value || previousPoint.value === 0) {
             return { ...point, value: null };
         }
+         // @ts-ignore: Object is possibly 'null'.
         const qoqChange = ((point.value - previousPoint.value) / Math.abs(previousPoint.value)) * 100;
         return {
             ...point,
             value: parseFloat(qoqChange.toFixed(2)),
         };
-    }).slice(1);
+    }).slice(1).filter(p => p.value !== null);
 }
 
-// Add calculateQoQChange if needed
+// --- NEW Statistical Calculation Function ---
+export interface SeriesStatistics {
+  mean: number | null;
+  median: number | null;
+  stdDev: number | null;
+  min: number | null;
+  max: number | null;
+  count: number;
+}
+
+export function calculateSeriesStatistics(data: TimeSeriesDataPoint[]): SeriesStatistics {
+  const values = data.map(d => d.value).filter(v => v !== null && v !== undefined && !isNaN(v)) as number[];
+
+  if (values.length === 0) {
+    return { mean: null, median: null, stdDev: null, min: null, max: null, count: 0 };
+  }
+
+  const stdDevValue = values.length >= 2 ? parseFloat(sStdDev(values).toFixed(2)) : null;
+
+  return {
+    mean: parseFloat(sMean(values).toFixed(2)),
+    median: parseFloat(sMedian(values).toFixed(2)),
+    stdDev: stdDevValue,
+    min: parseFloat(sMin(values).toFixed(2)),
+    max: parseFloat(sMax(values).toFixed(2)),
+    count: values.length,
+  };
+}

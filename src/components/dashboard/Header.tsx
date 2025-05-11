@@ -1,45 +1,38 @@
 // src/components/dashboard/Header.tsx
-'use client'; // Make it a client component if it includes client-side interactions like state or effects
+'use client';
 
 import React from 'react';
-import CountrySelector from './CountrySelector'; // Import the selector
+import CountrySelector from './CountrySelector';
 import { usePathname } from 'next/navigation';
-import { getCategoryBySlug } from '@/lib/indicators'; // Helper to get category name
+import { getCategoryBySlug } from '@/lib/indicators';
+import { ThemeToggle } from './ThemeToggle';
+import { DateRangePicker } from './DateRangePicker'; // Import DateRangePicker
 
-// Header Component for the Dashboard
 export default function Header() {
     const pathname = usePathname();
-
-    // Determine the title based on the current path
     let title = "Dashboard Overview";
+
     if (pathname.startsWith('/category/')) {
-        const slug = pathname.split('/').pop(); // Get the last part of the path (slug)
+        const slug = pathname.split('/').pop();
         if (slug) {
             const category = getCategoryBySlug(slug);
-            if (category) {
-                title = category.name;
-            } else {
-                 title = "Indicator Category"; // Fallback title
-            }
+            title = category ? category.name : "Indicator Category";
         }
     } else if (pathname === '/') {
          title = "Dashboard Overview";
     }
-     // Add more conditions for other potential pages
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm h-16 flex items-center justify-between px-4 md:px-6 border-b dark:border-gray-700 flex-shrink-0">
-      {/* Left side - Dynamic Title */}
-      <div>
-        <h1 className="text-lg font-semibold text-gray-800 dark:text-white">
+    <header className="bg-card dark:bg-gray-800 shadow-sm h-auto py-2.5 md:h-16 flex flex-col md:flex-row items-center justify-between px-3 md:px-6 border-b dark:border-gray-700 flex-shrink-0 gap-2 md:gap-0">
+      <div className="flex-grow md:flex-grow-0 mb-2 md:mb-0">
+        <h1 className="text-md sm:text-lg font-semibold text-foreground dark:text-white text-center md:text-left truncate max-w-xs sm:max-w-sm md:max-w-md">
           {title}
         </h1>
       </div>
-
-      {/* Right side - Country Selector and other actions */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-1.5 sm:space-x-2 md:space-x-3"> {/* Adjusted spacing */}
+         <DateRangePicker />
          <CountrySelector />
-        {/* Add other header elements here (e.g., User menu, Theme toggle button) */}
+         <ThemeToggle />
       </div>
     </header>
   );

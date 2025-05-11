@@ -1,16 +1,15 @@
 // src/lib/indicators.ts
 import { IconType } from 'react-icons';
-import { FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaBalanceScale, FaExchangeAlt, FaBuilding, FaPlaneDeparture, FaSeedling, FaCar } from 'react-icons/fa';
-import { IoStatsChart, IoTrendingUp, IoTrendingDown } from "react-icons/io5";
-import { BsBank2, BsGraphUpArrow } from "react-icons/bs";
+import { FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaPlaneDeparture, FaCar } from 'react-icons/fa'; // FaBalanceScale, FaBuilding, FaExchangeAlt, FaPlaneDeparture, FaSeedling
+// import { IoStatsChart, IoTrendingUp, IoTrendingDown } from "react-icons/io5";
+import { BsBank2 } from "react-icons/bs"; // BsGraphUpArrow
 
-// Define categories with slugs and icons (no changes here)
 export const indicatorCategories = {
   'i': { name: 'Overall Economic Output & Growth', slug: 'economic-output', icon: FaChartLine },
   'ii': { name: 'Labor Market', slug: 'labor-market', icon: FaUsers },
   'iii': { name: 'Inflation & Prices', slug: 'inflation-prices', icon: FaDollarSign },
   'iv': { name: 'Consumer Activity', slug: 'consumer-activity', icon: FaCar },
-  'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaBuilding },
+  'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaIndustry }, // FaBuilding changed to FaIndustry
   'vi': { name: 'Housing Market', slug: 'housing-market', icon: FaHome },
   'vii': { name: 'International Trade', slug: 'international-trade', icon: FaPlaneDeparture },
   'viii': { name: 'Financial Markets', slug: 'financial-markets', icon: BsBank2 },
@@ -19,11 +18,10 @@ export const indicatorCategories = {
 export type IndicatorCategoryKey = keyof typeof indicatorCategories;
 
 export interface TimeSeriesDataPoint {
-  date: string;
+  date: string; // Expect "YYYY-MM-DD"
   value: number | null;
 }
 
-// Added CalculationType to explicitly define what kind of calculation is needed
 export type CalculationType = 'NONE' | 'YOY_PERCENT' | 'MOM_PERCENT' | 'QOQ_PERCENT' | 'MOM_CHANGE' | 'QOQ_CHANGE';
 
 export interface IndicatorMetadata {
@@ -36,14 +34,29 @@ export interface IndicatorMetadata {
   sourceName: string;
   sourceLink?: string;
   apiSource: 'FRED' | 'AlphaVantage' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac';
-  apiIdentifier?: string; // This should be for the BASE series if calculation is needed
+  apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
-  calculation?: CalculationType; // Explicitly state if a calculation is needed
-  notes?: string; // General notes
+  calculation?: CalculationType;
+  notes?: string;
 }
 
+// Interfaces for FRED API (can be in api.ts or here for indicator context)
+export interface FredObservation {
+  date: string;
+  value: string;
+}
+export interface FredResponse {
+  observations: FredObservation[];
+  // Add other potential fields from FRED response if needed for metadata
+  // e.g. units, frequency_short, title (though we define these in IndicatorMetadata)
+}
+
+
+// INDICATORS ARRAY (No changes made here, ensure it's the same as your original long list)
+// For brevity, I will not repeat the entire 'indicators' array.
+// Please ensure your existing 'indicators' array from the original file is used here.
+// For example:
 export const indicators: IndicatorMetadata[] = [
-  // --- I. Overall Economic Output & Growth ---
   {
     id: 'GDP_REAL', name: 'Real Gross Domestic Product', categoryKey: 'i',
     description: 'Measures the value of final goods and services produced within a country during a specific period, adjusted for inflation.',
@@ -54,17 +67,14 @@ export const indicators: IndicatorMetadata[] = [
     id: 'GDP_GROWTH', name: 'Real GDP Growth Rate', categoryKey: 'i',
     description: 'The percentage change in real GDP from the preceding period, annualized.',
     unit: '% Change (Annualized)', frequency: 'Quarterly', sourceName: 'BEA',
-    apiSource: 'FRED', apiIdentifier: 'A191RL1Q225SBEA', chartType: 'bar', calculation: 'NONE', // This FRED series is already a growth rate
+    apiSource: 'FRED', apiIdentifier: 'A191RL1Q225SBEA', chartType: 'bar', calculation: 'NONE',
   },
-  // ... (other Category I indicators - assuming they are direct values or pre-calculated by FRED)
   {
     id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'i',
     description: 'Measures the real output of manufacturing, mining, and electric and gas utilities.',
     unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB',
     apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE',
   },
-
-  // --- II. Labor Market ---
   {
     id: 'UNRATE', name: 'Unemployment Rate', categoryKey: 'ii',
     description: 'The percentage of the total labor force that is unemployed but actively seeking employment.',
@@ -85,9 +95,6 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'CES0500000003', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated as YoY % change from level data.',
   },
-  // ... (other Category II indicators)
-
-  // --- III. Inflation & Prices ---
    {
     id: 'CPI_YOY_PCT', name: 'Consumer Price Index (CPI-U, YoY %)', categoryKey: 'iii',
     description: 'Year-over-year percentage change in the average price level of a basket of consumer goods and services purchased by urban households.',
@@ -127,7 +134,7 @@ export const indicators: IndicatorMetadata[] = [
     id: 'GDPDEF_YOY_PCT', name: 'GDP Deflator (YoY %)', categoryKey: 'iii',
     description: 'Year-over-year percentage change in the measure of the level of prices of all new, domestically produced, final goods and services in an economy.',
     unit: '% Change YoY', frequency: 'Quarterly', sourceName: 'BEA',
-    apiSource: 'FRED', apiIdentifier: 'GDPDEF', chartType: 'bar', calculation: 'YOY_PERCENT', // Note: GDPDEF is quarterly, so YoY needs 4 period lookback
+    apiSource: 'FRED', apiIdentifier: 'GDPDEF', chartType: 'bar', calculation: 'YOY_PERCENT', 
     notes: 'Calculated from GDPDEF index.',
   },
   {
@@ -144,9 +151,6 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'IQ', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated from Export Price Index (All Commodities).',
   },
-  // ... (other Category III indicators like OIL_WTI, INFL_EXPECT_UMICH, TIPS_BREAKEVEN_5Y are direct values)
-
-  // --- IV. Consumer Activity ---
   {
     id: 'RETAIL_SALES_MOM_PCT', name: 'Retail Sales (Advance, MoM %)', categoryKey: 'iv',
     description: 'Month-over-month percentage change in estimated sales for retail and food services firms.',
@@ -175,9 +179,6 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'TOTALSL', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated from TOTALSL level data.',
   },
-  // ... (other Category IV indicators like CCI, UMCSENT, VEHICLE_SALES, SAVINGS_RATE are direct values/indices)
-
-  // --- V. Business Activity & Investment ---
   {
     id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v',
     description: 'Month-over-month percentage change in new orders received by manufacturers of goods planned to last three years or more.',
@@ -206,9 +207,6 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'CP', chartType: 'bar', calculation: 'QOQ_PERCENT',
     notes: 'Calculated from CP level data.',
   },
-  // ... (other Category V indicators like PMI, PMI_SERVICES are direct indices)
-
-  // --- VI. Housing Market ---
   {
     id: 'CASE_SHILLER_YOY_PCT', name: 'S&P Case-Shiller Home Price Index (YoY %)', categoryKey: 'vi',
     description: 'Year-over-year percentage change in a leading measure of U.S. residential real estate prices (National Index).',
@@ -216,14 +214,11 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'CSUSHPINSA', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated from CSUSHPINSA index.',
   },
-  // ... (other Category VI indicators are mostly direct values/indices)
-
-  // --- VIII. Financial Markets ---
   {
     id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii',
     description: 'Stock market index representing the performance of 500 large companies listed on stock exchanges in the United States.',
     unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P',
-    apiSource: 'Mock', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE',
+    apiSource: 'Mock', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE', // Change to AlphaVantage if implemented
     notes: 'Requires dedicated financial API for real data. Mock data uses realistic values.',
   },
   {
@@ -233,10 +228,6 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated from M2SL level data.',
   },
-  // ... (other Category VIII indicators like FED_FUNDS, US10Y, M2SL are direct values)
-
-  // Ensure all previously defined indicators are here and have `calculation: 'NONE'` if they don't need it.
-  // Example:
   {
     id: 'GNP', name: 'Gross National Product', categoryKey: 'i',
     description: 'Measures the total income earned by a nation\'s people and businesses, including investment income earned abroad.',
@@ -479,7 +470,8 @@ export const indicators: IndicatorMetadata[] = [
   },
 ];
 
-// Helper functions (no changes here)
+
+// Helper functions
 export function getIndicatorById(id: string): IndicatorMetadata | undefined {
   return indicators.find(ind => ind.id === id);
 }

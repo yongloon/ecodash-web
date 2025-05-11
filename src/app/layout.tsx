@@ -1,31 +1,35 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; // Import the font
-import "./globals.css"; // Import global styles
-import { TooltipProvider } from "@/components/ui/tooltip"; // Import TooltipProvider if using Shadcn
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/theme-provider"; // MODIFIED: Import custom ThemeProvider
 
-// Initialize the font
 const inter = Inter({ subsets: ["latin"] });
 
-// Define metadata for the application
 export const metadata: Metadata = {
   title: "Economic Indicators Dashboard",
   description: "Track key economic indicators",
 };
 
-// Root layout component
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* Add suppressHydrationWarning for theme/dark mode */}
-      <body className={`${inter.className} antialiased`}> {/* Apply font class and antialiasing */}
-        {/* Wrap children with TooltipProvider if using Shadcn Tooltips */}
-        <TooltipProvider>
-           {children}
-        </TooltipProvider>
-        {/* You might add a ThemeProvider here if implementing dark mode toggle */}
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.className} antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange // Optional: helps prevent flicker on initial load
+        >
+          <TooltipProvider>
+             {children}
+          </TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

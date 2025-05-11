@@ -1,5 +1,5 @@
 {
-    "name": "economic-indicators-dashboard-v3",
+    "name": "ecodash-web",
     "version": "0.1.0",
     "private": true,
     "scripts": {
@@ -9,19 +9,23 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@radix-ui/react-popover": "^1.1.13",
         "@radix-ui/react-select": "^2.0.0",
-        "@radix-ui/react-slot": "^1.0.2",
+        "@radix-ui/react-slot": "^1.2.2",
         "@radix-ui/react-tooltip": "^1.0.7",
-        "class-variance-authority": "^0.7.0",
+        "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "date-fns": "^3.6.0",
         "lucide-react": "^0.378.0",
         "next": "14.2.3",
+        "next-themes": "^0.3.0",
         "react": "^18",
+        "react-day-picker": "^8.10.1",
         "react-dom": "^18",
         "react-icons": "^5.2.1",
         "recharts": "^2.12.7",
-        "tailwind-merge": "^2.3.0",
+        "simple-statistics": "^7.8.3",
+        "tailwind-merge": "^2.6.0",
         "tailwindcss-animate": "^1.0.7"
     },
     "devDependencies": {
@@ -32,6 +36,7 @@
         "eslint": "^8",
         "eslint-config-next": "14.2.3",
         "postcss": "^8",
+        "simple-statistics": "^7.8.3",
         "tailwindcss": "^3.4.1",
         "typescript": "^5"
     }
