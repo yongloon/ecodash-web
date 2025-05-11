@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "@/components/theme-provider"; // MODIFIED: Import custom ThemeProvider
+import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/context/AuthContext"; // IMPORT AuthProvider
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,11 +25,13 @@ export default function RootLayout({
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange // Optional: helps prevent flicker on initial load
+          disableTransitionOnChange
         >
-          <TooltipProvider>
-             {children}
-          </TooltipProvider>
+          <AuthProvider> {/* WRAP with AuthProvider */}
+            <TooltipProvider>
+               {children}
+            </TooltipProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
