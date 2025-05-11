@@ -4,14 +4,11 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/context/AuthContext"; // IMPORT AuthProvider
+import { NextAuthProvider } from "@/context/NextAuthProvider"; // RENAMED for clarity or create this file
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Economic Indicators Dashboard",
-  description: "Track key economic indicators",
-};
+export const metadata: Metadata = { /* ... */ };
 
 export default function RootLayout({
   children,
@@ -21,18 +18,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider> {/* WRAP with AuthProvider */}
+        <NextAuthProvider> {/* WRAP with NextAuthProvider */}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
             <TooltipProvider>
                {children}
             </TooltipProvider>
-          </AuthProvider>
-        </ThemeProvider>
+          </ThemeProvider>
+        </NextAuthProvider>
       </body>
     </html>
   );

@@ -1,27 +1,28 @@
 // src/components/dashboard/Header.tsx
-'use client';
+"use client"; // <--- ENSURE THIS IS THE VERY FIRST LINE
 
 import React from 'react';
 import CountrySelector from './CountrySelector';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation'; // This hook requires "use client"
+// useRouter was also imported in a previous snippet, also requires "use client"
+// import { useRouter } from 'next/navigation'; 
 import { getCategoryBySlug } from '@/lib/indicators';
 import { ThemeToggle } from './ThemeToggle';
 import { DateRangePicker } from './DateRangePicker';
-import { useAuth } from '@/context/AuthContext';
+import { useSession, signIn, signOut } from "next-auth/react"; // Requires "use client"
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { LogOut } from 'lucide-react'; // UserCircle removed if not used
-// MODIFIED: Import Tooltip components from Shadcn/ui
+import { LogIn, LogOut } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-
 export default function Header() {
-    const pathname = usePathname();
-    const router = useRouter();
-    const { currentUser, logout, isLoading } = useAuth();
-    let title = "Dashboard Overview";
+    const pathname = usePathname(); // Now valid because of "use client"
+    // const router = useRouter(); // If you need router for navigation
+    const { data: session, status } = useSession();
+    const isLoading = status === "loading";
+    const currentUser = session?.user;
 
-    // --- Your existing title logic ---
+    let title = "Dashboard Overview";
     if (pathname.startsWith('/category/')) {
         const slug = pathname.split('/').pop();
         if (slug) {
@@ -31,12 +32,6 @@ export default function Header() {
     } else if (pathname === '/') {
          title = "Dashboard Overview";
     }
-    // --- End of title logic ---
-
-    const handleLogout = () => {
-      logout();
-      router.push('/login');
-    };
 
   return (
     <header className="bg-card dark:bg-gray-800 shadow-sm h-auto py-2.5 md:h-16 flex flex-col md:flex-row items-center justify-between px-3 md:px-6 border-b dark:border-gray-700 flex-shrink-0 gap-2 md:gap-0">
@@ -53,26 +48,23 @@ export default function Header() {
             currentUser ? (
                 <div className="flex items-center space-x-2">
                     <span className="text-sm text-muted-foreground hidden sm:inline">
-                        Hi, {currentUser.username}
+                        Hi, {currentUser.name || currentUser.email}
                     </span>
-                    {/* MODIFIED: Wrap the logout button's Tooltip with TooltipProvider */}
-                    <TooltipProvider delayDuration={100}>
+                     <TooltipProvider delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={handleLogout} className="h-9 w-9" aria-label="Logout">
+                                <Button variant="ghost" size="icon" onClick={() => signOut()} className="h-9 w-9" aria-label="Logout">
                                     <LogOut className="h-[1.1rem] w-[1.1rem]" />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Logout</p>
-                            </TooltipContent>
+                            <TooltipContent><p>Logout</p></TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                 </div>
             ) : (
-                <Link href="/login" passHref>
-                    <Button variant="outline" size="sm" className="h-9">Login</Button>
-                </Link>
+                <Button variant="outline" size="sm" className="h-9" onClick={() => signIn()}>
+                    <LogIn className="mr-2 h-4 w-4" /> Login
+                </Button>
             )
          )}
       </div>
