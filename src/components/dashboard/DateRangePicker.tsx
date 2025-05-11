@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+// MODIFIED: Ensure subYears is imported
 import { format, subYears, isValid, startOfMonth, endOfMonth } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { DateRange } from "react-day-picker";
@@ -15,6 +16,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+// --- HELPER FUNCTION FOR DEFAULT DATE RANGE ---
+function getDefaultDateRange(): DateRange {
+  const today = new Date();
+  // --- MODIFIED: Default to Last 1 Year from today ---
+  // The 'from' date will be exactly one year ago from today.
+  // The 'to' date will be today.
+  const oneYearAgo = subYears(today, 1);
+  return { from: oneYearAgo, to: today };
+}
 
 export function DateRangePicker({
   className,
@@ -36,14 +47,25 @@ export function DateRangePicker({
     }
 
     if (fromDate && toDate && isValid(fromDate) && isValid(toDate)) {
-      return { from: fromDate, to: toDate };
+      // If URL params are valid and provide a complete range, use them.
+      // Ensure 'from' is not after 'to'. If so, maybe use default or adjust.
+      if (fromDate <= toDate) {
+        return { from: fromDate, to: toDate };
+      } else {
+        console.warn("DateRangePicker: Start date from URL is after end date. Using default.");
+        return getDefaultDateRange();
+      }
+    } else if (fromDate && isValid(fromDate) && !toDate) {
+      // If only a valid start date is in URL, set 'to' to today for a valid range.
+      return { from: fromDate, to: new Date() };
     }
-    const fiveYearsAgo = subYears(new Date(), 5);
-    return { from: startOfMonth(fiveYearsAgo), to: endOfMonth(new Date()) };
+    // --- MODIFIED: Use helper for default if URL params are missing or incomplete/invalid ---
+    return getDefaultDateRange();
   });
 
   const [popoverOpen, setPopoverOpen] = React.useState(false);
 
+  // Effect to update URL when local date state changes
   React.useEffect(() => {
     const current = new URLSearchParams(Array.from(searchParams.entries()));
     let changed = false;
@@ -79,11 +101,12 @@ export function DateRangePicker({
 
     if (changed) {
       const query = current.toString() ? `?${current.toString()}` : "";
-      router.push(`${pathname}${query}`);
+      router.push(`${pathname}${query}`, { scroll: false });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, pathname]); // Removed router to prevent re-triggering from its own change
+  }, [date, pathname]); // Removed router from deps
 
+  // Effect to update local date state if URL searchParams change
   React.useEffect(() => {
     const startParam = searchParams.get("startDate");
     const endParam = searchParams.get("endDate");
@@ -92,20 +115,30 @@ export function DateRangePicker({
     if (startParam && isValid(new Date(startParam))) fromDate = new Date(startParam);
     if (endParam && isValid(new Date(endParam))) toDate = new Date(endParam);
 
+    const defaultRange = getDefaultDateRange();
+    const defaultFromFormatted = format(defaultRange.from as Date, "yyyy-MM-dd");
+    const defaultToFormatted = format(defaultRange.to as Date, "yyyy-MM-dd");
+
     const localFromFormatted = date?.from && isValid(date.from) ? format(date.from, "yyyy-MM-dd") : null;
     const localToFormatted = date?.to && isValid(date.to) ? format(date.to, "yyyy-MM-dd") : null;
 
-    if ( (startParam && startParam !== localFromFormatted) || (!startParam && localFromFormatted) ||
-         (endParam && endParam !== localToFormatted) || (!endParam && localToFormatted) ) {
-      if (fromDate && toDate) {
+    const urlStartIsDifferent = startParam && startParam !== localFromFormatted;
+    const urlStartMissingAndLocalNotDefault = !startParam && localFromFormatted && localFromFormatted !== defaultFromFormatted;
+    const urlEndIsDifferent = endParam && endParam !== localToFormatted;
+    const urlEndMissingAndLocalNotDefault = !endParam && localToFormatted && localToFormatted !== defaultToFormatted;
+
+    if (urlStartIsDifferent || urlStartMissingAndLocalNotDefault || urlEndIsDifferent || urlEndMissingAndLocalNotDefault) {
+      if (fromDate && toDate && isValid(fromDate) && isValid(toDate) && fromDate <= toDate) {
         setDate({ from: fromDate, to: toDate });
-      } else {
-        const fiveYearsAgo = subYears(new Date(), 5);
-        setDate({ from: startOfMonth(fiveYearsAgo), to: endOfMonth(new Date()) });
+      } else if (fromDate && isValid(fromDate) && !toDate) {
+        setDate({ from: fromDate, to: new Date() }); // Default 'to' to today if only start is valid in URL
+      }
+       else {
+        setDate(defaultRange);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams]); // Removed 'date' from deps
 
 
   return (
@@ -141,9 +174,9 @@ export function DateRangePicker({
             mode="range"
             defaultMonth={date?.from}
             selected={date}
-            onSelect={(newDate) => {
-                setDate(newDate);
-                if (newDate?.from && newDate.to && isValid(newDate.from) && isValid(newDate.to)) {
+            onSelect={(newDateRange) => {
+                setDate(newDateRange);
+                if (newDateRange?.from && newDateRange?.to && isValid(newDateRange.from) && isValid(newDateRange.to)) {
                     setPopoverOpen(false);
                 }
             }}

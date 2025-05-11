@@ -5,11 +5,11 @@ import { FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaPlaneDepartur
 import { BsBank2 } from "react-icons/bs"; // BsGraphUpArrow
 
 export const indicatorCategories = {
-  'i': { name: 'Overall Economic Output & Growth', slug: 'economic-output', icon: FaChartLine },
+  'i': { name: 'Economic Output & Growth', slug: 'economic-output', icon: FaChartLine }, // <--- MODIFIED NAME
   'ii': { name: 'Labor Market', slug: 'labor-market', icon: FaUsers },
   'iii': { name: 'Inflation & Prices', slug: 'inflation-prices', icon: FaDollarSign },
   'iv': { name: 'Consumer Activity', slug: 'consumer-activity', icon: FaCar },
-  'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaIndustry }, // FaBuilding changed to FaIndustry
+  'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaIndustry },
   'vi': { name: 'Housing Market', slug: 'housing-market', icon: FaHome },
   'vii': { name: 'International Trade', slug: 'international-trade', icon: FaPlaneDeparture },
   'viii': { name: 'Financial Markets', slug: 'financial-markets', icon: BsBank2 },
