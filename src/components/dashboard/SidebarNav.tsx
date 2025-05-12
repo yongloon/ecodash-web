@@ -1,18 +1,18 @@
 // src/components/dashboard/SidebarNav.tsx
-'use client';
+"use client"; // <--- ADD THIS DIRECTIVE AT THE TOP
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation'; // This hook requires "use client"
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
-import { FaTachometerAlt } from 'react-icons/fa';
+import { FaTachometerAlt, FaDollarSign } from 'react-icons/fa'; // Added FaDollarSign for Pricing example
 
 export default function SidebarNav() {
-  const pathname = usePathname();
+  const pathname = usePathname(); // Now correctly used in a Client Component
 
   const isCategoryActive = (slug: string) => {
     return pathname === `/category/${slug}`;
   };
-  const isOverviewActive = pathname === '/';
+  const isOverviewActive = pathname === '/'; // Assuming overview is at the root of the (dashboard) group
 
   return (
     <div className="w-16 md:w-64 bg-card dark:bg-gray-800 flex-shrink-0 border-r dark:border-gray-700 transition-all duration-300 ease-in-out overflow-y-auto">
@@ -28,11 +28,11 @@ export default function SidebarNav() {
       </div>
       <nav className="mt-4 px-2 pb-4">
         <Link
-          href="/"
+          href="/" // Links to the root of the (dashboard) group
           className={`flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
             isOverviewActive
               ? 'bg-indigo-100 text-indigo-700 dark:bg-gray-700 dark:text-white'
-              : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white' // Adjusted hover for light mode
+              : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
           }`}
         >
           <FaTachometerAlt className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" />
@@ -41,7 +41,7 @@ export default function SidebarNav() {
 
         {Object.keys(indicatorCategories).map((key) => {
           const category = indicatorCategories[key as IndicatorCategoryKey];
-          const Icon = category.icon;
+          const IconComponent = category.icon; // Use the IconComponent directly
           const isActive = isCategoryActive(category.slug);
           return (
             <Link
@@ -50,15 +50,29 @@ export default function SidebarNav() {
               className={`mt-2 flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
                 isActive
                   ? 'bg-indigo-100 text-indigo-700 dark:bg-gray-700 dark:text-white'
-                  : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white' // Adjusted hover
+                  : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
               }`}
               title={category.name}
             >
-              <Icon className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" />
+              <IconComponent className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" /> {/* Render the icon component */}
               <span className="hidden md:inline">{category.name}</span>
             </Link>
           );
         })}
+
+        {/* Pricing Link in Sidebar */}
+        <Link
+          href="/pricing"
+          className={`mt-2 flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
+            pathname === '/pricing'
+              ? 'bg-indigo-100 text-indigo-700 dark:bg-gray-700 dark:text-white'
+              : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
+          }`}
+          title="Pricing Plans"
+        >
+          <FaDollarSign className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" />
+          <span className="hidden md:inline">Pricing</span>
+        </Link>
       </nav>
     </div>
   );

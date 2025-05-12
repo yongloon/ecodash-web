@@ -109,6 +109,12 @@ export default function LoginPage() {
                 Register here
               </Link>
             </p>
+
+                    <p className="text-xs text-center text-muted-foreground">
+          <Link href="/pricing" className="underline hover:text-primary">
+            View Pricing Plans
+          </Link>
+        </p>
           </CardFooter>
         </form>
       </Card>

@@ -45,6 +45,10 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
+  stripeCustomerId      String?   @unique // Store Stripe Customer ID
+  stripeSubscriptionId  String?   @unique
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
   // Add any app-specific user fields here, e.g.:
   // savedIndicatorPreferences Json?
 }
@@ -57,12 +61,15 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// TODO: Add models for password reset tokens if implementing manually
-// model PasswordResetToken {
-//   id        String   @id @default(cuid())
-//   token     String   @unique
-//   userId    String
-//   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-//   expiresAt DateTime
-//   createdAt DateTime @default(now())
-// }
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique // Store the HASHED token
+  email     String   // To quickly find tokens by email for cleanup
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([email])
+}
