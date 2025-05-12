@@ -1,106 +1,119 @@
 // src/lib/calculations.ts
 import { TimeSeriesDataPoint } from './indicators';
-import { parseISO, differenceInMonths, differenceInQuarters, differenceInYears, isValid } from 'date-fns'; // Added isValid
-
-// Import from simple-statistics
+import { parseISO, isValid } from 'date-fns';
 import { mean as sMean, median as sMedian, standardDeviation as sStdDev, min as sMin, max as sMax } from 'simple-statistics';
 
-// --- Existing Calculation Functions (YoY, MoM, QoQ) ---
-// Ensure they handle null values gracefully or filter them out before calculation.
-// For brevity, I'm assuming the existing functions are mostly fine but may need null checks.
+// Helper to ensure data points are valid for calculations
+const getValidPoints = (data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] => {
+  return data.filter(p => p.value !== null && p.value !== undefined && !isNaN(p.value) && p.date && isValid(parseISO(p.date)));
+};
+
 export function calculateYoYPercent(
     data: TimeSeriesDataPoint[],
     lookbackPeriods: number = 12
-): TimeSeriesDataPoint[] {
-    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+): TimeSeriesDataPoint[] { // ALWAYS RETURN TimeSeriesDataPoint[]
+    const validData = getValidPoints(data);
     if (validData.length < lookbackPeriods + 1) {
-        return data.map(p => ({ ...p, value: null }));
+        return []; // Return EMPTY ARRAY
     }
 
-    return validData.map((point, index) => {
-        if (index < lookbackPeriods) { // No value for points that don't have a year of prior data
-            return { ...point, value: null };
+    const calculated: TimeSeriesDataPoint[] = [];
+    for (let i = lookbackPeriods; i < validData.length; i++) {
+        const point = validData[i];
+        const previousYearPoint = validData[i - lookbackPeriods];
+        // Point.value and previousYearPoint.value are guaranteed to be numbers here due to getValidPoints
+        if (previousYearPoint.value === 0) { // Avoid division by zero
+            continue;
         }
-        const previousYearPoint = validData[index - lookbackPeriods];
-        if (!previousYearPoint.value || previousYearPoint.value === 0) {
-            return { ...point, value: null };
-        }
-        // @ts-ignore: Object is possibly 'null'. This is handled by filter and check above
-        const yoyChange = ((point.value - previousYearPoint.value) / Math.abs(previousYearPoint.value)) * 100;
-        return {
+        const yoyChange = (((point.value as number) - (previousYearPoint.value as number)) / Math.abs(previousYearPoint.value as number)) * 100;
+        calculated.push({
             ...point,
             value: parseFloat(yoyChange.toFixed(2)),
-        };
-    }).filter(p => p.value !== null); // Filter out points where calculation wasn't possible after mapping
+        });
+    }
+    return calculated;
 }
 
-export function calculateMoMPercent(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
-    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+export function calculateMoMPercent(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] { // ALWAYS RETURN TimeSeriesDataPoint[]
+    const validData = getValidPoints(data);
     if (validData.length < 2) {
-        return data.map(p => ({ ...p, value: null }));
+        return []; // Return EMPTY ARRAY
     }
-    return validData.map((point, index) => {
-        if (index < 1) {
-            return { ...point, value: null };
+    const calculated: TimeSeriesDataPoint[] = [];
+    for (let i = 1; i < validData.length; i++) {
+        const point = validData[i];
+        const previousPoint = validData[i - 1];
+        if (previousPoint.value === 0) { // Avoid division by zero
+            continue;
         }
-        const previousPoint = validData[index - 1];
-        if (!previousPoint.value || previousPoint.value === 0) {
-            return { ...point, value: null };
-        }
-         // @ts-ignore: Object is possibly 'null'.
-        const momChange = ((point.value - previousPoint.value) / Math.abs(previousPoint.value)) * 100;
-        return {
+        const momChange = (((point.value as number) - (previousPoint.value as number)) / Math.abs(previousPoint.value as number)) * 100;
+        calculated.push({
             ...point,
             value: parseFloat(momChange.toFixed(2)),
-        };
-    }).slice(1).filter(p => p.value !== null);
+        });
+    }
+    return calculated;
 }
 
-export function calculateMoMChange(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
-    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
+export function calculateMoMChange(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] { // ALWAYS RETURN TimeSeriesDataPoint[]
+    const validData = getValidPoints(data);
     if (validData.length < 2) {
-        return data.map(p => ({ ...p, value: null }));
+        return []; // Return EMPTY ARRAY
     }
-    return validData.map((point, index) => {
-        if (index < 1) {
-            return { ...point, value: null };
-        }
-        const previousPoint = validData[index - 1];
-        if (previousPoint.value === null) { // Check previous point value specifically
-            return { ...point, value: null };
-        }
-         // @ts-ignore: Object is possibly 'null'.
-        const momChange = point.value - previousPoint.value;
-        return {
+    const calculated: TimeSeriesDataPoint[] = [];
+    for (let i = 1; i < validData.length; i++) {
+        const point = validData[i];
+        const previousPoint = validData[i - 1];
+        const momChange = (point.value as number) - (previousPoint.value as number);
+        calculated.push({
             ...point,
             value: parseFloat(momChange.toFixed(2)),
-        };
-    }).slice(1).filter(p => p.value !== null);
-}
-
-export function calculateQoQPercent(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
-    const validData = data.filter(p => p.value !== null && p.date && isValid(parseISO(p.date)));
-    if (validData.length < 2) {
-        return data.map(p => ({ ...p, value: null }));
+        });
     }
-    return validData.map((point, index) => {
-        if (index < 1) {
-            return { ...point, value: null };
-        }
-        const previousPoint = validData[index - 1];
-        if (!previousPoint.value || previousPoint.value === 0) {
-            return { ...point, value: null };
-        }
-         // @ts-ignore: Object is possibly 'null'.
-        const qoqChange = ((point.value - previousPoint.value) / Math.abs(previousPoint.value)) * 100;
-        return {
-            ...point,
-            value: parseFloat(qoqChange.toFixed(2)),
-        };
-    }).slice(1).filter(p => p.value !== null);
+    return calculated;
 }
 
-// --- NEW Statistical Calculation Function ---
+export function calculateQoQPercent(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] { // ALWAYS RETURN TimeSeriesDataPoint[]
+    const validData = getValidPoints(data);
+    if (validData.length < 2) { // Assuming quarterly data, so 1 period lookback is sufficient
+        return []; // Return EMPTY ARRAY
+    }
+    const calculated: TimeSeriesDataPoint[] = [];
+    for (let i = 1; i < validData.length; i++) {
+        const point = validData[i];
+        const previousPoint = validData[i-1];
+         if (previousPoint.value === 0) { // Avoid division by zero
+            continue;
+        }
+        const qoqChange = (((point.value as number) - (previousPoint.value as number)) / Math.abs(previousPoint.value as number)) * 100;
+        calculated.push({ ...point, value: parseFloat(qoqChange.toFixed(2)) });
+    }
+    return calculated;
+}
+
+export function calculateMovingAverage(data: TimeSeriesDataPoint[], windowSize: number): TimeSeriesDataPoint[] { // ALWAYS RETURN TimeSeriesDataPoint[]
+  if (windowSize <= 0) {
+    console.warn("Moving average windowSize must be greater than 0.");
+    return []; // Return EMPTY ARRAY
+  }
+  const validPointsWithValue = getValidPoints(data);
+
+  if (validPointsWithValue.length < windowSize) {
+    return []; // Return EMPTY ARRAY
+  }
+
+  const result: TimeSeriesDataPoint[] = [];
+  for (let i = 0; i <= validPointsWithValue.length - windowSize; i++) {
+    const windowSlice = validPointsWithValue.slice(i, i + windowSize);
+    const sum = windowSlice.reduce((acc, p) => acc + (p.value as number), 0);
+    result.push({
+      date: windowSlice[windowSize - 1].date,
+      value: parseFloat((sum / windowSize).toFixed(2)),
+    });
+  }
+  return result;
+}
+
 export interface SeriesStatistics {
   mean: number | null;
   median: number | null;
@@ -109,16 +122,12 @@ export interface SeriesStatistics {
   max: number | null;
   count: number;
 }
-
-export function calculateSeriesStatistics(data: TimeSeriesDataPoint[]): SeriesStatistics {
-  const values = data.map(d => d.value).filter(v => v !== null && v !== undefined && !isNaN(v)) as number[];
-
+export function calculateSeriesStatistics(data: TimeSeriesDataPoint[]): SeriesStatistics { // This one is fine, returns object
+  const values = data.map(d => d.value).filter(v => v !== null && v !== undefined && !isNaN(v as number)) as number[];
   if (values.length === 0) {
     return { mean: null, median: null, stdDev: null, min: null, max: null, count: 0 };
   }
-
   const stdDevValue = values.length >= 2 ? parseFloat(sStdDev(values).toFixed(2)) : null;
-
   return {
     mean: parseFloat(sMean(values).toFixed(2)),
     median: parseFloat(sMedian(values).toFixed(2)),
