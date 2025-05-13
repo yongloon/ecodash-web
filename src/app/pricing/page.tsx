@@ -1,111 +1,78 @@
 // src/app/pricing/page.tsx
 import React from 'react';
-import SubscriptionButton from '@/components/SubscriptionButton'; // Ensure this path is correct
+import SubscriptionButton from '@/components/SubscriptionButton';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from '@/components/ui/button'; // Import Button if used directly (like for Login button)
-import { CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, ShieldQuestion, Zap } from 'lucide-react'; // Added Zap for Pro
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../api/auth/[...nextauth]/route'; // Ensure this path is correct
-// import prisma from '@/lib/prisma'; // Keep commented out for "no DB" mode for demo users
+import { authOptions, APP_PLANS, AppPlanTier } from '../api/auth/[...nextauth]/route'; // Import APP_PLANS and AppPlanTier
 
-// Define your plans here
-// IMPORTANT: Replace placeholder Price IDs with your actual Stripe Price IDs
-// Ensure environment variables are prefixed with NEXT_PUBLIC_ if SubscriptionButton needs them client-side for any reason (though typically it just passes the ID to the backend)
-const plans = [
+// Define your plans here, ensure 'tier' matches keys in APP_PLANS
+const pagePlans = [
   {
-    name: 'Basic',
-    priceId: process.env.STRIPE_BASIC_PLAN_PRICE_ID || 'price_basic_placeholder_id', // Fallback to a string
-    priceMonthly: '$10',
-    description: 'Essential tools for tracking the economy.',
+    name: APP_PLANS.FREE.name,
+    tier: APP_PLANS.FREE.tier,
+    priceId: APP_PLANS.FREE.priceId,
+    priceMonthly: '$0',
+    description: 'Get started with essential economic indicators.',
     features: [
-      'Access to 20+ core economic indicators',
-      'Standard chart visualizations',
+      'Access to 10 key economic indicators',
+      'Basic chart visualizations',
+      'Standard historical data (last 2 years)',
+      'Community support',
+    ],
+    cta: 'Get Started',
+    icon: ShieldQuestion,
+  },
+  {
+    name: APP_PLANS.BASIC.name,
+    tier: APP_PLANS.BASIC.tier,
+    priceId: APP_PLANS.BASIC.priceId || 'price_basic_placeholder_id', // Fallback if env var missing
+    priceMonthly: '$10', // You might want to fetch this from Stripe for accuracy
+    description: 'More indicators and standard analysis tools.',
+    features: [
+      'Access to 25+ core economic indicators',
+      'Recession shading on charts',
+      'Standard Moving Averages',
       'Email support',
-      'Data updated daily/weekly (as available)',
       'Last 5 years of historical data',
     ],
     cta: 'Choose Basic',
+    icon: CheckCircle,
   },
   {
-    name: 'Pro',
-    priceId: process.env.STRIPE_PRO_PLAN_PRICE_ID || 'price_pro_placeholder_id', // Fallback to a string
-    priceMonthly: '$25',
-    description: 'Advanced insights and tools for serious analysts.',
+    name: APP_PLANS.PRO.name,
+    tier: APP_PLANS.PRO.tier,
+    priceId: APP_PLANS.PRO.priceId || 'price_pro_placeholder_id', // Fallback
+    priceMonthly: '$25', // You might want to fetch this from Stripe
+    description: 'Full access to all data and advanced analytical tools.',
     features: [
       'All Basic features',
-      'Access to all 50+ indicators',
-      'Advanced data analysis tools (Moving Averages, Trend Lines)',
-      'Extended historical data access (up to 20+ years)',
-      'Data export (CSV)',
-      'Recession shading on charts',
+      'Access to all 70+ indicators',
+      'Advanced Moving Averages & Trend Lines',
+      'Indicator Comparison Mode',
+      'Full historical data access',
+      'Data export (CSV, Images)',
       'Priority email support',
-      'Early access to new indicators & features',
     ],
     cta: 'Choose Pro',
     highlighted: true,
+    icon: Zap,
   },
-  // Example: Free tier (if you have one, doesn't need a Stripe Price ID for subscribing)
-  // {
-  //   name: 'Free',
-  //   priceId: null, // No Stripe Price ID needed for a free tier button
-  //   priceMonthly: '$0',
-  //   description: 'Get started with core features.',
-  //   features: [
-  //     'Access to 5 key economic indicators',
-  //     'Basic chart visualizations',
-  //     'Community support',
-  //   ],
-  //   cta: 'Get Started',
-  // },
 ];
 
 export default async function PricingPage() {
-  // --- Debugging: Log the plans array on the server-side ---
-  console.log("[PricingPage] Plans defined:", JSON.stringify(plans, null, 2));
-  if (!process.env.STRIPE_BASIC_PLAN_PRICE_ID) {
-    console.warn("[PricingPage] STRIPE_BASIC_PLAN_PRICE_ID environment variable is not set. Using placeholder.");
-  }
-  if (!process.env.STRIPE_PRO_PLAN_PRICE_ID) {
-    console.warn("[PricingPage] STRIPE_PRO_PLAN_PRICE_ID environment variable is not set. Using placeholder.");
-  }
-  // --- End Debugging ---
-
   const session = await getServerSession(authOptions);
-  let userCurrentPriceId: string | null = null;
-  let userHasActiveSubscription = false;
+  const userSessionData = session?.user as any;
+  const currentUserTier: AppPlanTier = userSessionData?.activePlanTier || 'free';
 
-  // For "no DB" mode with demo users, we assume they have no active subscription
-  // because we can't check the database for it.
-  if (session?.user) {
-    // In a DB-connected scenario, you'd fetch from Prisma here:
-    // const userId = (session.user as any).id;
-    // if (userId && process.env.DATABASE_URL) { // Only try Prisma if DB_URL suggests it's configured
-    //   try {
-    //     const userWithSubscription = await prisma.user.findUnique({
-    //       where: { id: userId },
-    //       select: { stripePriceId: true, stripeCurrentPeriodEnd: true }
-    //     });
-    //     if (userWithSubscription?.stripePriceId && 
-    //         userWithSubscription.stripeCurrentPeriodEnd && 
-    //         userWithSubscription.stripeCurrentPeriodEnd > new Date()) {
-    //       userCurrentPriceId = userWithSubscription.stripePriceId;
-    //       userHasActiveSubscription = true;
-    //     }
-    //   } catch (e) {
-    //     console.error("[PricingPage] Error fetching user subscription from DB:", e);
-    //     // Fallback to no active subscription if DB query fails
-    //   }
-    // }
-    // For demo purposes, you could simulate a subscription based on a demo user's property
-    if ((session.user as any).email === 'admin@example.com') { // Example: Make admin a "Pro" user for demo
-        // userHasActiveSubscription = true;
-        // userCurrentPriceId = plans.find(p => p.name === 'Pro')?.priceId || null;
-        // console.log("[PricingPage] Demo admin user, simulating Pro subscription status.");
-    } else {
-        console.log(`[PricingPage] User ${session.user.email} is logged in. In current 'no DB check' mode, assuming no active subscription unless explicitly simulated.`);
+  console.log(`[PricingPage] Current user tier: ${currentUserTier}`);
+  pagePlans.forEach(p => {
+    if (!p.priceId && p.tier !== 'free') {
+        console.warn(`[PricingPage] Plan "${p.name}" is missing a Stripe Price ID in .env.local or APP_PLANS config.`);
     }
-  }
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -120,12 +87,12 @@ export default async function PricingPage() {
                 <span className="text-xs sm:text-sm text-muted-foreground hidden md:inline">
                   {session.user.name || session.user.email}
                 </span>
-                 <Link href="/dashboard" passHref> {/* Assuming your dashboard is at / or /dashboard */}
+                 <Link href="/dashboard" passHref> {/* Assuming dashboard is at / or /dashboard */}
                     <Button variant="ghost" size="sm">Dashboard</Button>
                 </Link>
               </div>
             ) : (
-              <Link href="/login">
+              <Link href="/login?callbackUrl=/pricing">
                 <Button variant="outline" size="sm">Login</Button>
               </Link>
             )}
@@ -136,63 +103,61 @@ export default async function PricingPage() {
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 lg:py-20">
         <section className="text-center mb-12 md:mb-16">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4">
-            Choose Your Plan
+            Flexible Plans for Every Analyst
           </h1>
           <p className="text-md sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Unlock powerful economic insights. Simple, transparent pricing.
+            Choose the plan that best fits your needs to unlock powerful economic insights.
           </p>
         </section>
 
-        {plans.length > 0 ? (
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
-            {plans.map((plan) => {
-              // --- Debugging: Log each plan being mapped ---
-              console.log("[PricingPage] Rendering plan:", plan.name, "Price ID:", plan.priceId);
-              // --- End Debugging ---
-              if (!plan.priceId && plan.name !== 'Free') { // Skip if priceId is missing for a non-Free plan
-                  console.warn(`[PricingPage] Plan "${plan.name}" is missing a priceId and is not named 'Free'. It will not be rendered with a subscription button.`);
-                  // You might want to render it differently or not at all
-                  // return null; 
-              }
+        {pagePlans.length > 0 ? (
+            <section className={`grid grid-cols-1 md:grid-cols-${pagePlans.length > 2 ? '2' : pagePlans.length} lg:grid-cols-${pagePlans.length > 2 ? '3' : pagePlans.length} gap-6 lg:gap-8 max-w-6xl mx-auto`}>
+            {pagePlans.map((plan) => {
+              const PlanIcon = plan.icon || CheckCircle;
+              const isCurrentPlan = currentUserTier === plan.tier;
 
               return (
                 <Card
                   key={plan.name}
-                  className={`flex flex-col overflow-hidden ${
-                    plan.highlighted ? 'border-primary ring-2 ring-primary shadow-xl' : 'border-border'
-                  }`}
+                  className={`flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl ${
+                    plan.highlighted ? 'border-primary ring-2 ring-primary shadow-xl scale-100 md:scale-105' : 'border-border'
+                  } ${isCurrentPlan ? 'border-green-500 ring-2 ring-green-500' : '' }`}
                 >
-                  <CardHeader className="pb-4 bg-muted/30">
-                    <CardTitle className="text-xl sm:text-2xl font-semibold">{plan.name}</CardTitle>
-                    {plan.description && <CardDescription className="text-sm text-muted-foreground pt-1">{plan.description}</CardDescription>}
-                    <div className="text-3xl sm:text-4xl font-bold text-primary pt-3">
+                  <CardHeader className="pb-4 bg-card"> {/* Changed background */}
+                    {plan.highlighted && (
+                        <div className="text-xs uppercase font-semibold text-primary tracking-wider mb-2 text-center">Most Popular</div>
+                    )}
+                    <CardTitle className="text-xl sm:text-2xl font-semibold text-center">{plan.name}</CardTitle>
+                    <div className="text-3xl sm:text-4xl font-bold text-primary pt-3 text-center">
                       {plan.priceMonthly}
-                      <span className="text-sm font-normal text-muted-foreground">/month</span>
+                      {plan.priceMonthly !== '$0' && <span className="text-sm font-normal text-muted-foreground">/month</span>}
                     </div>
+                    {plan.description && <CardDescription className="text-sm text-muted-foreground pt-2 text-center h-12">{plan.description}</CardDescription>}
                   </CardHeader>
                   <CardContent className="flex-grow pt-6 space-y-3">
                     <ul className="space-y-2 text-sm">
                       {plan.features.map((feature, index) => (
                         <li key={index} className="flex items-start">
-                          <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                          <PlanIcon className={`h-4 w-4 ${plan.name === 'Free' ? 'text-muted-foreground/70' : 'text-green-500'} mr-2 mt-0.5 flex-shrink-0`} />
                           <span className="text-muted-foreground">{feature}</span>
                         </li>
                       ))}
                     </ul>
                   </CardContent>
-                  <CardFooter className="mt-auto pt-6 border-t">
-                    {plan.name === 'Free' ? (
-                         <Link href="/dashboard" className="w-full"> {/* Or to /register if needed */}
-                            <Button variant="outline" className="w-full">{plan.cta || 'Get Started'}</Button>
+                  <CardFooter className="mt-auto pt-6 border-t bg-muted/20">
+                    {isCurrentPlan ? (
+                        <Button disabled className="w-full bg-green-600 hover:bg-green-700 text-white">Current Plan</Button>
+                    ) : plan.tier === 'free' ? (
+                         <Link href={session?.user ? "/dashboard" : "/register"} className="w-full">
+                            <Button variant="outline" className="w-full">{session?.user ? 'Go to Dashboard' : plan.cta || 'Get Started'}</Button>
                          </Link>
                     ) : plan.priceId ? (
                         <SubscriptionButton 
                             priceId={plan.priceId} 
-                            planName={plan.name} 
-                            isCurrentPlan={userHasActiveSubscription && userCurrentPriceId === plan.priceId}
+                            planName={plan.name}
                         />
-                    ) : (
-                        <Button disabled className="w-full">Not Available</Button>
+                    ) : ( // Fallback for paid plans with missing priceId (shouldn't happen with placeholders)
+                        <Button disabled className="w-full">Configuration Error</Button>
                     )}
                   </CardFooter>
                 </Card>
@@ -205,18 +170,8 @@ export default async function PricingPage() {
             </section>
         )}
         
-        <section className="text-center mt-16">
-            <p className="text-muted-foreground">
-                Need a custom solution or have questions? <Link href="/contact" className="text-primary hover:underline">Contact us</Link>.
-            </p>
-            {/* Link back to dashboard if logged in */}
-            {session?.user && (
-                <p className="mt-4">
-                    <Link href="/dashboard" className="text-sm text-primary hover:underline">
-                        ← Back to Dashboard
-                    </Link>
-                </p>
-            )}
+        <section className="text-center mt-16 text-sm">
+            {/* ... Contact us / Back to Dashboard links ... */}
         </section>
       </main>
     </div>

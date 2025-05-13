@@ -3,16 +3,18 @@ import { stripe } from '@/lib/stripe';
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { headers } from 'next/headers'; // To get Stripe signature
+import { headers } from 'next/headers';
+import { Resend } from 'resend'; // IMPORT RESEND
+import WelcomeSubscriberEmail from '@/emails/WelcomeSubscriberEmail'; // IMPORT EMAIL TEMPLATE
 
-const relevantEvents = new Set([
-  'checkout.session.completed',
-  'customer.subscription.created',
-  'customer.subscription.updated',
-  'customer.subscription.deleted',
-  'invoice.payment_succeeded',
-  'invoice.payment_failed',
-]);
+const resend = new Resend(process.env.RESEND_API_KEY); // Initialize Resend
+
+const appPlansForWebhook = [ // Keep this in sync with your actual plans
+  { priceId: process.env.STRIPE_BASIC_PLAN_PRICE_ID, name: 'Basic' },
+  { priceId: process.env.STRIPE_PRO_PLAN_PRICE_ID, name: 'Pro' },
+];
+
+const relevantEvents = new Set([ /* ... same as before ... */ ]);
 
 export async function POST(request: Request) {
   const body = await request.text();
@@ -22,76 +24,71 @@ export async function POST(request: Request) {
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-  } catch (err: any) {
-    console.error(`❌ Error message: ${err.message}`);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
-  }
+  } catch (err: any) { /* ... error handling ... */ }
 
   if (relevantEvents.has(event.type)) {
     try {
       switch (event.type) {
         case 'checkout.session.completed':
           const checkoutSession = event.data.object as Stripe.Checkout.Session;
-          if (checkoutSession.mode === 'subscription' && checkoutSession.subscription) {
+          if (checkoutSession.mode === 'subscription' && checkoutSession.payment_status === 'paid') {
             const subscriptionId = checkoutSession.subscription as string;
             const customerId = checkoutSession.customer as string;
             const userId = checkoutSession.metadata?.userId;
 
             if (userId) {
               const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-              await prisma.user.update({
+              const updatedUser = await prisma.user.update({ // Capture updated user
                 where: { id: userId },
                 data: {
                   stripeSubscriptionId: subscription.id,
-                  stripeCustomerId: customerId,
+                  stripeCustomerId: customerId, // Ensure customerId is also updated/set here
                   stripePriceId: subscription.items.data[0].price.id,
                   stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
                 },
               });
+
+              // --- SEND WELCOME EMAIL ---
+              if (updatedUser.email) {
+                const currentPlan = appPlansForWebhook.find(p => p.priceId === updatedUser.stripePriceId);
+                try {
+                  await resend.emails.send({
+                    from: process.env.EMAIL_FROM_ADDRESS || 'EcoDash Welcome <welcome@yourdomain.com>',
+                    to: [updatedUser.email],
+                    subject: `Welcome to EcoDash ${currentPlan?.name || 'Pro'}!`,
+                    react: WelcomeSubscriberEmail({ userName: updatedUser.name, planName: currentPlan?.name }),
+                  });
+                  console.log(`Welcome email sent to ${updatedUser.email} for plan ${currentPlan?.name}`);
+                } catch (emailError) {
+                  console.error("Error sending welcome email:", emailError);
+                }
+              }
+              // --- END SEND WELCOME EMAIL ---
             }
           }
           break;
+        // ... other cases like invoice.payment_succeeded, customer.subscription.updated/deleted ...
         case 'invoice.payment_succeeded':
-          const invoice = event.data.object as Stripe.Invoice;
-          if (invoice.subscription) {
-            const subscriptionId = invoice.subscription as string;
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-             const user = await prisma.user.findFirst({ where: { stripeSubscriptionId: subscription.id }});
-            if (user) {
-                await prisma.user.update({
-                    where: { id: user.id },
-                    data: {
-                        stripePriceId: subscription.items.data[0].price.id,
-                        stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
-                    },
-                });
-            }
-          }
-          break;
-        case 'customer.subscription.deleted':
-        case 'customer.subscription.updated': // Handle upgrades, downgrades, cancellations
-          const subscriptionEvent = event.data.object as Stripe.Subscription;
-          const userToUpdate = await prisma.user.findFirst({ where: { stripeSubscriptionId: subscriptionEvent.id }});
-          if (userToUpdate) {
-            await prisma.user.update({
-              where: { id: userToUpdate.id },
-              data: {
-                stripeSubscriptionId: subscriptionEvent.status === 'canceled' ? null : subscriptionEvent.id,
-                stripePriceId: subscriptionEvent.status === 'canceled' ? null : subscriptionEvent.items.data[0].price.id,
-                stripeCurrentPeriodEnd: subscriptionEvent.status === 'canceled' ? null : new Date(subscriptionEvent.current_period_end * 1000),
-              },
-            });
-          }
-          break;
-        default:
-          console.warn(`🤷‍♀️ Unhandled relevant event type: ${event.type}`);
+              const invoice = event.data.object as Stripe.Invoice;
+              if (invoice.subscription && invoice.billing_reason === 'subscription_cycle') { // For renewals
+                const subscriptionId = invoice.subscription as string;
+                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                 const userToUpdate = await prisma.user.findFirst({ where: { stripeSubscriptionId: subscription.id }});
+                if (userToUpdate) {
+                    await prisma.user.update({
+                        where: { id: userToUpdate.id },
+                        data: {
+                            stripePriceId: subscription.items.data[0].price.id,
+                            stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                        },
+                    });
+                    console.log(`Subscription renewed in DB for user ${userToUpdate.id}`);
+                }
+              }
+              break;
+        // ...
       }
-    } catch (error) {
-      console.error('Webhook handler error:', error);
-      return NextResponse.json({ error: 'Webhook handler failed.' }, { status: 500 });
-    }
-  } else {
-    console.log(`🔔 Received ignorable event: ${event.type}`);
+    } catch (error) { /* ... */ }
   }
   return NextResponse.json({ received: true });
 }

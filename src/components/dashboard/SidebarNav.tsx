@@ -1,78 +1,100 @@
 // src/components/dashboard/SidebarNav.tsx
-"use client"; // <--- ADD THIS DIRECTIVE AT THE TOP
+"use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation'; // This hook requires "use client"
+import { usePathname } from 'next/navigation';
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
-import { FaTachometerAlt, FaDollarSign } from 'react-icons/fa'; // Added FaDollarSign for Pricing example
+import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa'; // Renamed for clarity
+import { Zap as ProToolsIcon, Settings as AccountIcon } from 'lucide-react'; // Icons
+import { useSession } from 'next-auth/react';
+import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure path is correct
 
 export default function SidebarNav() {
-  const pathname = usePathname(); // Now correctly used in a Client Component
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const userTier: AppPlanTier | undefined = (session?.user as any)?.activePlanTier;
+  const isLoggedIn = !!session?.user;
 
-  const isCategoryActive = (slug: string) => {
-    return pathname === `/category/${slug}`;
-  };
-  const isOverviewActive = pathname === '/'; // Assuming overview is at the root of the (dashboard) group
+  const canAccessProTools = userTier === 'pro';
+
+  const navLinkClasses = (isActive: boolean) => 
+    `flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
+      isActive
+        ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground font-semibold'
+        : 'text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-muted/50'
+    }`;
 
   return (
-    <div className="w-16 md:w-64 bg-card dark:bg-gray-800 flex-shrink-0 border-r dark:border-gray-700 transition-all duration-300 ease-in-out overflow-y-auto">
-      <div className="flex items-center justify-center md:justify-start h-16 border-b dark:border-gray-700 px-4">
-        <Link href="/" className="flex items-center gap-2">
-           <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400 hidden md:inline">
+    <div className="hidden md:flex md:flex-col md:w-64 bg-card text-card-foreground flex-shrink-0 border-r border-border/60 transition-all duration-300 ease-in-out overflow-y-auto">
+      <div className="flex items-center justify-center md:justify-start h-16 border-b border-border/60 px-4">
+        <Link href="/" className="flex items-center gap-2 group">
+           <span className="text-xl font-bold text-primary group-hover:opacity-80 transition-opacity">
             EcoDash
-           </span>
-           <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 md:hidden">
-            E
            </span>
         </Link>
       </div>
-      <nav className="mt-4 px-2 pb-4">
-        <Link
-          href="/" // Links to the root of the (dashboard) group
-          className={`flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
-            isOverviewActive
-              ? 'bg-indigo-100 text-indigo-700 dark:bg-gray-700 dark:text-white'
-              : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
-          }`}
-        >
-          <FaTachometerAlt className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" />
-          <span className="hidden md:inline">Overview</span>
+      <nav className="mt-4 px-2 pb-4 space-y-1">
+        <Link href="/" className={navLinkClasses(pathname === '/')}>
+          <FaTachometerAlt className="h-4 w-4 mr-3 flex-shrink-0" />
+          <span>Overview</span>
         </Link>
 
         {Object.keys(indicatorCategories).map((key) => {
           const category = indicatorCategories[key as IndicatorCategoryKey];
-          const IconComponent = category.icon; // Use the IconComponent directly
-          const isActive = isCategoryActive(category.slug);
+          const IconComponent = category.icon;
           return (
             <Link
               key={category.slug}
               href={`/category/${category.slug}`}
-              className={`mt-2 flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
-                isActive
-                  ? 'bg-indigo-100 text-indigo-700 dark:bg-gray-700 dark:text-white'
-                  : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
-              }`}
+              className={navLinkClasses(pathname === `/category/${category.slug}`)}
               title={category.name}
             >
-              <IconComponent className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" /> {/* Render the icon component */}
-              <span className="hidden md:inline">{category.name}</span>
+              <IconComponent className="h-4 w-4 mr-3 flex-shrink-0" />
+              <span>{category.name}</span>
             </Link>
           );
         })}
 
-        {/* Pricing Link in Sidebar */}
+        {/* Separator */}
+        <hr className="my-3 border-border/60" />
+
+        {/* Pro Tools Section - Conditionally Rendered */}
+        {canAccessProTools && (
+          <>
+            <div className="px-4 pt-2 pb-1">
+                <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Pro Tools</p>
+            </div>
+            <Link
+              href="/pro/comparison" // Example Pro tool page
+              className={navLinkClasses(pathname.startsWith('/pro/comparison'))}
+              title="Indicator Comparison"
+            >
+              <ProToolsIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+              <span>Compare</span>
+            </Link>
+            {/* Add more Pro links here */}
+          </>
+        )}
+        
         <Link
           href="/pricing"
-          className={`mt-2 flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
-            pathname === '/pricing'
-              ? 'bg-indigo-100 text-indigo-700 dark:bg-gray-700 dark:text-white'
-              : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'
-          }`}
+          className={navLinkClasses(pathname === '/pricing')}
           title="Pricing Plans"
         >
-          <FaDollarSign className="h-5 w-5 mr-0 md:mr-3 flex-shrink-0" />
-          <span className="hidden md:inline">Pricing</span>
+          <PricingIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+          <span>Pricing</span>
         </Link>
+
+        {isLoggedIn && (
+             <Link
+                href="/account/profile"
+                className={navLinkClasses(pathname === '/account/profile')}
+                title="My Account"
+            >
+                <AccountIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+                <span>My Account</span>
+            </Link>
+        )}
       </nav>
     </div>
   );
