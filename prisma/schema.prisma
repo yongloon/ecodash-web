@@ -38,19 +38,24 @@ model Session {
 model User {
   id            String    @id @default(cuid())
   name          String?
-  username      String?   @unique // Added for your username/password requirement
+  username      String?   @unique
   email         String?   @unique
   emailVerified DateTime?
-  passwordHash  String?   // For storing hashed passwords
+  passwordHash  String?
   image         String?
   accounts      Account[]
   sessions      Session[]
-  stripeCustomerId      String?   @unique // Store Stripe Customer ID
-  stripeSubscriptionId  String?   @unique
-  stripePriceId         String?
-  stripeCurrentPeriodEnd DateTime?
-  // Add any app-specific user fields here, e.g.:
-  // savedIndicatorPreferences Json?
+  // favoriteIndicators FavoriteIndicator[] // If you implement favorites later
+  // annotations UserAnnotation[]      // If you implement annotations later
+
+  // --- STRIPE RELATED FIELDS ---
+  stripeCustomerId       String?   @unique // Stripe Customer ID
+  stripeSubscriptionId   String?   @unique // Active Stripe Subscription ID
+  stripePriceId          String?            // ID of the price for the active subscription
+  stripeCurrentPeriodEnd DateTime?          // When the current subscription period ends
+  // --- END STRIPE RELATED FIELDS ---
+
+  // PasswordResetToken PasswordResetToken[] // If you implement password reset
 }
 
 model VerificationToken {
