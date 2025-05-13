@@ -76,6 +76,22 @@ export const authOptions: AuthOptions = {
         (session.user as any).activePlanName = currentPlan.name;
         (session.user as any).activePlanTier = currentPlan.tier;
         (session.user as any).hasActivePaidSubscription = currentPlan.tier !== 'free'; // Simplified
+
+         // --- Fetch Favorite Indicator IDs and add to session ---
+        if (process.env.DATABASE_URL) { // Only if DB is configured
+            try {
+                const favorites = await prisma.favoriteIndicator.findMany({
+                    where: { userId: token.id as string },
+                    select: { indicatorId: true },
+                });
+                (session.user as any).favoriteIndicatorIds = favorites.map(fav => fav.indicatorId);
+            } catch (e) {
+                console.error("Error fetching user favorites for session:", e);
+                (session.user as any).favoriteIndicatorIds = []; // Default to empty array on error
+            }
+        } else {
+            (session.user as any).favoriteIndicatorIds = []; // No DB, no favorites
+        }
       }
       return session;
     },

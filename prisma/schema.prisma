@@ -45,7 +45,7 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
-  // favoriteIndicators FavoriteIndicator[] // If you implement favorites later
+  favoriteIndicators FavoriteIndicator[] // If you implement favorites later
   // annotations UserAnnotation[]      // If you implement annotations later
 
   // --- STRIPE RELATED FIELDS ---
@@ -77,4 +77,16 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([email])
+}
+
+model FavoriteIndicator {
+  id          String   @id @default(cuid())
+  userId      String
+  indicatorId String   // The ID string from your src/lib/indicators.ts (e.g., "GDP_REAL")
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, indicatorId]) // A user can only favorite an indicator once
+  @@index([userId]) // Good for querying a user's favorites
 }

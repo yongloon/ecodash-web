@@ -33,7 +33,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac';
+  apiSource: 'FRED' | 'AlphaVantage' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI';
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -214,12 +214,20 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'FRED', apiIdentifier: 'CSUSHPINSA', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated from CSUSHPINSA index.',
   },
-  {
-    id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii',
-    description: 'Stock market index representing the performance of 500 large companies listed on stock exchanges in the United States.',
-    unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P',
-    apiSource: 'Mock', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE', // Change to AlphaVantage if implemented
-    notes: 'Requires dedicated financial API for real data. Mock data uses realistic values.',
+   {
+    id: 'SP500', // Keep the same ID if you want, or change to e.g., 'SPX_FRED'
+    name: 'S&P 500 Index (FRED)', // Clarify source in name if desired
+    categoryKey: 'viii', // Financial Markets
+    description: 'The S&P 500 is a stock market index tracking the stock performance of 500 of the largest companies listed on stock exchanges in the United States. Data sourced from FRED.',
+    unit: 'Index Value',
+    frequency: 'Daily', // FRED SP500 series is daily
+    sourceName: 'FRED (Source: S&P Dow Jones Indices LLC)', // FRED often lists the ultimate source
+    sourceLink: 'https://fred.stlouisfed.org/series/SP500', // Optional: Direct link to FRED page
+    apiSource: 'FRED', // MODIFIED: Changed from 'AlphaVantage' or 'Mock'
+    apiIdentifier: 'SP500', // MODIFIED: This is the FRED Series ID for S&P 500 daily closing values
+    chartType: 'line',
+    calculation: 'NONE', // No calculation needed on top of the index value
+    notes: 'Daily closing values of the S&P 500 Index.',
   },
   {
     id: 'M2_YOY_PCT', name: 'M2 Money Stock (YoY %)', categoryKey: 'viii',
@@ -467,6 +475,37 @@ export const indicators: IndicatorMetadata[] = [
     description: 'Measure of the U.S. money supply that includes M1 (cash and checking deposits) as well as savings deposits, small time deposits, and retail money market funds.',
     unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB',
     apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE',
+  },
+   // --- NEW CRYPTO & SENTIMENT INDICATORS ---
+  {
+    id: 'BTC_PRICE_USD',
+    name: 'Bitcoin Price (USD)',
+    categoryKey: 'viii', // Financial Markets
+    description: 'Daily closing price of Bitcoin in US Dollars, typically sourced around UTC midnight.',
+    unit: 'USD',
+    frequency: 'Daily',
+    sourceName: 'CoinGecko',
+    sourceLink: 'https://www.coingecko.com/en/coins/bitcoin',
+    apiSource: 'CoinGeckoAPI', // New unique key for our fetcher
+    apiIdentifier: 'bitcoin', // The ID CoinGecko API uses for Bitcoin
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Data from CoinGecko public API.',
+  },
+  {
+    id: 'CRYPTO_FEAR_GREED',
+    name: 'Crypto Fear & Greed Index',
+    categoryKey: 'viii', // Financial Markets
+    description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market (0=Extreme Fear, 100=Extreme Greed). Data is collected daily.',
+    unit: 'Index (0-100)',
+    frequency: 'Daily',
+    sourceName: 'Alternative.me',
+    sourceLink: 'https://alternative.me/crypto/fear-and-greed-index/',
+    apiSource: 'AlternativeMeAPI', // New unique key for our fetcher
+    apiIdentifier: 'fear-and-greed', // A placeholder, specific API might not need one if it only returns this index
+    chartType: 'line', // Can also be a gauge, but line for history
+    calculation: 'NONE',
+    notes: 'Data from Alternative.me API.',
   },
 ];
 

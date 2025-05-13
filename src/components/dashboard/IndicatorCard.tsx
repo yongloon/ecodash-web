@@ -2,22 +2,30 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+// Shadcn/ui & Icon Imports
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import ChartComponent, { MovingAverageSeries } from './ChartComponent'; // Ensure MovingAverageSeries is exported or defined
-import { format, parseISO, isValid } from 'date-fns';
-import { FaInfoCircle } from 'react-icons/fa';
-import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
-import { FiBarChart2 } from 'react-icons/fi';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+// import { Badge } from "@/components/ui/badge"; // Uncomment if you use badges for PRO indicators
+import { Button } from '@/components/ui/button';
+import { FaInfoCircle } from 'react-icons/fa';
+import { FiBarChart2 } from 'react-icons/fi';
+import { Lock, Star, BarChartHorizontalBig } from 'lucide-react';
+
+// Custom Hooks & Types
 import { useSession } from 'next-auth/react';
-import { Badge } from "@/components/ui/badge";
-import { Lock, TrendingUp, BarChartHorizontalBig } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '../ui/button';
-import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Make sure this path is correct
+import { useFavorites } from '@/hooks/useFavorites';
+import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure path is correct
+import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
+import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
+import ChartComponent, { MovingAverageSeries } from './ChartComponent'; // Ensure MovingAverageSeries is exported
+
+// Date Formatting
+import { format, parseISO, isValid } from 'date-fns';
 
 interface IndicatorCardProps {
   indicator: IndicatorMetadata;
@@ -26,15 +34,16 @@ interface IndicatorCardProps {
 }
 
 const getMaPeriods = (frequency?: string): number[] => {
-    if (frequency === 'Daily' || frequency === 'Weekly') return [20, 50];
-    if (frequency === 'Monthly') return [3, 6];
+    if (frequency === 'Daily' || frequency === 'Weekly') return [20, 50, 100];
+    if (frequency === 'Monthly') return [3, 6, 12];
     if (frequency === 'Quarterly') return [2, 4];
-    return [30]; // Default
+    return [30];
 };
 
 const FEATURE_ACCESS: Record<string, AppPlanTier[]> = {
     MOVING_AVERAGES: ['basic', 'pro'],
     ADVANCED_STATS_BUTTON: ['pro'],
+    FAVORITES: ['basic', 'pro'],
 };
 
 const canUserAccessFeature = (userTier: AppPlanTier | undefined, featureKey: string): boolean => {
@@ -43,26 +52,32 @@ const canUserAccessFeature = (userTier: AppPlanTier | undefined, featureKey: str
 };
 
 export default function IndicatorCard({ indicator, latestValue, historicalData }: IndicatorCardProps) {
-  const { data: session } = useSession();
+  const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const userSessionData = session?.user as any;
   const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier;
+  const isLoggedIn = !!userSessionData && sessionStatus === 'authenticated';
 
   const canAccessMAs = canUserAccessFeature(userTier, 'MOVING_AVERAGES');
   const canAccessAdvancedStats = canUserAccessFeature(userTier, 'ADVANCED_STATS_BUTTON');
+  const canUseFavorites = isLoggedIn && canUserAccessFeature(userTier, 'FAVORITES');
 
-  // --- RESTORED/CORRECTED DEFINITIONS ---
-  const displayValue = latestValue?.value !== null && latestValue?.value !== undefined
+  const { favoriteIds, addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites();
+  const currentIsFavorited = useMemo(() => isFavorited(indicator.id), [isFavorited, indicator.id]);
+
+  const displayValue = useMemo(() => latestValue?.value !== null && latestValue?.value !== undefined
     ? `${latestValue.value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${indicator.unit}`
-    : 'N/A';
+    : 'N/A', [latestValue, indicator.unit]);
 
-  let displayDate = '';
-  if (latestValue?.date && isValid(parseISO(latestValue.date))) {
-    try {
-      displayDate = `(${format(parseISO(latestValue.date), 'MMM d, yyyy')})`;
-    } catch (e) { /* date parsing failed, displayDate remains empty */ }
-  }
+  const displayDate = useMemo(() => {
+    if (latestValue?.date && isValid(parseISO(latestValue.date))) {
+      try { return `(${format(parseISO(latestValue.date), 'MMM d, yyyy')})`; } catch (e) { return ''; }
+    }
+    return '';
+  }, [latestValue?.date]);
 
-  const validHistoricalData = Array.isArray(historicalData) ? historicalData : [];
+  const validHistoricalData = useMemo(() => Array.isArray(historicalData) ? historicalData : [], [historicalData]);
+  
   const statistics: SeriesStatistics = useMemo(() => 
     calculateSeriesStatistics(validHistoricalData), 
   [validHistoricalData]);
@@ -70,15 +85,13 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
   const availableMaPeriods = useMemo(() => 
     getMaPeriods(indicator.frequency), 
   [indicator.frequency]);
-  // --- END OF RESTORED/CORRECTED DEFINITIONS ---
-
 
   const [selectedMaPeriods, setSelectedMaPeriods] = useState<number[]>([]);
 
   const movingAverageData: MovingAverageSeries[] = useMemo(() => {
-    if (!canAccessMAs) return [];
+    if (!canAccessMAs || selectedMaPeriods.length === 0) return [];
     return selectedMaPeriods.map((period, index) => {
-      const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'];
+      const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
       return {
         period,
         data: calculateMovingAverage(validHistoricalData, period),
@@ -87,11 +100,15 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
     }).filter(ma => ma.data.length > 0);
   }, [validHistoricalData, selectedMaPeriods, canAccessMAs]);
 
+  const promptUpgrade = (featureName: string) => {
+    if (confirm(`${featureName} requires a higher tier subscription. Would you like to view plans?`)) {
+        router.push('/pricing');
+    }
+  };
+
   const handleMaToggle = (period: number) => {
     if (!canAccessMAs) {
-        alert("Moving Averages require a Basic or Pro subscription. Please upgrade.");
-        // Consider using a more user-friendly modal or redirect here
-        // For example: router.push('/pricing'); (if router is available)
+        promptUpgrade("Moving Averages");
         return;
     }
     setSelectedMaPeriods(prev =>
@@ -101,34 +118,78 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
 
   const handleAdvancedStatsClick = () => {
     if (!canAccessAdvancedStats) {
-        alert("Advanced Statistics is a Pro feature. Please upgrade.");
+        promptUpgrade("Advanced Statistics");
         return;
     }
-    alert("Showing Advanced Statistics! (Pro Feature)"); // Placeholder for actual feature
+    alert("Showing Advanced Statistics! (Pro Feature Placeholder)");
   };
 
-  // --- JSX Return statement starts here ---
+  const handleFavoriteToggle = async () => {
+    if (!isLoggedIn) {
+        if (confirm("Please login to save favorites. Go to login page?")) {
+            router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search));
+        }
+        return;
+    }
+    if (!canUseFavorites) {
+        promptUpgrade("Favoriting indicators");
+        return;
+    }
+    if (isLoadingFavorites) return;
+
+    if (currentIsFavorited) {
+      await removeFavorite(indicator.id);
+    } else {
+      await addFavorite(indicator.id);
+    }
+  };
+
   return (
-    <Card className="flex flex-col h-full border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader>
+    <Card className="flex flex-col h-full border bg-card text-card-foreground shadow-sm hover:shadow-lg transition-shadow duration-200 relative overflow-hidden">
+      <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
           <div className='flex-1 min-w-0'>
             <CardTitle className="text-base md:text-lg font-semibold leading-tight tracking-tight truncate" title={indicator.name}>
                 {indicator.name}
-                {/* Example: Show PRO badge next to indicator name if it's a Pro-only indicator based on its metadata */}
-                {/* {indicator.minTier === 'pro' && !canAccessProIndicator && <Badge variant="outline" className="ml-2 text-xs border-amber-500 text-amber-600">PRO</Badge>} */}
             </CardTitle>
-            <CardDescription className="text-sm mt-1">
+            <CardDescription className="text-xs sm:text-sm mt-1">
               <span className='font-medium text-foreground'>{displayValue}</span>
               <span className="text-xs ml-1 text-muted-foreground">{displayDate}</span>
             </CardDescription>
           </div>
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            {statistics && statistics.count > 0 && ( // Statistics Tooltip
+          <div className="flex items-center space-x-1 flex-shrink-0">
+            {isLoggedIn && FEATURE_ACCESS.FAVORITES && (
+                <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-amber-500 disabled:opacity-50"
+                                onClick={handleFavoriteToggle}
+                                disabled={isLoadingFavorites || !canUseFavorites}
+                                aria-label={currentIsFavorited ? "Remove from favorites" : "Add to favorites"}
+                            >
+                                {currentIsFavorited ? (
+                                    <Star className="h-4 w-4 fill-amber-400 text-amber-500" />
+                                ) : (
+                                    <Star className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                            <p>{currentIsFavorited ? "Unfavorite" : "Favorite"}</p>
+                            {!canUseFavorites && 
+                                <p className="text-xs text-amber-600 mt-1">Upgrade to use favorites.</p>}
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            )}
+            {statistics && statistics.count > 0 && (
                  <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
-                        <button className="text-muted-foreground hover:text-foreground">
-                            <FiBarChart2 className="h-4 w-4" />
-                        </button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                        <FiBarChart2 className="h-4 w-4" />
+                    </Button>
                  </TooltipTrigger> <TooltipContent className="max-w-xs text-xs bg-popover text-popover-foreground border-border shadow-lg rounded-md p-2">
                     <p className="font-semibold mb-1">Data Statistics ({statistics.count} points):</p>
                     <ul className="list-none space-y-0.5">
@@ -140,11 +201,11 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                     </ul>
                  </TooltipContent> </Tooltip> </TooltipProvider>
             )}
-            {indicator.description && ( // Info Tooltip
+            {indicator.description && (
               <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
-                    <button className="text-muted-foreground hover:text-foreground">
-                      <FaInfoCircle className="h-4 w-4" />
-                    </button>
+                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                    <FaInfoCircle className="h-4 w-4" />
+                 </Button>
               </TooltipTrigger> <TooltipContent className="max-w-xs text-xs bg-popover text-popover-foreground border-border shadow-lg rounded-md p-2">
                 <p>{indicator.description}</p>
               </TooltipContent> </Tooltip> </TooltipProvider>
@@ -152,8 +213,8 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow flex flex-col">
-        <div className="flex-grow h-48 md:h-64 -ml-1 -mr-1 sm:-ml-2 sm:-mr-2">
+      <CardContent className="flex-grow flex flex-col px-3 sm:px-4 pt-0 pb-2">
+        <div className="flex-grow h-48 md:h-56 lg:h-60 -ml-1 -mr-1 sm:-ml-2 sm:-mr-2">
            <ChartComponent
               data={validHistoricalData}
               dataKey="value"
@@ -162,11 +223,11 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
             />
         </div>
       </CardContent>
-      <CardFooter className="flex-col items-start space-y-2 text-xs pt-2">
+      <CardFooter className="flex-col items-start space-y-2 text-xs px-3 sm:px-4 pt-2 pb-3 border-t">
         <div className="w-full flex justify-between items-center text-muted-foreground">
-            <div className='truncate max-w-[60%]' title={`Source: ${indicator.sourceName}`}>
+            <div className='truncate max-w-[50%] sm:max-w-[60%]' title={`Source: ${indicator.sourceName}`}>
                 Source: {indicator.sourceLink ? (
-                    <a href={indicator.sourceLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline ml-1">
+                    <a href={indicator.sourceLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
                         {indicator.sourceName}
                     </a>
                 ) : ( <span className="ml-1">{indicator.sourceName}</span> )}
@@ -174,36 +235,39 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
             {indicator.frequency && <span className="flex-shrink-0 ml-2">({indicator.frequency})</span>}
         </div>
         
-        {availableMaPeriods.length > 0 && validHistoricalData.length > Math.max(...availableMaPeriods, 0) && (
-          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 pt-1 border-t w-full mt-2">
-            <Label className="text-xs font-medium text-muted-foreground shrink-0">MAs:</Label>
+        {FEATURE_ACCESS.MOVING_AVERAGES && availableMaPeriods.length > 0 && validHistoricalData.length >= Math.min(...availableMaPeriods, Infinity) && (
+          <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 pt-1.5 border-t w-full mt-1.5">
+            <Label className="text-xs font-medium text-muted-foreground shrink-0 mr-1">MAs:</Label>
             {availableMaPeriods.map(period => (
-              <div key={period} className="flex items-center space-x-1.5 relative">
+              <div key={period} className="flex items-center space-x-1 relative group">
                 <Switch
                   id={`ma-${indicator.id}-${period}`}
                   checked={selectedMaPeriods.includes(period) && canAccessMAs}
                   onCheckedChange={() => handleMaToggle(period)}
-                  disabled={!canAccessMAs && FEATURE_ACCESS.MOVING_AVERAGES.length > 0} // Disable if MA is a gated feature and user lacks access
+                  disabled={!canAccessMAs}
                   className="h-4 w-7 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
                   thumbClassName="h-3 w-3 data-[state=checked]:translate-x-3 data-[state=unchecked]:translate-x-0.5"
                 />
-                <Label htmlFor={`ma-${indicator.id}-${period}`} className={`text-xs ${(!canAccessMAs && FEATURE_ACCESS.MOVING_AVERAGES.length > 0) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-                  {period}{indicator.frequency?.charAt(0).toUpperCase()}
+                <Label htmlFor={`ma-${indicator.id}-${period}`} className={`text-xs ${!canAccessMAs ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                  {period}{indicator.frequency?.charAt(0).toUpperCase() || 'P'}
                 </Label>
-                {(!canAccessMAs && FEATURE_ACCESS.MOVING_AVERAGES.length > 0) && ( // Show lock only if MAs are meant to be gated
-                  <TooltipProvider delayDuration={100}>
+                {!canAccessMAs && (
+                  <TooltipProvider delayDuration={50}>
                     <Tooltip>
-                      <TooltipTrigger 
-                        asChild /* Important for positioning if parent is flex/grid item */
-                        // className="absolute -top-1 -right-1.5 z-10" // This positioning might need adjustment
-                      > 
-                        <span className="ml-1 cursor-pointer" onClick={(e) => {e.preventDefault(); router.push('/pricing');}}> {/* Assuming router is available */}
-                            <Lock className="h-3 w-3 text-amber-500" />
-                        </span>
+                      <TooltipTrigger asChild> 
+                        <button 
+                            onClick={(e) => {e.preventDefault(); e.stopPropagation(); promptUpgrade("Moving Averages");}}
+                            className="flex items-center justify-center h-full ml-0.5" // Making lock clickable
+                            aria-label="Upgrade for Moving Averages"
+                        >
+                            <Lock className="h-3 w-3 text-amber-500 group-hover:text-amber-400 transition-colors" />
+                        </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p className="text-xs">Moving Averages require Basic or Pro.</p>
-                        <Link href="/pricing" legacyBehavior><Button size="xs" variant="link" className="p-0 h-auto text-xs">Upgrade</Button></Link>
+                      <TooltipContent side="top" className="text-xs">
+                        <p>Moving Averages require Basic/Pro.</p>
+                        <Button asChild size="xs" variant="link" className="p-0 h-auto text-xs">
+                            <Link href="/pricing">Upgrade Now</Link>
+                        </Button>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -213,24 +277,28 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
           </div>
         )}
 
-        <div className="w-full pt-2 border-t mt-2">
-            <Button 
-                variant="outline" 
-                size="xs" 
-                className="w-full text-xs"
-                onClick={handleAdvancedStatsClick}
-                disabled={!canAccessAdvancedStats}
-            >
-                <BarChartHorizontalBig className="mr-2 h-3.5 w-3.5" />
-                Advanced Stats
-                {!canAccessAdvancedStats && FEATURE_ACCESS.ADVANCED_STATS_BUTTON.length > 0 && <Lock className="ml-2 h-3 w-3 text-amber-500" />}
-            </Button>
-            {(!canAccessAdvancedStats && FEATURE_ACCESS.ADVANCED_STATS_BUTTON.length > 0) && (
-                <p className="text-xs text-muted-foreground text-center mt-1">
-                    <Link href="/pricing" className="text-primary hover:underline">Upgrade to Pro</Link> for Advanced Statistics.
-                </p>
-            )}
-        </div>
+        {FEATURE_ACCESS.ADVANCED_STATS_BUTTON && (
+            <div className="w-full pt-1.5 border-t mt-1.5">
+                <Button 
+                    variant="outline" 
+                    size="xs" 
+                    className="w-full text-xs h-7"
+                    onClick={handleAdvancedStatsClick}
+                    disabled={!canAccessAdvancedStats}
+                >
+                    <BarChartHorizontalBig className="mr-1.5 h-3.5 w-3.5" />
+                    Advanced Stats
+                    {!canAccessAdvancedStats && <Lock className="ml-1.5 h-3 w-3 text-amber-500" />}
+                </Button>
+                {!canAccessAdvancedStats && (
+                    <p className="text-xs text-muted-foreground text-center mt-0.5">
+                        <Button asChild variant="link" size="xs" className="p-0 h-auto text-xs">
+                            <Link href="/pricing">Upgrade to Pro</Link>
+                        </Button> for Advanced Statistics.
+                    </p>
+                )}
+            </div>
+        )}
       </CardFooter>
     </Card>
   );

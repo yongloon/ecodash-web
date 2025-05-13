@@ -4,18 +4,28 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
-import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa'; // Renamed for clarity
-import { Zap as ProToolsIcon, Settings as AccountIcon } from 'lucide-react'; // Icons
-import { useSession } from 'next-auth/react';
+import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa';
+import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon } from 'lucide-react'; // Combined icons
+import { useSession } from 'next-auth/react'; // Import useSession
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure path is correct
+
+// Define which tiers can use favorites (example, adjust as needed)
+const FAVORITES_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['basic', 'pro']; 
+const PRO_TOOLS_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['pro'];
 
 export default function SidebarNav() {
   const pathname = usePathname();
-  const { data: session } = useSession();
-  const userTier: AppPlanTier | undefined = (session?.user as any)?.activePlanTier;
-  const isLoggedIn = !!session?.user;
+  const { data: session, status } = useSession(); // CORRECTLY get session from useSession() hook
+  const isLoadingSession = status === "loading";
 
-  const canAccessProTools = userTier === 'pro';
+  // Now access userTier and isLoggedIn from the destructured session object
+  const userSessionData = session?.user as any; // Cast to access custom properties
+  const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier;
+  const isLoggedIn = !!session?.user; // True if session.user object exists
+
+  const canSeeFavoritesLink = isLoggedIn && FAVORITES_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
+  const canSeeProToolsLink = isLoggedIn && PRO_TOOLS_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
+
 
   const navLinkClasses = (isActive: boolean) => 
     `flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
@@ -57,9 +67,21 @@ export default function SidebarNav() {
 
         {/* Separator */}
         <hr className="my-3 border-border/60" />
+        
+        {/* Favorites Link - Conditionally Rendered */}
+        {isLoggedIn && !isLoadingSession && canSeeFavoritesLink && ( // Check isLoggedIn and not loading
+            <Link
+                href="/favorites"
+                className={navLinkClasses(pathname === '/favorites')}
+                title="My Favorites"
+            >
+                <FavoriteIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+                <span>My Favorites</span>
+            </Link>
+        )}
 
         {/* Pro Tools Section - Conditionally Rendered */}
-        {canAccessProTools && (
+        {isLoggedIn && !isLoadingSession && canSeeProToolsLink && (
           <>
             <div className="px-4 pt-2 pb-1">
                 <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Pro Tools</p>
@@ -85,7 +107,7 @@ export default function SidebarNav() {
           <span>Pricing</span>
         </Link>
 
-        {isLoggedIn && (
+        {isLoggedIn && !isLoadingSession && ( // Check isLoggedIn and not loading
              <Link
                 href="/account/profile"
                 className={navLinkClasses(pathname === '/account/profile')}
