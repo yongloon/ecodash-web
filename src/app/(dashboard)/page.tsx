@@ -1,19 +1,24 @@
 // src/app/(dashboard)/page.tsx
 import React from 'react';
-import SummaryCard from '@/components/dashboard/SummaryCard';
+import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata, indicatorCategories } from '@/lib/indicators';
 import { fetchIndicatorData } from '@/lib/mockData';
-import { getServerSession } from 'next-auth';
-import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure this path is correct
-import Link from 'next/link';
+
+// UI Components
+import SummaryCard from '@/components/dashboard/SummaryCard';
+import NewsFeedWidget from '@/components/dashboard/NewsFeedWidget'; // Assuming this exists
+import EconomicCalendarWidget from '@/components/dashboard/EconomicCalendarWidget'; // Assuming this exists
+import EarningsCalendarWidget from '@/components/dashboard/EarningsCalendarWidget'; // Assuming this exists
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Gem, Star, TrendingUp, Zap } from 'lucide-react'; // Common icons
-import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa'; // Icons for trend in Market Snapshot
+import { Gem, Star, TrendingUp, Zap, Newspaper, CalendarDays, Briefcase } from 'lucide-react';
+import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 
-// Define which indicators show in the main summary grid vs. snapshot
-const headlineIndicatorIds = ['GDP_GROWTH', 'UNRATE', 'CPI_YOY_PCT', 'PMI']; // Main focus indicators
-const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED']; // Quick look
+// Configuration for Overview Page
+const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI'];
+const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED'];
 const MAX_FAVORITES_ON_OVERVIEW = 3;
 
 const getSparklineDataLength = (frequency?: string): number => {
@@ -28,7 +33,13 @@ const fetchDataForIndicatorList = async (
     ids: string[], 
     country: string, 
     dateRange: { startDate?: string; endDate?: string }
-): Promise<Array<{ indicator: IndicatorMetadata; latestValue: TimeSeriesDataPoint | null; previousValue: TimeSeriesDataPoint | null; sparklineData: TimeSeriesDataPoint[] }>> => {
+): Promise<Array<{ 
+    indicator: IndicatorMetadata; 
+    latestValue: TimeSeriesDataPoint | null; 
+    previousValue: TimeSeriesDataPoint | null; 
+    sparklineData: TimeSeriesDataPoint[] 
+}>> => {
+  if (!ids || ids.length === 0) return [];
   return Promise.all(
       ids
       .map(id => getIndicatorById(id))
@@ -37,10 +48,9 @@ const fetchDataForIndicatorList = async (
           return !!indicator;
       })
       .map(async (indicator) => {
-          // Determine if data should be fetched based on country or if indicator is global
           const shouldFetch = country === 'US' || 
                               indicator.apiSource === 'Mock' || 
-                              ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(indicator.id); // Add other global indicators
+                              ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(indicator.id);
 
           if (shouldFetch) {
               const historicalData = await fetchIndicatorData(indicator, dateRange); 
@@ -61,7 +71,7 @@ export default async function OverviewPage({
 }: {
     searchParams?: {
         country?: string;
-        startDate?: string;
+        startDate?: string; // Date range from URL params
         endDate?: string;
      };
 }) {
@@ -72,6 +82,8 @@ export default async function OverviewPage({
   const favoriteIndicatorIdsFromSession: string[] = userSessionData?.favoriteIndicatorIds || [];
 
   const country = searchParams?.country || 'US';
+  // dateRange will be used by fetchIndicatorData
+  // If startDate/endDate are not in searchParams, fetchIndicatorData uses its own defaults (last 1 year)
   const dateRange = { 
     startDate: searchParams?.startDate,
     endDate: searchParams?.endDate,
@@ -81,16 +93,16 @@ export default async function OverviewPage({
   const [
     summaryData, 
     marketSnapshotData, 
-    favoritesInitialData // Will be further processed for display
+    favoritesInitialData
   ] = await Promise.all([
     fetchDataForIndicatorList(headlineIndicatorIds, country, dateRange),
-    fetchDataForIndicatorList(marketSnapshotIndicatorIds, country, dateRange), // Market snapshot indicators might also need sparklines if you change their display
+    fetchDataForIndicatorList(marketSnapshotIndicatorIds, country, dateRange),
     (isLoggedIn && (userTier === 'basic' || userTier === 'pro') && favoriteIndicatorIdsFromSession.length > 0)
         ? fetchDataForIndicatorList(favoriteIndicatorIdsFromSession.slice(0, MAX_FAVORITES_ON_OVERVIEW), country, dateRange)
-        : Promise.resolve([]) // Resolve to empty array if no favorites to fetch
+        : Promise.resolve([])
   ]);
   
-  const favoritesSnippetData = favoritesInitialData; // Already sliced and fetched
+  const favoritesSnippetData = favoritesInitialData;
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -123,7 +135,7 @@ export default async function OverviewPage({
         {/* Main Content Area (Takes up 2/3 on large screens) */}
         <div className="lg:col-span-2 space-y-6 md:space-y-8">
           {/* My Favorites Snippet */}
-          {favoritesSnippetData.length > 0 && ( // Only show if there are favorites to display
+          {favoritesSnippetData.length > 0 && (
             <section>
               <div className="flex justify-between items-center mb-3">
                 <h2 className="text-xl font-semibold text-foreground flex items-center">
@@ -161,9 +173,9 @@ export default async function OverviewPage({
                     previousValue={previousValue} 
                     sparklineData={sparklineData}/>
                   ))
-              ) : ( <p className="col-span-full text-center text-muted-foreground py-8">No key indicators to display.</p> )}
+              ) : ( <p className="col-span-full text-center text-muted-foreground py-8">No key indicators to display for this selection.</p> )}
               {summaryData.length > 0 && summaryData.filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id)).length === 0 && (
-                  <p className="col-span-full text-center text-muted-foreground py-8">Key indicators for this overview are currently unavailable. Try adjusting the date range or country.</p>
+                  <p className="col-span-full text-center text-muted-foreground py-8">Key indicators for this overview are currently unavailable.</p>
               )}
             </div>
           </section>
@@ -206,18 +218,15 @@ export default async function OverviewPage({
             </CardContent>
           </Card>
 
-          {/* Placeholder for Upcoming Economic Events - you would fetch data for this similarly */}
-          {/* <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold flex items-center"><Newspaper className="h-5 w-5 mr-2 text-indigo-500"/>Upcoming Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-1.5 text-sm text-muted-foreground">
-                <li><span className="font-medium text-foreground">CPI Data Release:</span> Tomorrow, 8:30 AM ET</li>
-                <li><span className="font-medium text-foreground">FOMC Meeting Minutes:</span> Wed, 2:00 PM ET</li>
-              </ul>
-            </CardContent>
-          </Card> */}
+          {/* News Feed Widget */}
+          <NewsFeedWidget itemCount={5} defaultCategory="business" defaultCountry="us" />
+
+          {/* Economic Calendar Widget */}
+          <EconomicCalendarWidget daysAhead={7} itemCount={4} />
+
+          {/* Earnings Calendar Widget */}
+          <EarningsCalendarWidget daysAhead={7} itemCount={5} />
+
         </aside>
       </div>
     </div>

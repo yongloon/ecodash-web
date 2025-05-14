@@ -356,17 +356,39 @@ export const indicators: IndicatorMetadata[] = [
     unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB',
     apiSource: 'FRED', apiIdentifier: 'DRCCLACBS', chartType: 'line', calculation: 'NONE',
   },
-  {
-    id: 'PMI', name: 'ISM Manufacturing PMI', categoryKey: 'v',
-    description: 'Purchasing Managers\' Index based on a survey of manufacturing firms. Above 50 indicates expansion, below 50 indicates contraction.',
-    unit: 'Index', frequency: 'Monthly', sourceName: 'ISM',
-    apiSource: 'FRED', apiIdentifier: 'NAPM', chartType: 'line', calculation: 'NONE',
+ {
+    id: 'PMI', // Your internal ID can remain 'PMI'
+    name: 'ISM Manufacturing PMI',
+    categoryKey: 'v', // Business Activity & Investment
+    description: 'The ISM Manufacturing Purchasing Managers’ Index (PMI) monitors employment, production, new orders, and supplier deliveries. Above 50 indicates expansion in the manufacturing sector; below 50 indicates contraction.',
+    unit: 'Index',
+    frequency: 'Monthly', // Alpha Vantage provides this monthly
+    sourceName: 'Alpha Vantage (Source: ISM)',
+    sourceLink: 'https://www.alphavantage.co/documentation/#pmi',
+    apiSource: 'AlphaVantage', // <<< CHANGED
+    apiIdentifier: 'PMI',      // <<< Alpha Vantage uses function=PMI, no specific series ID needed in the same way as FRED
+                               // We'll use this identifier internally to know it's the PMI function.
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Data sourced via Alpha Vantage API, Function: PMI.'
   },
-   {
-    id: 'PMI_SERVICES', name: 'ISM Services PMI', categoryKey: 'v',
-    description: 'Purchasing Managers\' Index based on a survey of non-manufacturing (services) firms. Above 50 indicates expansion, below 50 indicates contraction.',
-    unit: 'Index', frequency: 'Monthly', sourceName: 'ISM',
-    apiSource: 'FRED', apiIdentifier: 'NMFCI', chartType: 'line', calculation: 'NONE',
+
+  // --- MODIFIED ISM Services PMI ---
+  {
+    id: 'PMI_SERVICES', // Your internal ID
+    name: 'ISM Services PMI',
+    categoryKey: 'v', // Business Activity & Investment
+    description: 'The ISM Services Purchasing Managers’ Index (PMI), also known as Non-Manufacturing Index (NMI), monitors business activity, new orders, employment, and supplier deliveries in the services sector. Above 50 indicates expansion; below 50 indicates contraction.',
+    unit: 'Index',
+    frequency: 'Monthly', // Alpha Vantage provides this monthly
+    sourceName: 'Alpha Vantage (Source: ISM)',
+    sourceLink: 'https://www.alphavantage.co/documentation/#nmi', // Alpha Vantage calls this NMI
+    apiSource: 'AlphaVantage', // <<< CHANGED
+    apiIdentifier: 'NMI',      // <<< Alpha Vantage uses function=NMI for Non-Manufacturing/Services PMI
+                               // We use this to trigger the correct Alpha Vantage function.
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Data sourced via Alpha Vantage API, Function: NMI (Non-Manufacturing Index).'
   },
   {
     id: 'NONRES_INVESTMENT', name: 'Nonresidential Fixed Investment', categoryKey: 'v',

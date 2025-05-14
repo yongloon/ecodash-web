@@ -59,7 +59,7 @@ export default function SummaryCard({ indicator, latestValue, previousValue, spa
   const categoryForLink = Object.values(indicatorCategories).find(cat => cat.key === indicator.categoryKey);
   const linkHref = categoryForLink 
     ? `/category/${categoryForLink.slug}?indicator=${indicator.id}` 
-    : `/`; // Fallback to overview
+    : `/`;
 
   let formattedDate = '';
   if (latestValue?.date && isValid(parseISO(latestValue.date))) {
@@ -81,7 +81,7 @@ export default function SummaryCard({ indicator, latestValue, previousValue, spa
       }
   }
 
-  const gradientId = `sparklineGrad-${indicator.id.replace(/[^a-zA-Z0-9-_]/g, '')}`; // More robust ID
+  const gradientId = `sparklineGrad-${indicator.id.replace(/[^a-zA-Z0-9-_]/g, '')}`;
 
   return (
      <Link href={linkHref} className="block hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-shadow duration-200 rounded-lg group">
