@@ -43,10 +43,12 @@ export default async function OverviewPage({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Dashboard Overview</h1>
+      {/* REMOVED SUBTITLE:
       <p className="text-muted-foreground">
         Key economic indicators for {country === 'US' ? 'United States' : country} at a glance.
         {country !== 'US' && ' (International data may be limited or use mock data placeholders)'}
-      </p>
+      </p> 
+      */}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {summaryData

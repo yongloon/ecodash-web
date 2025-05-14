@@ -3,17 +3,17 @@ import React from 'react';
 import SubscriptionButton from '@/components/SubscriptionButton';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { CheckCircle, ShieldQuestion, Zap } from 'lucide-react'; // Added Zap for Pro
+import { CheckCircle, ShieldQuestion, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
-import { authOptions, APP_PLANS, AppPlanTier } from '../api/auth/[...nextauth]/route'; // Import APP_PLANS and AppPlanTier
+// --- CORRECTED IMPORT FOR APP_PLANS ---
+import { authOptions, APP_PLANS, AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Make sure this path is correct
 
-// Define your plans here, ensure 'tier' matches keys in APP_PLANS
+// Define pagePlans using the imported APP_PLANS for consistency
+// This ensures that if APP_PLANS is undefined due to an import error, it's caught here.
 const pagePlans = [
   {
-    name: APP_PLANS.FREE.name,
-    tier: APP_PLANS.FREE.tier,
-    priceId: APP_PLANS.FREE.priceId,
+    ...APP_PLANS.FREE, // Spread properties from the central definition
     priceMonthly: '$0',
     description: 'Get started with essential economic indicators.',
     features: [
@@ -26,10 +26,9 @@ const pagePlans = [
     icon: ShieldQuestion,
   },
   {
-    name: APP_PLANS.BASIC.name,
-    tier: APP_PLANS.BASIC.tier,
-    priceId: APP_PLANS.BASIC.priceId || 'price_basic_placeholder_id', // Fallback if env var missing
-    priceMonthly: '$10', // You might want to fetch this from Stripe for accuracy
+    ...APP_PLANS.BASIC,
+    priceId: APP_PLANS.BASIC.priceId || 'price_basic_placeholder_id', // Fallback if env var for priceId is missing
+    priceMonthly: '$10',
     description: 'More indicators and standard analysis tools.',
     features: [
       'Access to 25+ core economic indicators',
@@ -42,10 +41,9 @@ const pagePlans = [
     icon: CheckCircle,
   },
   {
-    name: APP_PLANS.PRO.name,
-    tier: APP_PLANS.PRO.tier,
+    ...APP_PLANS.PRO,
     priceId: APP_PLANS.PRO.priceId || 'price_pro_placeholder_id', // Fallback
-    priceMonthly: '$25', // You might want to fetch this from Stripe
+    priceMonthly: '$25',
     description: 'Full access to all data and advanced analytical tools.',
     features: [
       'All Basic features',
@@ -63,16 +61,23 @@ const pagePlans = [
 ];
 
 export default async function PricingPage() {
+  if (!APP_PLANS || !APP_PLANS.FREE || !APP_PLANS.BASIC || !APP_PLANS.PRO) {
+    // This check helps catch if APP_PLANS wasn't imported correctly
+    console.error("[PricingPage] CRITICAL ERROR: APP_PLANS not defined or incomplete. Check export/import from authOptions.");
+    return <div className="container mx-auto p-8 text-center text-destructive">Error: Pricing plans could not be loaded. Please contact support.</div>;
+  }
+
+  console.log("[PricingPage] Effective pagePlans for rendering:", JSON.stringify(pagePlans.map(p => ({name: p.name, tier: p.tier, priceId: p.priceId})), null, 2));
+  if (!process.env.STRIPE_BASIC_PLAN_PRICE_ID) {
+    console.warn("[PricingPage] STRIPE_BASIC_PLAN_PRICE_ID environment variable is not set. Using placeholder for Basic plan SubscriptionButton.");
+  }
+  if (!process.env.STRIPE_PRO_PLAN_PRICE_ID) {
+    console.warn("[PricingPage] STRIPE_PRO_PLAN_PRICE_ID environment variable is not set. Using placeholder for Pro plan SubscriptionButton.");
+  }
+
   const session = await getServerSession(authOptions);
   const userSessionData = session?.user as any;
   const currentUserTier: AppPlanTier = userSessionData?.activePlanTier || 'free';
-
-  console.log(`[PricingPage] Current user tier: ${currentUserTier}`);
-  pagePlans.forEach(p => {
-    if (!p.priceId && p.tier !== 'free') {
-        console.warn(`[PricingPage] Plan "${p.name}" is missing a Stripe Price ID in .env.local or APP_PLANS config.`);
-    }
-  });
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -87,7 +92,7 @@ export default async function PricingPage() {
                 <span className="text-xs sm:text-sm text-muted-foreground hidden md:inline">
                   {session.user.name || session.user.email}
                 </span>
-                 <Link href="/dashboard" passHref> {/* Assuming dashboard is at / or /dashboard */}
+                 <Link href="/dashboard" passHref>
                     <Button variant="ghost" size="sm">Dashboard</Button>
                 </Link>
               </div>
@@ -111,7 +116,7 @@ export default async function PricingPage() {
         </section>
 
         {pagePlans.length > 0 ? (
-            <section className={`grid grid-cols-1 md:grid-cols-${pagePlans.length > 2 ? '2' : pagePlans.length} lg:grid-cols-${pagePlans.length > 2 ? '3' : pagePlans.length} gap-6 lg:gap-8 max-w-6xl mx-auto`}>
+            <section className={`grid grid-cols-1 md:grid-cols-${pagePlans.length >= 2 ? '2' : '1'} lg:grid-cols-${pagePlans.length >= 3 ? '3' : pagePlans.length} gap-6 lg:gap-8 max-w-6xl mx-auto`}>
             {pagePlans.map((plan) => {
               const PlanIcon = plan.icon || CheckCircle;
               const isCurrentPlan = currentUserTier === plan.tier;
@@ -121,9 +126,9 @@ export default async function PricingPage() {
                   key={plan.name}
                   className={`flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl ${
                     plan.highlighted ? 'border-primary ring-2 ring-primary shadow-xl scale-100 md:scale-105' : 'border-border'
-                  } ${isCurrentPlan ? 'border-green-500 ring-2 ring-green-500' : '' }`}
+                  } ${isCurrentPlan ? 'border-green-500 ring-2 ring-green-500 shadow-lg' : '' }`}
                 >
-                  <CardHeader className="pb-4 bg-card"> {/* Changed background */}
+                  <CardHeader className="pb-4 bg-card">
                     {plan.highlighted && (
                         <div className="text-xs uppercase font-semibold text-primary tracking-wider mb-2 text-center">Most Popular</div>
                     )}
@@ -132,13 +137,13 @@ export default async function PricingPage() {
                       {plan.priceMonthly}
                       {plan.priceMonthly !== '$0' && <span className="text-sm font-normal text-muted-foreground">/month</span>}
                     </div>
-                    {plan.description && <CardDescription className="text-sm text-muted-foreground pt-2 text-center h-12">{plan.description}</CardDescription>}
+                    {plan.description && <CardDescription className="text-sm text-muted-foreground pt-2 text-center h-12 sm:h-10">{plan.description}</CardDescription>}
                   </CardHeader>
                   <CardContent className="flex-grow pt-6 space-y-3">
                     <ul className="space-y-2 text-sm">
                       {plan.features.map((feature, index) => (
                         <li key={index} className="flex items-start">
-                          <PlanIcon className={`h-4 w-4 ${plan.name === 'Free' ? 'text-muted-foreground/70' : 'text-green-500'} mr-2 mt-0.5 flex-shrink-0`} />
+                          <PlanIcon className={`h-4 w-4 ${plan.tier === 'free' ? 'text-muted-foreground/70' : 'text-green-500'} mr-2 mt-0.5 flex-shrink-0`} />
                           <span className="text-muted-foreground">{feature}</span>
                         </li>
                       ))}
@@ -156,8 +161,8 @@ export default async function PricingPage() {
                             priceId={plan.priceId} 
                             planName={plan.name}
                         />
-                    ) : ( // Fallback for paid plans with missing priceId (shouldn't happen with placeholders)
-                        <Button disabled className="w-full">Configuration Error</Button>
+                    ) : (
+                        <Button disabled className="w-full">Plan Inactive</Button>
                     )}
                   </CardFooter>
                 </Card>
@@ -171,7 +176,16 @@ export default async function PricingPage() {
         )}
         
         <section className="text-center mt-16 text-sm">
-            {/* ... Contact us / Back to Dashboard links ... */}
+            <p className="text-muted-foreground">
+                Need a custom solution or have questions? <Link href="/contact" className="text-primary hover:underline">Contact us</Link>.
+            </p>
+            {session?.user && (
+                <p className="mt-4">
+                    <Link href="/dashboard" className="text-sm text-primary hover:underline">
+                        ← Back to Dashboard
+                    </Link>
+                </p>
+            )}
         </section>
       </main>
     </div>

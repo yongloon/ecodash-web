@@ -1,13 +1,14 @@
 // src/app/login/page.tsx
-"use client";
+"use client"; // ESSENTIAL FIRST LINE
+
 import React, { useState } from 'react';
-import { signIn } from 'next-auth/react'; // Use signIn from next-auth
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button'; // Check this path
+import { Input } from '@/components/ui/input';   // Check this path
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; // Check this path
 import Link from 'next/link';
-import { FaGoogle } from 'react-icons/fa'; // For Google button
+import { FaGoogle } from 'react-icons/fa';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,19 +23,29 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const result = await signIn('credentials', {
-        redirect: false, // Handle redirect manually
+        redirect: false,
         email,
         password,
       });
 
+      console.log("[LoginPage] Credentials sign-in result:", result); // For debugging
+
       if (result?.error) {
-        setError(result.error === "CredentialsSignin" ? "Invalid email or password." : result.error);
-      } else if (result?.ok) {
-        router.push('/'); // Redirect to dashboard
-        router.refresh(); // Important to refresh server session state
+        setError(result.error === "CredentialsSignin" ? "Invalid email or password." : "Login failed. Please try again.");
+      } else if (result?.ok && !result.error) { // Check for !result.error explicitly
+        // Successful login, NextAuth usually handles redirect via callbackUrl if set
+        // If not, or if redirect:false, we push manually.
+        // The callbackUrl for credentials provider is often handled by NextAuth itself based on where user came from
+        // or defaults. Pushing here might be redundant or override NextAuth's intended flow.
+        // For now, let's assume successful result means we want to go to dashboard.
+        router.push('/'); // Or simply '/' if that's your overview
+        router.refresh(); // Good practice to refresh server session state if needed
+      } else if (!result?.ok) {
+        setError("Login attempt failed. Please check your credentials.");
       }
-    } catch (err) {
-      setError("An unexpected error occurred.");
+    } catch (err: any) {
+      console.error("[LoginPage] Credentials sign-in catch error:", err);
+      setError(err.message || "An unexpected error occurred during login.");
     } finally {
       setIsLoading(false);
     }
@@ -42,8 +53,16 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
-    await signIn('google', { callbackUrl: '/' }); // Redirect to dashboard after Google sign-in
-    // setIsLoading(false); // Page will redirect, so this might not be hit
+    setError(null);
+    // signIn with 'google' will redirect to Google, then back to callbackUrl
+    // The callbackUrl should ideally be handled by NextAuth configuration
+    // or if specified here, ensure it's a valid page to return to.
+    signIn('google', { callbackUrl: '/dashboard' }).catch(err => { // Or '/'
+        console.error("[LoginPage] Google sign-in error:", err);
+        setError("Failed to initiate Google Sign-In.");
+        setIsLoading(false);
+    });
+    // setIsLoading(false) might not be reached if redirect is successful
   };
 
   return (
@@ -55,12 +74,13 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleCredentialsLogin}>
           <CardContent className="space-y-4">
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{error}</p>}
             <div className="space-y-2">
-              <label htmlFor="email_login" className="text-sm font-medium">Email</label>
+              <label htmlFor="email_login_page" className="text-sm font-medium">Email</label> {/* Unique ID */}
               <Input
-                id="email_login" // Unique ID
+                id="email_login_page"
                 type="email"
+                autoComplete="email"
                 placeholder="user@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -69,10 +89,11 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password_login" className="text-sm font-medium">Password</label>
+              <label htmlFor="password_login_page" className="text-sm font-medium">Password</label> {/* Unique ID */}
               <Input
-                id="password_login" // Unique ID
+                id="password_login_page"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -80,7 +101,7 @@ export default function LoginPage() {
               />
             </div>
              <div className="text-right">
-                <Link href="/forgot-password" // Link to forgot password page
+                <Link href="/forgot-password"
                     className="text-xs text-muted-foreground hover:text-primary underline">
                     Forgot password?
                 </Link>
@@ -88,9 +109,9 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
+              {isLoading && !email.includes("google") ? 'Logging in...' : 'Login with Email'}
             </Button>
-            <div className="relative w-full">
+            <div className="relative w-full my-2"> {/* Added margin */}
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
@@ -109,12 +130,6 @@ export default function LoginPage() {
                 Register here
               </Link>
             </p>
-
-                    <p className="text-xs text-center text-muted-foreground">
-          <Link href="/pricing" className="underline hover:text-primary">
-            View Pricing Plans
-          </Link>
-        </p>
           </CardFooter>
         </form>
       </Card>

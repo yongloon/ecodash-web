@@ -50,10 +50,13 @@ export default async function CategoryPage({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground">{category.name}</h1>
+       {/* REMOVED SUBTITLE:
       <p className="text-muted-foreground">
         Detailed view for {country === 'US' ? 'United States' : country}.
         {country !== 'US' && ' (International data may be limited or use mock data placeholders)'}
-      </p>
+      </p> 
+      */}
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {resolvedIndicatorData

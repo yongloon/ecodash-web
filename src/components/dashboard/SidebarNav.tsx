@@ -5,27 +5,30 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
 import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa';
-import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon } from 'lucide-react'; // Combined icons
-import { useSession } from 'next-auth/react'; // Import useSession
+import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure path is correct
 
-// Define which tiers can use favorites (example, adjust as needed)
 const FAVORITES_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['basic', 'pro']; 
 const PRO_TOOLS_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['pro'];
 
-export default function SidebarNav() {
-  const pathname = usePathname();
-  const { data: session, status } = useSession(); // CORRECTLY get session from useSession() hook
-  const isLoadingSession = status === "loading";
+interface SidebarNavProps {
+  isMobileMenuOpen?: boolean;
+  toggleMobileMenu?: () => void;
+}
 
-  // Now access userTier and isLoggedIn from the destructured session object
-  const userSessionData = session?.user as any; // Cast to access custom properties
+export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: SidebarNavProps) {
+  const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const isLoadingSession = status === "loading";
+  const userSessionData = session?.user as any;
   const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier;
-  const isLoggedIn = !!session?.user; // True if session.user object exists
+  const isLoggedIn = !!session?.user;
+
+  const hasActivePaidSubscription = isLoggedIn && userTier && userTier !== 'free';
 
   const canSeeFavoritesLink = isLoggedIn && FAVORITES_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
   const canSeeProToolsLink = isLoggedIn && PRO_TOOLS_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
-
 
   const navLinkClasses = (isActive: boolean) => 
     `flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
@@ -33,91 +36,125 @@ export default function SidebarNav() {
         ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground font-semibold'
         : 'text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-muted/50'
     }`;
+  
+  const handleLinkClick = () => {
+    if (isMobileMenuOpen && toggleMobileMenu) {
+      toggleMobileMenu();
+    }
+  };
 
   return (
-    <div className="hidden md:flex md:flex-col md:w-64 bg-card text-card-foreground flex-shrink-0 border-r border-border/60 transition-all duration-300 ease-in-out overflow-y-auto">
-      <div className="flex items-center justify-center md:justify-start h-16 border-b border-border/60 px-4">
-        <Link href="/" className="flex items-center gap-2 group">
-           <span className="text-xl font-bold text-primary group-hover:opacity-80 transition-opacity">
-            EcoDash
-           </span>
-        </Link>
+    <>
+      {/* Overlay for mobile when menu is open */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm md:hidden"
+          onClick={toggleMobileMenu}
+          aria-hidden="true"
+        />
+      )}
+
+      <div 
+        className={`
+          fixed inset-y-0 left-0 z-40 flex flex-col
+          w-64 bg-card text-card-foreground 
+          border-r border-border/60 
+          transition-transform duration-300 ease-in-out 
+          md:static md:translate-x-0 md:w-64 
+          ${isMobileMenuOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'}
+          overflow-y-auto
+        `}
+        aria-label="Main Navigation"
+      >
+        <div className="flex items-center justify-center h-16 border-b border-border/60 px-4 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2 group" onClick={handleLinkClick}>
+             <BarChart3 className="h-7 w-7 text-primary group-hover:opacity-80 transition-opacity" />
+             {/* Removed EcoDash text title from here */}
+          </Link>
+        </div>
+        <nav className="mt-4 px-2 pb-4 space-y-1 flex-grow flex flex-col">
+          <Link href="/" className={navLinkClasses(pathname === '/')} onClick={handleLinkClick}>
+            <FaTachometerAlt className="h-4 w-4 mr-3 flex-shrink-0" />
+            <span>Overview</span>
+          </Link>
+
+          {Object.keys(indicatorCategories).map((key) => {
+            const category = indicatorCategories[key as IndicatorCategoryKey];
+            const IconComponent = category.icon;
+            return (
+              <Link
+                key={category.slug}
+                href={`/category/${category.slug}`}
+                className={navLinkClasses(pathname === `/category/${category.slug}`)}
+                title={category.name}
+                onClick={handleLinkClick}
+              >
+                <IconComponent className="h-4 w-4 mr-3 flex-shrink-0" />
+                <span>{category.name}</span>
+              </Link>
+            );
+          })}
+
+          <hr className="my-3 border-border/60" />
+          
+          {!isLoadingSession && canSeeFavoritesLink && (
+              <Link
+                  href="/favorites"
+                  className={navLinkClasses(pathname === '/favorites')}
+                  title="My Favorites"
+                  onClick={handleLinkClick}
+              >
+                  <FavoriteIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+                  <span>My Favorites</span>
+              </Link>
+          )}
+
+          {!isLoadingSession && canSeeProToolsLink && (
+            <>
+              <div className="px-4 pt-2 pb-1">
+                  <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Pro Tools</p>
+              </div>
+              <Link
+                href="/pro/comparison"
+                className={navLinkClasses(pathname.startsWith('/pro/comparison'))}
+                title="Indicator Comparison"
+                onClick={handleLinkClick}
+              >
+                <ProToolsIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+                <span>Compare</span>
+              </Link>
+            </>
+          )}
+          
+          {/* Conditional Pricing Link */}
+          {!isLoadingSession && (!isLoggedIn || !hasActivePaidSubscription) && (
+            <Link
+              href="/pricing"
+              className={navLinkClasses(pathname === '/pricing')}
+              title="Pricing Plans"
+              onClick={handleLinkClick}
+            >
+              <PricingIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+              <span>Pricing</span>
+            </Link>
+          )}
+
+          {/* Spacer to push account link to bottom */}
+          <div className="flex-grow"></div> 
+
+          {!isLoadingSession && isLoggedIn && (
+               <Link
+                  href="/account/profile"
+                  className={`${navLinkClasses(pathname === '/account/profile')} mt-2`} // Added mt-2
+                  title="My Account"
+                  onClick={handleLinkClick}
+              >
+                  <AccountIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+                  <span>My Account</span>
+              </Link>
+          )}
+        </nav>
       </div>
-      <nav className="mt-4 px-2 pb-4 space-y-1">
-        <Link href="/" className={navLinkClasses(pathname === '/')}>
-          <FaTachometerAlt className="h-4 w-4 mr-3 flex-shrink-0" />
-          <span>Overview</span>
-        </Link>
-
-        {Object.keys(indicatorCategories).map((key) => {
-          const category = indicatorCategories[key as IndicatorCategoryKey];
-          const IconComponent = category.icon;
-          return (
-            <Link
-              key={category.slug}
-              href={`/category/${category.slug}`}
-              className={navLinkClasses(pathname === `/category/${category.slug}`)}
-              title={category.name}
-            >
-              <IconComponent className="h-4 w-4 mr-3 flex-shrink-0" />
-              <span>{category.name}</span>
-            </Link>
-          );
-        })}
-
-        {/* Separator */}
-        <hr className="my-3 border-border/60" />
-        
-        {/* Favorites Link - Conditionally Rendered */}
-        {isLoggedIn && !isLoadingSession && canSeeFavoritesLink && ( // Check isLoggedIn and not loading
-            <Link
-                href="/favorites"
-                className={navLinkClasses(pathname === '/favorites')}
-                title="My Favorites"
-            >
-                <FavoriteIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-                <span>My Favorites</span>
-            </Link>
-        )}
-
-        {/* Pro Tools Section - Conditionally Rendered */}
-        {isLoggedIn && !isLoadingSession && canSeeProToolsLink && (
-          <>
-            <div className="px-4 pt-2 pb-1">
-                <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Pro Tools</p>
-            </div>
-            <Link
-              href="/pro/comparison" // Example Pro tool page
-              className={navLinkClasses(pathname.startsWith('/pro/comparison'))}
-              title="Indicator Comparison"
-            >
-              <ProToolsIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-              <span>Compare</span>
-            </Link>
-            {/* Add more Pro links here */}
-          </>
-        )}
-        
-        <Link
-          href="/pricing"
-          className={navLinkClasses(pathname === '/pricing')}
-          title="Pricing Plans"
-        >
-          <PricingIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-          <span>Pricing</span>
-        </Link>
-
-        {isLoggedIn && !isLoadingSession && ( // Check isLoggedIn and not loading
-             <Link
-                href="/account/profile"
-                className={navLinkClasses(pathname === '/account/profile')}
-                title="My Account"
-            >
-                <AccountIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-                <span>My Account</span>
-            </Link>
-        )}
-      </nav>
-    </div>
+    </>
   );
 }
