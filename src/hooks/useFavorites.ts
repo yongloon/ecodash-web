@@ -1,27 +1,57 @@
 // src/hooks/useFavorites.ts
 "use client";
 
-import useSWR from 'swr';
+import useSWR, { SWRConfiguration } from 'swr'; // Import SWRConfiguration for options
 
-const fetcher = (url: string) => fetch(url).then(res => {
+// Enhanced fetcher to provide more error details
+const fetcher = async (url: string) => {
+    const res = await fetch(url);
     if (!res.ok) {
-        const error = new Error('An error occurred while fetching the data.');
-        // Attach extra info to the error object.
-        (error as any).info = res.json(); // Or res.text()
+        const error = new Error('An error occurred while fetching the data from the API.');
+        try {
+            // Attempt to parse JSON error from API response body
+            const errorInfo = await res.json();
+            (error as any).info = errorInfo; // Contains API specific error message
+            console.error(`API Error (${res.status}) for ${url}:`, errorInfo);
+        } catch (e) {
+            // If parsing JSON fails, use text and then fallback
+            try {
+                const errorText = await res.text();
+                (error as any).info = { message: errorText || "Unknown API error (non-JSON response)." };
+                 console.error(`API Error (${res.status}) for ${url} (non-JSON):`, errorText);
+            } catch (textError) {
+                (error as any).info = { message: `HTTP error ${res.status} and failed to read response body.` };
+                 console.error(`API Error (${res.status}) for ${url} (unreadable body):`, textError);
+            }
+        }
         (error as any).status = res.status;
-        throw error;
+        throw error; // SWR will catch this and put it in the 'error' state
     }
     return res.json();
-});
+};
+
+// Optional SWR configuration
+const swrOptions: SWRConfiguration = {
+    revalidateOnFocus: true, // Revalidate when window gets focus
+    revalidateOnReconnect: true, // Revalidate on network reconnect
+    // dedupingInterval: 2000, // Default is 2000ms
+};
 
 export function useFavorites() {
-  const { data: favoriteIds, error, isLoading, mutate } = useSWR<string[]>('/api/users/favorites', fetcher);
+  // The key for SWR is '/api/users/favorites'. This will make a GET request.
+  const { 
+    data: favoriteIds, 
+    error: favoritesError, // This will contain the error thrown by the fetcher
+    isLoading: isLoadingFavorites, 
+    mutate: mutateFavorites 
+  } = useSWR<string[]>('/api/users/favorites', fetcher, swrOptions);
 
   const addFavorite = async (indicatorId: string) => {
-    if (!favoriteIds || favoriteIds.includes(indicatorId)) return; // Already favorited or data not loaded
+    const currentFavorites = favoriteIds || [];
+    if (currentFavorites.includes(indicatorId)) return;
 
     // Optimistic update
-    mutate([...favoriteIds, indicatorId], false);
+    mutateFavorites([...currentFavorites, indicatorId], false);
 
     try {
       const res = await fetch('/api/users/favorites', {
@@ -30,37 +60,40 @@ export function useFavorites() {
         body: JSON.stringify({ indicatorId }),
       });
       if (!res.ok) {
-        throw new Error('Failed to add favorite');
+        const errorData = await res.json().catch(() => ({ error: "Failed to add favorite" }));
+        throw new Error(errorData.error || 'Server error adding favorite');
       }
-      // Revalidate after successful API call (optional, if optimistic update is not enough)
-      // mutate(); 
-    } catch (e) {
+      // No need to call mutate() again if server confirms, SWR might revalidate based on other factors
+      // or if you want to be absolutely sure: mutateFavorites();
+    } catch (e: any) {
       // Revert optimistic update on error
-      mutate(favoriteIds, false); 
-      console.error("Failed to add favorite:", e);
-      // Handle error (e.g., show toast)
+      mutateFavorites(currentFavorites, false); 
+      console.error("Failed to add favorite:", e.message);
+      alert(`Error: ${e.message}`); // Or use a toast
     }
   };
 
   const removeFavorite = async (indicatorId: string) => {
-    if (!favoriteIds || !favoriteIds.includes(indicatorId)) return;
+    const currentFavorites = favoriteIds || [];
+    if (!currentFavorites.includes(indicatorId)) return;
 
     // Optimistic update
-    mutate(favoriteIds.filter(id => id !== indicatorId), false);
+    mutateFavorites(currentFavorites.filter(id => id !== indicatorId), false);
 
     try {
       const res = await fetch(`/api/users/favorites?indicatorId=${encodeURIComponent(indicatorId)}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
-        throw new Error('Failed to remove favorite');
+        const errorData = await res.json().catch(() => ({ error: "Failed to remove favorite" }));
+        throw new Error(errorData.error || 'Server error removing favorite');
       }
-      // mutate(); 
-    } catch (e) {
+      // mutateFavorites(); // Optional revalidation
+    } catch (e: any) {
       // Revert optimistic update
-      mutate(favoriteIds, false);
-      console.error("Failed to remove favorite:", e);
-      // Handle error
+      mutateFavorites(currentFavorites, false);
+      console.error("Failed to remove favorite:", e.message);
+      alert(`Error: ${e.message}`); // Or use a toast
     }
   };
 
@@ -69,12 +102,12 @@ export function useFavorites() {
   };
 
   return {
-    favoriteIds: favoriteIds || [], // Default to empty array if undefined
-    isLoadingFavorites: isLoading,
-    favoritesError: error,
+    favoriteIds: favoriteIds || [],
+    isLoadingFavorites,
+    favoritesError,
     addFavorite,
     removeFavorite,
     isFavorited,
-    mutateFavorites: mutate, // Expose mutate for manual revalidation if needed
+    mutateFavorites,
   };
 }
