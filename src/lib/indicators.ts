@@ -513,6 +513,75 @@ export const indicators: IndicatorMetadata[] = [
     calculation: 'NONE',
     notes: 'Data from Alternative.me API.',
   },
+    // --- LOW RISK ASSETS ---
+  {
+    id: 'DTB3', name: '3-Month Treasury Bill Rate', categoryKey: 'viii',
+    description: 'Market yield on U.S. Treasury securities at 3-month constant maturity.',
+    unit: '%', frequency: 'Daily', sourceName: 'Federal Reserve Board via FRED',
+    apiSource: 'FRED', apiIdentifier: 'DTB3', chartType: 'line', calculation: 'NONE',
+    notes: 'Discount basis.'
+  },
+  {
+    id: 'GOLD_PRICE', // Keep internal ID
+    name: 'Gold Price (GLD ETF)', // Changed name to reflect source
+    categoryKey: 'viii',
+    description: 'Price of SPDR Gold Shares (GLD), an ETF that tracks the price of gold bullion.',
+    unit: 'USD', // Price per share of ETF
+    frequency: 'Daily',
+    sourceName: 'Alpha Vantage (Source: NYSE Arca)',
+    apiSource: 'AlphaVantage',    // <<< CORRECTED
+    apiIdentifier: 'GLD',        // <<< CORRECTED (Ticker for Gold ETF)
+    chartType: 'line',
+    calculation: 'NONE',
+  },
+
+  // --- MODERATE RISK ASSETS ---
+  // S&P 500 (ID: SP500) - Assuming this is already FRED or a working AlphaVantage ticker for the index itself.
+  // If SP500 from FRED (apiIdentifier: 'SP500') is also failing, you could switch it to AlphaVantage
+  // with apiIdentifier: 'SPY' (for the SPDR S&P 500 ETF). For now, let's assume your SP500 is working.
+  {
+    id: 'BAA_YIELD', name: 'Moody\'s Baa Corporate Bond Yield', categoryKey: 'viii',
+    description: 'Yield on Moody\'s Seasoned Baa Corporate Bonds.',
+    unit: '%', frequency: 'Daily', sourceName: 'Moody\'s via FRED',
+    apiSource: 'FRED', apiIdentifier: 'DBAA',
+    chartType: 'line', calculation: 'NONE',
+  },
+  {
+    id: 'REIT_INDEX', // Keep internal ID
+    name: 'US REIT ETF (VNQ)', // Changed name
+    categoryKey: 'viii',
+    description: 'Price of Vanguard Real Estate ETF (VNQ), tracking a broad U.S. REIT index.',
+    unit: 'USD', // Price per share of ETF
+    frequency: 'Daily',
+    sourceName: 'Alpha Vantage (Source: NYSE Arca)',
+    apiSource: 'AlphaVantage',    // <<< CORRECTED
+    apiIdentifier: 'VNQ',        // <<< CORRECTED (Ticker for a popular REIT ETF)
+    chartType: 'line',
+    calculation: 'NONE',
+  },
+
+  // --- HIGH RISK ASSETS ---
+  {
+    id: 'NASDAQ_100', // Keep internal ID
+    name: 'Nasdaq 100 ETF (QQQ)', // Changed name
+    categoryKey: 'viii',
+    description: 'Price of Invesco QQQ Trust (QQQ), an ETF that tracks the Nasdaq 100 Index.',
+    unit: 'USD', // Price per share of ETF
+    frequency: 'Daily',
+    sourceName: 'Alpha Vantage (Source: Nasdaq)',
+    apiSource: 'AlphaVantage',    // <<< CORRECTED
+    apiIdentifier: 'QQQ',        // <<< CORRECTED (Ticker for Nasdaq 100 ETF)
+    chartType: 'line',
+    calculation: 'NONE',
+  },
+  // Bitcoin (ID: BTC_PRICE_USD) is already CoinGecko.
+  {
+    id: 'EEM_ETF', name: 'MSCI Emerging Markets ETF (EEM)', categoryKey: 'viii',
+    description: 'Tracks the investment results of an index composed of large- and mid-capitalization emerging market equities.',
+    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage (Source: iShares)',
+    apiSource: 'AlphaVantage', apiIdentifier: 'EEM',
+    chartType: 'line', calculation: 'NONE',
+  },
 ];
 
 // Helper functions

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const userId = (session.user as any).id;
 
   try {
-    // --- ADD THIS CHECK ---
+    // --- PRISMA CHECK ---
     if (!prisma) {
       console.error("[API Create Checkout] Database not configured. Prisma instance is null.");
       return NextResponse.json(
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-    // --- END CHECK ---
+    // --- END PRISMA CHECK ---
 
     const { priceId, quantity = 1 } = await request.json();
     if (!priceId) {
@@ -57,14 +57,14 @@ export async function POST(request: Request) {
       mode: 'subscription',
       success_url: `${appUrl}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pricing`,
-      metadata: { userId: user.id, priceId: priceId }, // Store priceId for webhook
+      metadata: { userId: user.id, priceId: priceId },
     });
 
     return NextResponse.json({ sessionId: stripeSession.id });
 
   } catch (error: any) {
     console.error('[API Create Checkout] Error:', error);
-    if ((error as any).message?.includes("PrismaClientInitializationError")) {
+    if ((error as any).name === 'PrismaClientInitializationError' || (error as any).message?.includes("prisma")) {
         return NextResponse.json({ error: "Database service unavailable for checkout." }, { status: 503 });
     }
     return NextResponse.json({ error: error.message || 'Failed to create checkout session.' }, { status: 500 });

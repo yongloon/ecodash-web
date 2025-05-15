@@ -7,7 +7,7 @@ const SALT_ROUNDS = 10;
 
 export async function POST(request: Request) {
   try {
-    // --- ADD THIS CHECK ---
+    // --- PRISMA CHECK ---
     if (!prisma) {
       console.error("[API Confirm PW Reset] Database not configured. Prisma instance is null.");
       return NextResponse.json(
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-    // --- END CHECK ---
+    // --- END PRISMA CHECK ---
 
     const body = await request.json();
     const { token: plainToken, password } = body;
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("[API Confirm PW Reset] Error:", error);
-    if ((error as any).message?.includes("PrismaClientInitializationError")) {
+    if ((error as any).name === 'PrismaClientInitializationError' || (error as any).message?.includes("prisma")) {
         return NextResponse.json({ error: "Database service unavailable." }, { status: 503 });
     }
     return NextResponse.json({ error: "An unexpected error occurred while resetting password." }, { status: 500 });

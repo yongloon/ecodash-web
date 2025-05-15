@@ -2,10 +2,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { EarningsEvent, fetchEarningsCalendar } from '@/lib/api'; // Ensure fetchEarningsCalendar is correctly imported
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // <<< IMPORT CARD
-import { Briefcase, Loader2, AlertTriangle } from 'lucide-react';
-import { format, parseISO, isToday, isTomorrow, differenceInDays } from 'date-fns'; // Added differenceInDays
+import { EarningsEvent, fetchEarningsCalendar } from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Briefcase, Loader2, AlertTriangle, Info } from 'lucide-react'; // Added Info
+import { format, parseISO, isToday, isTomorrow, isValid } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EarningsCalendarWidgetProps {
     initialEvents?: EarningsEvent[];
@@ -13,88 +14,111 @@ interface EarningsCalendarWidgetProps {
     itemCount?: number;
 }
 
-export default function EarningsCalendarWidget({ 
-    initialEvents, 
-    daysAhead = 7,
-    itemCount = 6, // Default to show a few more earnings
+export default function EarningsCalendarWidget({
+    initialEvents,
+    daysAhead = 30,
+    itemCount = 6,
 }: EarningsCalendarWidgetProps) {
   const [events, setEvents] = useState<EarningsEvent[]>(initialEvents || []);
   const [isLoading, setIsLoading] = useState(!initialEvents);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  if (!initialEvents) {
-    setIsLoading(true);
-    setError(null);
-    console.log("[EarningsCalendarWidget] Fetching earnings..."); // Add log
-    fetchEarningsCalendar(daysAhead)
-      .then(data => {
-        console.log(`[EarningsCalendarWidget] Fetched ${data.length} earnings events.`); // Add log
-        setEvents(data.slice(0, itemCount)); // Slicing after fetch
-      })
-      .catch(err => { /* ... console.error ... */ })
-      .finally(() => setIsLoading(false));
-  }
-}, [initialEvents, daysAhead, itemCount]);
+    if (!initialEvents) {
+      // console.log(`[EarningsCalendarWidget] useEffect: Fetching earnings for ${daysAhead} days.`);
+      setIsLoading(true);
+      setError(null);
+      fetchEarningsCalendar(daysAhead)
+        .then(data => {
+          // console.log(`[EarningsCalendarWidget] fetchEarningsCalendar returned ${data.length} events. Data:`, JSON.stringify(data, null, 2).substring(0,300));
+          setEvents(data.slice(0, itemCount));
+        })
+        .catch(err => {
+          console.error("[EarningsCalendarWidget] Error fetching earnings:", err);
+          setError(err.message || "Could not load earnings events.");
+        })
+        .finally(() => {
+          // console.log("[EarningsCalendarWidget] Fetch finished.");
+          setIsLoading(false);
+        });
+    } else {
+        // console.log("[EarningsCalendarWidget] Using initialEvents. Count:", initialEvents.length);
+        setEvents(initialEvents.slice(0, itemCount));
+        setIsLoading(false);
+    }
+  }, [initialEvents, daysAhead, itemCount]);
 
-  const formatReleaseTime = (hour: string): string => {
+  const formatReleaseTime = (hour: string | null | undefined): string => {
     if (hour === 'bmo') return 'Before Market Open';
     if (hour === 'amc') return 'After Market Close';
     if (hour === 'dmh') return 'During Market Hours';
-    if (hour) return hour.toUpperCase(); // In case it's a specific time like "08:00:00"
-    return 'N/A';
+    if (hour) return hour.toUpperCase();
+    return 'Time N/A';
   };
 
-  const getDateDisplay = (dateStr: string): string => {
+  const getDateDisplay = (dateStr: string | null | undefined): string => {
     if (!dateStr || !isValid(parseISO(dateStr))) return "Date N/A";
     const date = parseISO(dateStr);
     if (isToday(date)) return "Today";
     if (isTomorrow(date)) return "Tomorrow";
-    // const daysDiff = differenceInDays(date, new Date()); // Check future days
-    // if (daysDiff > 1 && daysDiff < 7) return format(date, "eeee"); // Day of week for next few days
-    return format(date, "MMM d"); // Default format
+    return format(date, "MMM d");
   };
-  // --- ENSURE NO STRAY CHARACTERS OR INCOMPLETE STATEMENTS HERE ---
 
-  return ( // This is line 57/58 where the error points to <Card>
+  return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-semibold flex items-center">
           <Briefcase className="h-5 w-5 mr-2 text-green-500" />
           Upcoming Earnings
         </CardTitle>
+        {!isLoading && !error && events.length === 0 && (
+            <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">
+                        <p>No earnings releases found for the upcoming period. This could be due to API limitations or a quiet period.</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading && (
           <div className="flex justify-center items-center py-6">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="ml-2 text-sm text-muted-foreground">Loading earnings...</p>
           </div>
         )}
-        {error && <p className="text-sm text-destructive flex items-center"><AlertTriangle className="h-4 w-4 mr-2"/>{error}</p>}
+        {!isLoading && error && (
+            <div className="text-sm text-destructive p-3 bg-destructive/10 rounded-md flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2 shrink-0" />
+                <span>{error}</span>
+            </div>
+        )}
         {!isLoading && !error && events.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">No major earnings releases found for the upcoming period.</p>
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No earnings releases currently listed for the next {daysAhead} days.
+            </p>
         )}
         {!isLoading && !error && events.length > 0 && (
-          <ul className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar"> {/* Added custom-scrollbar if you define it */}
+          <ul className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
             {events.map((event, index) => (
               <li key={`${event.symbol}-${event.date}-${index}`} className="border-b border-border/30 pb-2.5 last:border-b-0 last:pb-0 text-xs">
                 <div className="flex justify-between items-center mb-0.5">
                     <span className="font-semibold text-sm text-foreground hover:text-primary transition-colors">
-                        {/* You could make this a link to a stock page if you had one */}
-                        {/* <Link href={`/stock/${event.symbol}`}>{event.symbol}</Link> */}
                         {event.symbol}
                     </span>
                     <span className="text-muted-foreground font-medium">{getDateDisplay(event.date)}</span>
                 </div>
                  <p className="text-muted-foreground leading-tight text-xs">{formatReleaseTime(event.hour)}</p>
                 {event.epsEstimate !== null && <p className="text-muted-foreground text-xs">EPS Est: {event.epsEstimate?.toFixed(2) ?? 'N/A'}</p>}
-                {/* Add Revenue Estimate if desired */}
-                {/* {event.revenueEstimate !== null && <p className="text-muted-foreground text-xs">Rev Est: ${(event.revenueEstimate / 1000).toFixed(1)}B</p>} */}
               </li>
             ))}
           </ul>
         )}
-         {!isLoading && !error && (
+        {!isLoading && (
              <div className="mt-4 text-center">
                 <a href="https://finnhub.io" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                     Earnings data powered by Finnhub.io

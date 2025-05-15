@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    // --- ADD THIS CHECK ---
+    // --- PRISMA CHECK ---
     if (!prisma) {
       console.error("[API Register] Database not configured. Prisma instance is null. Cannot register user.");
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         { status: 503 } // 503 Service Unavailable
       );
     }
-    // --- END CHECK ---
+    // --- END PRISMA CHECK ---
 
     const body = await request.json();
     const { email, password, name, username } = body;
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       data: {
         email: email.toLowerCase(),
         passwordHash,
-        name: name || username, // Default name to username if not provided
+        name: name || username,
         username,
       },
     });
@@ -52,7 +52,8 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("[API Register] Registration Error:", error);
-    if ((error as any).message?.includes("PrismaClientInitializationError") || (error as any).code === 'P2021' /* Table does not exist */) {
+    // More specific check for Prisma client issues if the initial check somehow passed or error originated differently
+    if ((error as any).name === 'PrismaClientInitializationError' || (error as any).message?.includes("prisma")) {
         return NextResponse.json({ error: "Database service unavailable for registration." }, { status: 503 });
     }
     return NextResponse.json({ error: "An unexpected error occurred during registration." }, { status: 500 });

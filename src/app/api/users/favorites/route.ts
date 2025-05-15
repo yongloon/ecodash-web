@@ -11,24 +11,18 @@ const favoritePostSchema = z.object({
 
 // GET: Fetch user's favorite indicator IDs
 export async function GET(request: Request) {
-  console.log("[API GET /users/favorites] Request received.");
   const session = await getServerSession(authOptions);
-
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
-  }
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
-  if (!userId) {
-    return NextResponse.json({ error: 'Invalid session: User ID missing.' }, { status: 401 });
-  }
+  if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
 
-  // --- ADD THIS CHECK ---
+  // --- PRISMA CHECK ---
   if (!prisma) {
-    console.warn("[API GET /users/favorites] No Database Mode: Returning demo favorites from session or empty array.");
+    console.warn("[API GET /users/favorites] No Database Mode: Returning demo favorites or empty.");
     const demoFavorites = (session.user as any).favoriteIndicatorIds || [];
     return NextResponse.json(demoFavorites, { status: 200 });
   }
-  // --- END CHECK ---
+  // --- END PRISMA CHECK ---
 
   try {
     const favorites = await prisma.favoriteIndicator.findMany({
@@ -36,11 +30,10 @@ export async function GET(request: Request) {
       select: { indicatorId: true },
       orderBy: { createdAt: 'desc' }
     });
-    const favoriteIds = favorites.map(fav => fav.indicatorId);
-    return NextResponse.json(favoriteIds, { status: 200 });
+    return NextResponse.json(favorites.map(fav => fav.indicatorId), { status: 200 });
   } catch (error: any) {
     console.error("[API GET /users/favorites] DB Error:", error.message);
-    return NextResponse.json({ error: 'Failed to fetch favorites.', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch favorites.'}, { status: 500 });
   }
 }
 
@@ -51,38 +44,27 @@ export async function POST(request: Request) {
   const userId = (session.user as any).id;
   if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
 
-  // --- ADD THIS CHECK ---
+  // --- PRISMA CHECK ---
   if (!prisma) {
     console.warn("[API POST /users/favorites] No Database Mode: Cannot add favorite.");
-    return NextResponse.json({ error: 'Favorites feature is unavailable in the current mode.' }, { status: 403 });
+    return NextResponse.json({ error: 'Favorites unavailable in demo mode.' }, { status: 403 });
   }
-  // --- END CHECK ---
+  // --- END PRISMA CHECK ---
 
   try {
     const body = await request.json();
     const validation = favoritePostSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json({ error: 'Invalid input', details: validation.error.flatten() }, { status: 400 });
-    }
+    if (!validation.success) return NextResponse.json({ error: 'Invalid input', details: validation.error.flatten() }, { status: 400 });
     const { indicatorId } = validation.data;
 
-    // Check if already favorited to prevent duplicates (Prisma unique constraint will also catch this)
-    const existing = await prisma.favoriteIndicator.findUnique({
-        where: { userId_indicatorId: { userId, indicatorId } }
-    });
-    if (existing) {
-        return NextResponse.json(existing, { status: 200 }); // Already exists, return success
-    }
+    const existing = await prisma.favoriteIndicator.findUnique({ where: { userId_indicatorId: { userId, indicatorId } } });
+    if (existing) return NextResponse.json(existing, { status: 200 });
 
-    const newFavorite = await prisma.favoriteIndicator.create({
-      data: { userId, indicatorId },
-    });
+    const newFavorite = await prisma.favoriteIndicator.create({ data: { userId, indicatorId } });
     return NextResponse.json(newFavorite, { status: 201 });
   } catch (error: any) {
     console.error("[API POST /users/favorites] Error:", error);
-     if (error.code === 'P2002') { // Unique constraint violation
-        return NextResponse.json({ error: 'Indicator already favorited.' }, { status: 409 });
-    }
+    if (error.code === 'P2002') return NextResponse.json({ error: 'Already favorited.' }, { status: 409 });
     return NextResponse.json({ error: 'Failed to add favorite' }, { status: 500 });
   }
 }
@@ -94,29 +76,23 @@ export async function DELETE(request: Request) {
   const userId = (session.user as any).id;
   if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
 
-  // --- ADD THIS CHECK ---
+  // --- PRISMA CHECK ---
   if (!prisma) {
     console.warn("[API DELETE /users/favorites] No Database Mode: Cannot remove favorite.");
-    return NextResponse.json({ error: 'Favorites feature is unavailable in the current mode.' }, { status: 403 });
+    return NextResponse.json({ error: 'Favorites unavailable in demo mode.' }, { status: 403 });
   }
-  // --- END CHECK ---
+  // --- END PRISMA CHECK ---
 
   const { searchParams } = new URL(request.url);
   const indicatorId = searchParams.get('indicatorId');
-  if (!indicatorId) {
-    return NextResponse.json({ error: 'indicatorId is required in query parameters' }, { status: 400 });
-  }
+  if (!indicatorId) return NextResponse.json({ error: 'indicatorId required' }, { status: 400 });
 
   try {
-    await prisma.favoriteIndicator.delete({
-      where: { userId_indicatorId: { userId, indicatorId } },
-    });
+    await prisma.favoriteIndicator.delete({ where: { userId_indicatorId: { userId, indicatorId } } });
     return NextResponse.json({ message: 'Favorite removed' }, { status: 200 });
   } catch (error: any) {
     console.error("[API DELETE /users/favorites] Error:", error);
-    if (error.code === 'P2025') { // Record to delete not found
-        return NextResponse.json({ error: 'Favorite not found or already removed.' }, { status: 404 });
-    }
+    if (error.code === 'P2025') return NextResponse.json({ error: 'Favorite not found.' }, { status: 404 });
     return NextResponse.json({ error: 'Failed to remove favorite' }, { status: 500 });
   }
 }
