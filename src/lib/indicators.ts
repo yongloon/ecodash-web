@@ -1,11 +1,10 @@
 // src/lib/indicators.ts
 import { IconType } from 'react-icons';
-import { FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaPlaneDeparture, FaCar } from 'react-icons/fa'; // FaBalanceScale, FaBuilding, FaExchangeAlt, FaPlaneDeparture, FaSeedling
-// import { IoStatsChart, IoTrendingUp, IoTrendingDown } from "react-icons/io5";
-import { BsBank2 } from "react-icons/bs"; // BsGraphUpArrow
+import { FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaPlaneDeparture, FaCar } from 'react-icons/fa';
+import { BsBank2 } from "react-icons/bs";
 
 export const indicatorCategories = {
-  'i': { name: 'Economic Output & Growth', slug: 'economic-output', icon: FaChartLine }, // <--- MODIFIED NAME
+  'i': { name: 'Economic Output & Growth', slug: 'economic-output', icon: FaChartLine },
   'ii': { name: 'Labor Market', slug: 'labor-market', icon: FaUsers },
   'iii': { name: 'Inflation & Prices', slug: 'inflation-prices', icon: FaDollarSign },
   'iv': { name: 'Consumer Activity', slug: 'consumer-activity', icon: FaCar },
@@ -33,29 +32,16 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI';
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI'; // Added DBNOMICS
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
   notes?: string;
 }
 
-// Interfaces for FRED API (can be in api.ts or here for indicator context)
-export interface FredObservation {
-  date: string;
-  value: string;
-}
-export interface FredResponse {
-  observations: FredObservation[];
-  // Add other potential fields from FRED response if needed for metadata
-  // e.g. units, frequency_short, title (though we define these in IndicatorMetadata)
-}
+export interface FredObservation { date: string; value: string; }
+export interface FredResponse { observations: FredObservation[]; }
 
-
-// INDICATORS ARRAY (No changes made here, ensure it's the same as your original long list)
-// For brevity, I will not repeat the entire 'indicators' array.
-// Please ensure your existing 'indicators' array from the original file is used here.
-// For example:
 export const indicators: IndicatorMetadata[] = [
   {
     id: 'GDP_REAL', name: 'Real Gross Domestic Product', categoryKey: 'i',
@@ -134,7 +120,7 @@ export const indicators: IndicatorMetadata[] = [
     id: 'GDPDEF_YOY_PCT', name: 'GDP Deflator (YoY %)', categoryKey: 'iii',
     description: 'Year-over-year percentage change in the measure of the level of prices of all new, domestically produced, final goods and services in an economy.',
     unit: '% Change YoY', frequency: 'Quarterly', sourceName: 'BEA',
-    apiSource: 'FRED', apiIdentifier: 'GDPDEF', chartType: 'bar', calculation: 'YOY_PERCENT', 
+    apiSource: 'FRED', apiIdentifier: 'GDPDEF', chartType: 'bar', calculation: 'YOY_PERCENT',
     notes: 'Calculated from GDPDEF index.',
   },
   {
@@ -215,18 +201,18 @@ export const indicators: IndicatorMetadata[] = [
     notes: 'Calculated from CSUSHPINSA index.',
   },
    {
-    id: 'SP500', // Keep the same ID if you want, or change to e.g., 'SPX_FRED'
-    name: 'S&P 500 Index (FRED)', // Clarify source in name if desired
-    categoryKey: 'viii', // Financial Markets
+    id: 'SP500',
+    name: 'S&P 500 Index (FRED)',
+    categoryKey: 'viii',
     description: 'The S&P 500 is a stock market index tracking the stock performance of 500 of the largest companies listed on stock exchanges in the United States. Data sourced from FRED.',
     unit: 'Index Value',
-    frequency: 'Daily', // FRED SP500 series is daily
-    sourceName: 'FRED (Source: S&P Dow Jones Indices LLC)', // FRED often lists the ultimate source
-    sourceLink: 'https://fred.stlouisfed.org/series/SP500', // Optional: Direct link to FRED page
-    apiSource: 'FRED', // MODIFIED: Changed from 'AlphaVantage' or 'Mock'
-    apiIdentifier: 'SP500', // MODIFIED: This is the FRED Series ID for S&P 500 daily closing values
+    frequency: 'Daily',
+    sourceName: 'FRED (Source: S&P Dow Jones Indices LLC)',
+    sourceLink: 'https://fred.stlouisfed.org/series/SP500',
+    apiSource: 'FRED',
+    apiIdentifier: 'SP500',
     chartType: 'line',
-    calculation: 'NONE', // No calculation needed on top of the index value
+    calculation: 'NONE',
     notes: 'Daily closing values of the S&P 500 Index.',
   },
   {
@@ -264,7 +250,7 @@ export const indicators: IndicatorMetadata[] = [
     id: 'LEI', name: 'Leading Economic Index (LEI)', categoryKey: 'i',
     description: 'Index designed by The Conference Board to predict future economic activity (typically 6-9 months ahead).',
     unit: 'Index', frequency: 'Monthly', sourceName: 'ConfBoard',
-    apiSource: 'Mock', apiIdentifier: 'LEI', chartType: 'line', notes: 'Requires subscription, using Mock data.', calculation: 'NONE',
+    apiSource: 'Mock', apiIdentifier: 'LEI_MOCK', chartType: 'line', notes: 'Requires subscription, using Mock data.', calculation: 'NONE',
   },
   {
     id: 'LFPR', name: 'Labor Force Participation Rate', categoryKey: 'ii',
@@ -330,7 +316,7 @@ export const indicators: IndicatorMetadata[] = [
     id: 'CCI', name: 'Consumer Confidence Index (CCI)', categoryKey: 'iv',
     description: 'The Conference Board\'s measure of consumer optimism about the economy and personal finances.',
     unit: 'Index 1985=100', frequency: 'Monthly', sourceName: 'ConfBoard',
-    apiSource: 'Mock', apiIdentifier: 'CCI', chartType: 'line', notes: 'Requires subscription, using Mock data.', calculation: 'NONE',
+    apiSource: 'Mock', apiIdentifier: 'CCI_MOCK', chartType: 'line', notes: 'Requires subscription, using Mock data.', calculation: 'NONE',
   },
    {
     id: 'UMCSENT', name: 'Consumer Sentiment Index (UMich)', categoryKey: 'iv',
@@ -356,32 +342,39 @@ export const indicators: IndicatorMetadata[] = [
     unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB',
     apiSource: 'FRED', apiIdentifier: 'DRCCLACBS', chartType: 'line', calculation: 'NONE',
   },
- {
-    id: 'PMI',
-    name: 'ISM Manufacturing PMI',
-    categoryKey: 'v',
-    description: 'The ISM Manufacturing Purchasing Managers’ Index (PMI)...',
-    unit: 'Index',
-    frequency: 'Monthly',
-    sourceName: 'Alpha Vantage (Source: ISM)',
-    apiSource: 'AlphaVantage', // CORRECTED
-    apiIdentifier: 'PMI',      // CORRECTED
-    chartType: 'line',
-    calculation: 'NONE',
-},
+  // --- UPDATED PMIs to use DBNOMICS ---
 {
-    id: 'PMI_SERVICES',
-    name: 'ISM Services PMI',
-    categoryKey: 'v',
-    description: 'The ISM Services Purchasing Managers’ Index (NMI)...',
+    id: 'PMI', // Keep internal ID for now, or change to 'CFNAI_IDX' if you prefer consistency
+    name: 'Chicago Fed National Activity Index (CFNAI)',
+    categoryKey: 'v', // Business Activity & Investment
+    description: 'A monthly index designed to gauge overall economic activity and related inflationary pressure. Zero indicates trend growth.',
     unit: 'Index',
     frequency: 'Monthly',
-    sourceName: 'Alpha Vantage (Source: ISM)',
-    apiSource: 'AlphaVantage', // CORRECTED
-    apiIdentifier: 'NMI',      // CORRECTED
-    chartType: 'line',
+    sourceName: 'Federal Reserve Bank of Chicago via FRED',
+    sourceLink: 'https://fred.stlouisfed.org/series/CFNAI',
+    apiSource: 'FRED',
+    apiIdentifier: 'CFNAI', // <<< CORRECTED FRED ID
+    chartType: 'bar', // Often shown as a bar chart around zero
     calculation: 'NONE',
-},
+    notes: 'Zero = trend growth; Positive = above-trend; Negative = below-trend.'
+  },
+  // --- MODIFIED "PMI_SERVICES" to Durable Goods New Orders (Ex-Trans, MoM%) ---
+  {
+    id: 'PMI_SERVICES', // Keep internal ID for now, or change to 'DURGOODS_EXTRANS_MOMPCT'
+    name: 'Durable Goods New Orders (Ex-Trans, MoM %)',
+    categoryKey: 'v', // Business Activity & Investment
+    description: 'Month-over-month percentage change in new orders for durable goods, excluding transportation.',
+    unit: '% MoM',
+    frequency: 'Monthly',
+    sourceName: 'U.S. Census Bureau via FRED',
+    sourceLink: 'https://fred.stlouisfed.org/series/ADXTNO',
+    apiSource: 'FRED',
+    apiIdentifier: 'ADXTNO', // <<< CORRECTED FRED ID for levels
+    chartType: 'bar',
+    calculation: 'MOM_PERCENT', // <<< APPLY CALCULATION
+    notes: 'Calculated as Month-over-Month % change from seasonally adjusted levels.'
+  },
+  // --- END UPDATED PMIs ---
   {
     id: 'NONRES_INVESTMENT', name: 'Nonresidential Fixed Investment', categoryKey: 'v',
     description: 'Spending by businesses on structures, equipment, and intellectual property products.',
@@ -490,18 +483,17 @@ export const indicators: IndicatorMetadata[] = [
     unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB',
     apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE',
   },
-   // --- NEW CRYPTO & SENTIMENT INDICATORS ---
   {
     id: 'BTC_PRICE_USD',
     name: 'Bitcoin Price (USD)',
-    categoryKey: 'viii', // Financial Markets
+    categoryKey: 'viii',
     description: 'Daily closing price of Bitcoin in US Dollars, typically sourced around UTC midnight.',
     unit: 'USD',
     frequency: 'Daily',
     sourceName: 'CoinGecko',
     sourceLink: 'https://www.coingecko.com/en/coins/bitcoin',
-    apiSource: 'CoinGeckoAPI', // New unique key for our fetcher
-    apiIdentifier: 'bitcoin', // The ID CoinGecko API uses for Bitcoin
+    apiSource: 'CoinGeckoAPI',
+    apiIdentifier: 'bitcoin',
     chartType: 'line',
     calculation: 'NONE',
     notes: 'Data from CoinGecko public API.',
@@ -509,20 +501,19 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'CRYPTO_FEAR_GREED',
     name: 'Crypto Fear & Greed Index',
-    categoryKey: 'viii', // Financial Markets
+    categoryKey: 'viii',
     description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market (0=Extreme Fear, 100=Extreme Greed). Data is collected daily.',
     unit: 'Index (0-100)',
     frequency: 'Daily',
     sourceName: 'Alternative.me',
     sourceLink: 'https://alternative.me/crypto/fear-and-greed-index/',
-    apiSource: 'AlternativeMeAPI', // New unique key for our fetcher
-    apiIdentifier: 'fear-and-greed', // A placeholder, specific API might not need one if it only returns this index
-    chartType: 'line', // Can also be a gauge, but line for history
+    apiSource: 'AlternativeMeAPI',
+    apiIdentifier: 'fear-and-greed', // Placeholder, as API might not need one if it only returns this
+    chartType: 'line',
     calculation: 'NONE',
     notes: 'Data from Alternative.me API.',
   },
 ];
-
 
 // Helper functions
 export function getIndicatorById(id: string): IndicatorMetadata | undefined {

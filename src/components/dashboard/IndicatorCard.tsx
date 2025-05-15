@@ -4,27 +4,20 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-// Shadcn/ui & Icon Imports
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@/components/ui/switch"; // Correct import
 import { Label } from "@/components/ui/label";
-// import { Badge } from "@/components/ui/badge"; // Uncomment if you use badges for PRO indicators
 import { Button } from '@/components/ui/button';
 import { FaInfoCircle } from 'react-icons/fa';
-import { FiBarChart2 } from 'react-icons/fi';
+import { FiBarChart2, FiAlertCircle } from 'react-icons/fi';
 import { Lock, Star, BarChartHorizontalBig } from 'lucide-react';
-
-// Custom Hooks & Types
 import { useSession } from 'next-auth/react';
 import { useFavorites } from '@/hooks/useFavorites';
-import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure path is correct
+import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
 import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
-import ChartComponent, { MovingAverageSeries } from './ChartComponent'; // Ensure MovingAverageSeries is exported
-
-// Date Formatting
+import ChartComponent, { MovingAverageSeries } from './ChartComponent';
 import { format, parseISO, isValid } from 'date-fns';
 
 interface IndicatorCardProps {
@@ -51,6 +44,7 @@ const canUserAccessFeature = (userTier: AppPlanTier | undefined, featureKey: str
     return FEATURE_ACCESS[featureKey]?.includes(effectiveTier) || false;
 };
 
+
 export default function IndicatorCard({ indicator, latestValue, historicalData }: IndicatorCardProps) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -62,7 +56,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
   const canAccessAdvancedStats = canUserAccessFeature(userTier, 'ADVANCED_STATS_BUTTON');
   const canUseFavorites = isLoggedIn && canUserAccessFeature(userTier, 'FAVORITES');
 
-  const { favoriteIds, addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites();
+  const { addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites(); // Removed favoriteIds, not directly used
   const currentIsFavorited = useMemo(() => isFavorited(indicator.id), [isFavorited, indicator.id]);
 
   const displayValue = useMemo(() => latestValue?.value !== null && latestValue?.value !== undefined
@@ -76,14 +70,14 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
     return '';
   }, [latestValue?.date]);
 
-  const validHistoricalData = useMemo(() => Array.isArray(historicalData) ? historicalData : [], [historicalData]);
-  
-  const statistics: SeriesStatistics = useMemo(() => 
-    calculateSeriesStatistics(validHistoricalData), 
+  const validHistoricalData = useMemo(() => Array.isArray(historicalData) ? historicalData.filter(d => d.value !== null && d.value !== undefined && d.date && isValid(parseISO(d.date))) : [], [historicalData]);
+
+  const statistics: SeriesStatistics = useMemo(() =>
+    calculateSeriesStatistics(validHistoricalData),
   [validHistoricalData]);
 
-  const availableMaPeriods = useMemo(() => 
-    getMaPeriods(indicator.frequency), 
+  const availableMaPeriods = useMemo(() =>
+    getMaPeriods(indicator.frequency),
   [indicator.frequency]);
 
   const [selectedMaPeriods, setSelectedMaPeriods] = useState<number[]>([]);
@@ -121,7 +115,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
         promptUpgrade("Advanced Statistics");
         return;
     }
-    alert("Showing Advanced Statistics! (Pro Feature Placeholder)");
+    alert("Showing Advanced Statistics! (Pro Feature Placeholder) - Would navigate or show modal.");
   };
 
   const handleFavoriteToggle = async () => {
@@ -144,6 +138,8 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
     }
   };
 
+  const isDataEffectivelyUnavailable = historicalData.length === 0 && latestValue === null;
+
   return (
     <Card className="flex flex-col h-full border bg-card text-card-foreground shadow-sm hover:shadow-lg transition-shadow duration-200 relative overflow-hidden">
       <CardHeader className="pb-3">
@@ -159,31 +155,21 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
           </div>
           <div className="flex items-center space-x-1 flex-shrink-0">
             {isLoggedIn && FEATURE_ACCESS.FAVORITES && (
-                <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-amber-500 disabled:opacity-50"
-                                onClick={handleFavoriteToggle}
-                                disabled={isLoadingFavorites || !canUseFavorites}
-                                aria-label={currentIsFavorited ? "Remove from favorites" : "Add to favorites"}
-                            >
-                                {currentIsFavorited ? (
-                                    <Star className="h-4 w-4 fill-amber-400 text-amber-500" />
-                                ) : (
-                                    <Star className="h-4 w-4" />
-                                )}
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                            <p>{currentIsFavorited ? "Unfavorite" : "Favorite"}</p>
-                            {!canUseFavorites && 
-                                <p className="text-xs text-amber-600 mt-1">Upgrade to use favorites.</p>}
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+                <TooltipProvider delayDuration={100}> <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-amber-500 disabled:opacity-50"
+                            onClick={handleFavoriteToggle} disabled={isLoadingFavorites || !canUseFavorites}
+                            aria-label={currentIsFavorited ? "Remove from favorites" : "Add to favorites"}
+                        > {currentIsFavorited ? <Star className="h-4 w-4 fill-amber-400 text-amber-500" /> : <Star className="h-4 w-4" />}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                        <p>{currentIsFavorited ? "Unfavorite" : "Favorite"}</p>
+                        {!canUseFavorites && <p className="text-xs text-amber-600 mt-1">Upgrade to use favorites.</p>}
+                    </TooltipContent>
+                </Tooltip> </TooltipProvider>
             )}
             {statistics && statistics.count > 0 && (
                  <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
@@ -215,12 +201,23 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
       </CardHeader>
       <CardContent className="flex-grow flex flex-col px-3 sm:px-4 pt-0 pb-2">
         <div className="flex-grow h-48 md:h-56 lg:h-60 -ml-1 -mr-1 sm:-ml-2 sm:-mr-2">
-           <ChartComponent
-              data={validHistoricalData}
-              dataKey="value"
-              type={indicator.chartType || 'line'}
-              movingAverages={movingAverageData}
-            />
+           {validHistoricalData && validHistoricalData.length > 0 ? (
+             <ChartComponent
+                data={validHistoricalData}
+                dataKey="value"
+                type={indicator.chartType || 'line'}
+                movingAverages={movingAverageData}
+              />
+           ) : (
+             <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs p-3 text-center">
+               <FiAlertCircle className="h-6 w-6 mb-2 opacity-70" />
+               <p>
+                {isDataEffectivelyUnavailable
+                    ? "Data currently unavailable for this indicator."
+                    : "No data points for the selected period."}
+               </p>
+             </div>
+           )}
         </div>
       </CardContent>
       <CardFooter className="flex-col items-start space-y-2 text-xs px-3 sm:px-4 pt-2 pb-3 border-t">
@@ -234,7 +231,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
             </div>
             {indicator.frequency && <span className="flex-shrink-0 ml-2">({indicator.frequency})</span>}
         </div>
-        
+
         {FEATURE_ACCESS.MOVING_AVERAGES && availableMaPeriods.length > 0 && validHistoricalData.length >= Math.min(...availableMaPeriods, Infinity) && (
           <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 pt-1.5 border-t w-full mt-1.5">
             <Label className="text-xs font-medium text-muted-foreground shrink-0 mr-1">MAs:</Label>
@@ -246,21 +243,19 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                   onCheckedChange={() => handleMaToggle(period)}
                   disabled={!canAccessMAs}
                   className="h-4 w-7 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
-                  thumbClassName="h-3 w-3 data-[state=checked]:translate-x-3 data-[state=unchecked]:translate-x-0.5"
+                  // thumbClassName prop removed here
                 />
                 <Label htmlFor={`ma-${indicator.id}-${period}`} className={`text-xs ${!canAccessMAs ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                   {period}{indicator.frequency?.charAt(0).toUpperCase() || 'P'}
                 </Label>
                 {!canAccessMAs && (
-                  <TooltipProvider delayDuration={50}>
-                    <Tooltip>
-                      <TooltipTrigger asChild> 
-                        <button 
+                  <TooltipProvider delayDuration={50}> <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
                             onClick={(e) => {e.preventDefault(); e.stopPropagation(); promptUpgrade("Moving Averages");}}
-                            className="flex items-center justify-center h-full ml-0.5" // Making lock clickable
+                            className="flex items-center justify-center h-full ml-0.5"
                             aria-label="Upgrade for Moving Averages"
-                        >
-                            <Lock className="h-3 w-3 text-amber-500 group-hover:text-amber-400 transition-colors" />
+                        > <Lock className="h-3 w-3 text-amber-500 group-hover:text-amber-400 transition-colors" />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
@@ -269,8 +264,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                             <Link href="/pricing">Upgrade Now</Link>
                         </Button>
                       </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  </Tooltip> </TooltipProvider>
                 )}
               </div>
             ))}
@@ -279,12 +273,9 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
 
         {FEATURE_ACCESS.ADVANCED_STATS_BUTTON && (
             <div className="w-full pt-1.5 border-t mt-1.5">
-                <Button 
-                    variant="outline" 
-                    size="xs" 
-                    className="w-full text-xs h-7"
-                    onClick={handleAdvancedStatsClick}
-                    disabled={!canAccessAdvancedStats}
+                <Button
+                    variant="outline" size="xs" className="w-full text-xs h-7"
+                    onClick={handleAdvancedStatsClick} disabled={!canAccessAdvancedStats}
                 >
                     <BarChartHorizontalBig className="mr-1.5 h-3.5 w-3.5" />
                     Advanced Stats
