@@ -1,5 +1,5 @@
 // src/app/api/auth/confirm-password-reset/route.ts
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma"; // Now PrismaClient | null
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 
@@ -7,6 +7,16 @@ const SALT_ROUNDS = 10;
 
 export async function POST(request: Request) {
   try {
+    // --- ADD THIS CHECK ---
+    if (!prisma) {
+      console.error("[API Confirm PW Reset] Database not configured. Prisma instance is null.");
+      return NextResponse.json(
+        { error: "Password reset service is temporarily unavailable. Please try again later or contact support." },
+        { status: 503 }
+      );
+    }
+    // --- END CHECK ---
+
     const body = await request.json();
     const { token: plainToken, password } = body;
 
@@ -17,13 +27,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Password must be at least 6 characters long" }, { status: 400 });
     }
 
-    // Find token by iterating and comparing (since we stored hashed tokens)
-    // This is not super efficient for many tokens. A better way for production
-    // might be to also store the plain token temporarily with a short expiry
-    // or use a different crypto method that allows direct lookup if security permits.
-    // For now, we'll iterate. In a real system, also clean up expired tokens.
     const allTokens = await prisma.passwordResetToken.findMany({
-        where: { expiresAt: { gt: new Date() } } // Only check non-expired tokens
+        where: { expiresAt: { gt: new Date() } }
     });
 
     let dbTokenRecord = null;
@@ -39,27 +44,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid or expired reset token." }, { status: 400 });
     }
 
-    // Hash the new password
     const newPasswordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Update user's password
     await prisma.user.update({
       where: { id: dbTokenRecord.userId },
       data: { passwordHash: newPasswordHash },
     });
 
-    // Delete the used token (or all tokens for that user for good measure)
     await prisma.passwordResetToken.delete({
       where: { id: dbTokenRecord.id },
     });
-    // Optionally: await prisma.passwordResetToken.deleteMany({ where: { userId: dbTokenRecord.userId } });
-
 
     return NextResponse.json({ message: "Password has been reset successfully." }, { status: 200 });
 
   } catch (error) {
-    console.error("Confirm Password Reset Error:", error);
-    // Avoid leaking too much info in production errors
+    console.error("[API Confirm PW Reset] Error:", error);
+    if ((error as any).message?.includes("PrismaClientInitializationError")) {
+        return NextResponse.json({ error: "Database service unavailable." }, { status: 503 });
+    }
     return NextResponse.json({ error: "An unexpected error occurred while resetting password." }, { status: 500 });
   }
 }
