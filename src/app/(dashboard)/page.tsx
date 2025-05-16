@@ -18,25 +18,25 @@ import { Gem, Star, TrendingUp, Zap, Newspaper, CalendarDays, Briefcase, Shield,
 import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
 
-export const revalidate = 300;
+export const revalidate = 300; // Revalidate data at most every 5 minutes
 
 // Configuration for Overview Page
-const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI'];
-const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED']; // Keep these as they are general market snapshots
+const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI']; // PMI will now be ISM Mfg or CFNAI
+const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED'];
 const MAX_FAVORITES_ON_OVERVIEW = 3;
 
+// Updated Asset Risk Spectrum Configuration
 const riskSpectrumSetup = [
   {
     title: "🟢 Low-Risk Assets",
     iconLucide: Shield,
     description: "Often preferred during economic uncertainty for capital preservation; sensitive to interest rates and inflation.",
     keyIndicatorsConfig: [
-      { id: 'FED_FUNDS', explanation: "Lower rates generally boost bond prices (inverse relationship). Higher rates make cash more attractive." },
-      { id: 'CPI_YOY_PCT', explanation: "High inflation erodes the real return of fixed-income assets and cash." },
-      { id: 'T10Y2Y_SPREAD', explanation: "An inverted curve (negative spread) historically signals recession risk, increasing demand for safe havens." },
-      { id: 'UNRATE', explanation: "Rising unemployment can signal economic weakness, prompting a flight to safer assets like government bonds." },
-      // DTB3 Removed
-      { id: 'GOLD_PRICE', explanation: "Often considered a safe-haven asset during times of economic uncertainty and inflation."} // Kept Gold
+      { id: 'US10Y', explanation: "Benchmark for 'risk-free' rate; price moves inversely to yield. Lower yields often signal flight to safety or rate cut expectations." },
+      { id: 'GOLD_PRICE', explanation: "Traditionally seen as a store of value and hedge against inflation or geopolitical risk." },
+      { id: 'JNJ_STOCK', explanation: "Represents a stable, blue-chip company with consistent dividends, generally lower volatility." },
+      { id: 'KO_STOCK', explanation: "A defensive stock known for stable demand and dividends, often less affected by economic downturns." },
+      { id: 'XLU_ETF', explanation: "Utilities sector ETF, often considered defensive due to consistent demand for services." },
     ]
   },
   {
@@ -44,11 +44,11 @@ const riskSpectrumSetup = [
     iconLucide: Scale,
     description: "Typically offer a balance of income and growth; moderately affected by economic cycles and corporate health.",
     keyIndicatorsConfig: [
-      { id: 'GDP_GROWTH', explanation: "Stable GDP growth generally supports corporate earnings and real estate values." },
-      { id: 'CCI', explanation: "Strong consumer confidence can indicate robust spending, benefiting various sectors including REITs and dividend stocks." },
-      { id: 'PMI_SERVICES', explanation: "A healthy services sector (expansion >50) often correlates with broader economic strength." },
-      { id: 'BAA_YIELD', explanation: "Yields on investment-grade corporate bonds reflect credit risk and interest rate expectations." },
-      // REIT_INDEX (VNQ_ETF) Removed
+      { id: 'LQD_ETF', explanation: "Tracks investment-grade corporate bonds, offering higher yields than Treasuries with moderate credit risk." },
+      { id: 'VNQ_ETF', explanation: "Represents diversified real estate investments, sensitive to interest rates and economic growth." },
+      { id: 'LAND_REIT', explanation: "Farmland REIT, offering potential inflation hedging and unique asset class exposure." },
+      { id: 'SILVER_PRICE', explanation: "Precious metal with industrial uses, can be more volatile than gold but offers diversification." },
+      { id: 'PLATINUM_PRICE', explanation: "Industrial precious metal, price influenced by automotive demand and industrial output." },
     ]
   },
   {
@@ -56,14 +56,11 @@ const riskSpectrumSetup = [
     iconLucide: TrendingUp,
     description: "Highly sensitive to growth expectations, market sentiment, liquidity, and risk appetite.",
     keyIndicatorsConfig: [
-      { id: 'SP500', explanation: "Broad market performance reflects overall investor sentiment and economic outlook." },
-      // NASDAQ_100 (QQQ_ETF) Removed
-      { id: 'PMI', explanation: "Manufacturing activity (expansion >50) often drives cyclical and growth stocks." },
-      { id: 'RETAIL_SALES_MOM_PCT', explanation: "Consumer spending strength fuels growth in consumer discretionary and speculative equities." },
-      { id: 'VIX', explanation: "Higher VIX (volatility) indicates market fear, typically reducing appetite for high-risk assets." },
-      { id: 'M2_YOY_PCT', explanation: "Significant changes in money supply can influence asset valuations and inflation expectations, impacting speculative assets." },
-      { id: 'BTC_PRICE_USD', explanation: "Performance reflects sentiment in highly speculative digital asset markets." },
-      // EEM_ETF Removed
+      { id: 'BTC_PRICE_USD', explanation: "Highly volatile cryptocurrency, driven by adoption, sentiment, and macroeconomic factors." },
+      { id: 'ETH_PRICE_USD', explanation: "Leading smart contract platform cryptocurrency, also highly volatile." },
+      { id: 'OIL_WTI', explanation: "Crude oil price, highly sensitive to global supply/demand, geopolitical events, and economic growth." },
+      { id: 'JNK_ETF', explanation: "Tracks high-yield ('junk') corporate bonds, offering higher returns for significantly higher credit risk." },
+      { id: 'ARKK_ETF', explanation: "Invests in speculative, disruptive innovation companies, known for high growth potential and volatility." },
     ]
   },
 ];
@@ -99,8 +96,15 @@ const fetchDataForRiskAndSummaryLists = async (
           return !!indicator;
       })
       .map(async (indicator) => {
-          // Updated global asset list to reflect removals
-          const isGlobalAsset = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', /*'DTB3',*/ 'GOLD_PRICE', 'BAA_YIELD', /*'REIT_INDEX', 'NASDAQ_100', 'EEM_ETF',*/ 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT', 'FED_FUNDS', 'PMI', 'PMI_SERVICES', 'CCI', 'CPI_YOY_PCT', 'GDP_GROWTH', 'UNRATE', 'RETAIL_SALES_MOM_PCT'].includes(indicator.id);
+          // Updated global asset list to include new stock/ETF tickers
+          const isGlobalAsset = [
+            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'SILVER_PRICE', 'PLATINUM_PRICE',
+            'JNJ_STOCK', 'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT',
+            'ETH_PRICE_USD', 'OIL_WTI', 'JNK_ETF', 'ARKK_ETF',
+            // Core global/US-centric indicators often used in multiple places
+            'US10Y', 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT', 'FED_FUNDS', 'PMI', 'PMI_SERVICES',
+            'CCI', 'CPI_YOY_PCT', 'GDP_GROWTH', 'UNRATE', 'RETAIL_SALES_MOM_PCT'
+          ].includes(indicator.id);
           const shouldFetch = country === 'US' || indicator.apiSource === 'Mock' || isGlobalAsset;
 
           let latestValue: TimeSeriesDataPoint | null = null;
@@ -125,8 +129,8 @@ const fetchDataForRiskAndSummaryLists = async (
 
               if (latestValue?.value !== null && latestValue?.value !== undefined) {
                 currentValueDisplay = `${latestValue.value.toLocaleString(undefined, {
-                    minimumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') ? 2 : 0),
-                    maximumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') ? 2 : (indicator.id === 'BTC_PRICE_USD' ? 0 : 2)),
+                    minimumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('per troy ounce') ? 2 : 0), // Adjusted for commodity prices
+                    maximumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('per troy ounce') ? 2 : (['BTC_PRICE_USD', 'ETH_PRICE_USD'].includes(indicator.id) ? 0 : 2)),
                 })}`;
 
                 if (previousValue?.value !== null && previousValue?.value !== undefined) {

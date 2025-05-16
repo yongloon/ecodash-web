@@ -99,7 +99,7 @@ export async function fetchFredSeries(
 
 // --- Alpha Vantage API Fetcher ---
 export async function fetchAlphaVantageData(
-  apiIdentifier: string,
+  apiIdentifier: string, // Can be a stock/ETF symbol, "PMI", "NMI", or "XAU/USD"
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
   console.log(`[fetchAlphaVantageData API - ENTRY] Called with: apiIdentifier=${apiIdentifier}, dateRange=${JSON.stringify(dateRange)}`);
@@ -120,13 +120,34 @@ export async function fetchAlphaVantageData(
   let params: URLSearchParams;
   let dataKeyInResponse: string;
   let valueKeyInDataPoint: string;
-  const isKnownEconomicFunction = ['PMI', 'NMI'].includes(apiIdentifier.toUpperCase()) && false; // Disabled direct PMI/NMI calls for now
+  let isCurrencyPair = false;
 
-  if (isKnownEconomicFunction) {
+  if (apiIdentifier.includes('/')) { // Heuristic for currency pairs like "XAU/USD"
+    const parts = apiIdentifier.split('/');
+    if (parts.length === 2) {
+      params = new URLSearchParams({
+        function: 'CURRENCY_EXCHANGE_RATE',
+        from_currency: parts[0], // e.g., XAU
+        to_currency: parts[1],   // e.g., USD
+        apikey: apiKey,
+      });
+      // AlphaVantage response for CURRENCY_EXCHANGE_RATE is different:
+      // "Realtime Currency Exchange Rate": { "5. Exchange Rate": "VALUE" }
+      // It does NOT return a time series, only the latest rate.
+      // We will adapt to create a single point for today.
+      dataKeyInResponse = 'Realtime Currency Exchange Rate';
+      valueKeyInDataPoint = '5. Exchange Rate';
+      isCurrencyPair = true;
+      console.log(`[API AlphaVantage] Fetching currency exchange rate: ${apiIdentifier}`);
+    } else {
+      console.error(`[API AlphaVantage] Invalid currency pair format for ${apiIdentifier}. Expected FROM/TO.`);
+      return [];
+    }
+  } else if (['PMI', 'NMI'].includes(apiIdentifier.toUpperCase()) && false) { // Keep PMI/NMI disabled for AV for now
     params = new URLSearchParams({ function: apiIdentifier.toUpperCase(), apikey: apiKey });
     dataKeyInResponse = 'data'; valueKeyInDataPoint = 'value';
     console.log(`[API AlphaVantage] Fetching economic indicator: ${apiIdentifier.toUpperCase()}`);
-  } else {
+  } else { // Assume it's a stock/ETF symbol for TIME_SERIES_DAILY_ADJUSTED
     let outputSize = 'compact';
     if (isValid(parseISO(effectiveStartDateStr)) && isValid(parseISO(effectiveEndDateStr))) {
       if (differenceInDays(parseISO(effectiveEndDateStr), parseISO(effectiveStartDateStr)) > 90) outputSize = 'full';
@@ -135,11 +156,12 @@ export async function fetchAlphaVantageData(
     dataKeyInResponse = 'Time Series (Daily)'; valueKeyInDataPoint = '5. adjusted close';
     console.log(`[API AlphaVantage] Fetching stock/ETF: ${apiIdentifier} (output: ${outputSize})`);
   }
+
   const url = `${ALPHA_VANTAGE_API_URL}?${params.toString()}`;
   console.log(`[API AlphaVantage] Attempting to fetch: ${url.replace(apiKey, "REDACTED_KEY")}`);
 
   try {
-    const response = await fetch(url, { next: { revalidate: 14400 } }); // Cache 4 hours
+    const response = await fetch(url, { next: { revalidate: isCurrencyPair ? 300 : 14400 } }); // Shorter reval for currency quotes
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[API AlphaVantage] Error response for ${apiIdentifier}: ${response.status} - ${errorText.substring(0,500)}`);
@@ -154,36 +176,56 @@ export async function fetchAlphaVantageData(
     }
     if (data["Note"]) console.warn(`[API AlphaVantage] API Note for ${apiIdentifier}: ${data["Note"]}.`);
 
-    const timeSeriesArrayOrObject = data[dataKeyInResponse];
-    if (!timeSeriesArrayOrObject || (Array.isArray(timeSeriesArrayOrObject) && timeSeriesArrayOrObject.length === 0) || (typeof timeSeriesArrayOrObject === 'object' && Object.keys(timeSeriesArrayOrObject).length === 0) ) {
-      console.warn(`[API AlphaVantage] No '${dataKeyInResponse}' data or empty data in response for ${apiIdentifier}.`);
+    const responseDataBlock = data[dataKeyInResponse];
+    if (!responseDataBlock || (typeof responseDataBlock === 'object' && Object.keys(responseDataBlock).length === 0)) {
+      console.warn(`[API AlphaVantage] No '${dataKeyInResponse}' data or empty data object in response for ${apiIdentifier}.`);
       return [];
     }
-    let seriesData: TimeSeriesDataPoint[];
-    if (Array.isArray(timeSeriesArrayOrObject)) { // Should not be hit if isKnownEconomicFunction is false
-        seriesData = (timeSeriesArrayOrObject as Array<{ date: string; value: string }>)
-          .map(item => {
-            if (!item.date || !isValid(parseISO(item.date)) || item[valueKeyInDataPoint] === undefined) return null;
-            const value = parseFloat(item[valueKeyInDataPoint]);
-            return isNaN(value) ? null : { date: item.date, value };
-          }).filter(dp => dp !== null) as TimeSeriesDataPoint[];
-    } else {
-        seriesData = Object.keys(timeSeriesArrayOrObject)
+
+    let seriesData: TimeSeriesDataPoint[] = [];
+
+    if (isCurrencyPair) {
+      const rateStr = responseDataBlock[valueKeyInDataPoint];
+      if (rateStr !== undefined) {
+        const value = parseFloat(rateStr);
+        if (!isNaN(value)) {
+          seriesData = [{
+            date: format(new Date(), 'yyyy-MM-dd'), // Today's date
+            value: parseFloat(value.toFixed(4)) // More precision for currency/gold
+          }];
+        } else {
+            console.warn(`[API AlphaVantage] Could not parse exchange rate value for ${apiIdentifier}: ${rateStr}`);
+        }
+      } else {
+          console.warn(`[API AlphaVantage] Exchange rate key '${valueKeyInDataPoint}' not found for ${apiIdentifier}.`);
+      }
+    } else if (Array.isArray(responseDataBlock)) { // For PMI/NMI if re-enabled (currently not)
+        seriesData = (responseDataBlock as Array<{ date: string; value: string }>)
+          .map(item => { /* ... */ }).filter(dp => dp !== null) as TimeSeriesDataPoint[];
+    } else { // For stock/ETF TIME_SERIES_DAILY_ADJUSTED
+        seriesData = Object.keys(responseDataBlock)
           .map(dateStr => {
             if (!isValid(parseISO(dateStr))) return null;
-            const dayData = timeSeriesArrayOrObject[dateStr];
+            const dayData = responseDataBlock[dateStr];
             const valueStr = dayData[valueKeyInDataPoint] || dayData['4. close'];
             if (valueStr === undefined) return null;
             const value = parseFloat(valueStr);
             return isNaN(value) ? null : { date: dateStr, value: value };
           }).filter(dp => dp !== null) as TimeSeriesDataPoint[];
     }
-    seriesData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    let filteredSeriesData = seriesData;
-    if (isValid(parseISO(effectiveStartDateStr))) filteredSeriesData = filteredSeriesData.filter(dp => parseISO(dp.date) >= parseISO(effectiveStartDateStr));
-    if (isValid(parseISO(effectiveEndDateStr))) filteredSeriesData = filteredSeriesData.filter(dp => parseISO(dp.date) <= parseISO(effectiveEndDateStr));
-    console.log(`[API AlphaVantage] Parsed ${seriesData.length} raw points, ${filteredSeriesData.length} after date filtering for ${apiIdentifier}`);
-    return filteredSeriesData;
+
+    if (!isCurrencyPair) { // Time series data needs sorting and filtering
+        seriesData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        let filteredSeriesData = seriesData;
+        if (isValid(parseISO(effectiveStartDateStr))) filteredSeriesData = filteredSeriesData.filter(dp => parseISO(dp.date) >= parseISO(effectiveStartDateStr));
+        if (isValid(parseISO(effectiveEndDateStr))) filteredSeriesData = filteredSeriesData.filter(dp => parseISO(dp.date) <= parseISO(effectiveEndDateStr));
+        console.log(`[API AlphaVantage] Parsed ${seriesData.length} raw points, ${filteredSeriesData.length} after date filtering for ${apiIdentifier}`);
+        return filteredSeriesData;
+    } else { // For currency pair, we already have a single point array
+        console.log(`[API AlphaVantage] Parsed ${seriesData.length} points (single quote) for ${apiIdentifier}`);
+        return seriesData;
+    }
+
   } catch (error) {
     console.error(`[API AlphaVantage] Network or parsing error for ${apiIdentifier}:`, error);
     return [];
