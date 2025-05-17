@@ -13,7 +13,7 @@ export const indicatorCategories = {
   'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaIndustry },
   'vi': { name: 'Housing Market', slug: 'housing-market', icon: FaHome },
   'vii': { name: 'International Trade', slug: 'international-trade', icon: FaPlaneDeparture },
-  'viii': { name: 'Financial Markets & Assets', slug: 'financial-markets', icon: BsBank2 },
+  'viii': { name: 'Financial Markets & Interest Rates', slug: 'financial-markets-rates', icon: BsBank2 }, // Renamed for clarity
 } as const;
 
 export type IndicatorCategoryKey = keyof typeof indicatorCategories;
@@ -34,7 +34,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjasHistorical'; // Removed PolygonIO_PREV_CLOSE, PolygonIO_LAST_TRADE, ApiNinjas. Added ApiNinjasHistorical
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjasHistorical';
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -49,11 +49,8 @@ export const indicators: IndicatorMetadata[] = [
   // == Category I: Economic Output & Growth ==
   { id: 'GDP_REAL', name: 'Real Gross Domestic Product', categoryKey: 'i', description: 'Value of final goods/services, inflation-adjusted.', unit: 'Billions of Chained 2017 Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'GDPC1', chartType: 'line', calculation: 'NONE' },
   { id: 'GDP_GROWTH', name: 'Real GDP Growth Rate', categoryKey: 'i', description: '% change in real GDP, annualized.', unit: '% Change (Annualized)', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'A191RL1Q225SBEA', chartType: 'bar', calculation: 'NONE' },
-  { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'i', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' },
   { id: 'GNP', name: 'Gross National Product', categoryKey: 'i', description: 'Total income earned by a nation\'s people and businesses.', unit: 'Billions of Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'GNP', chartType: 'line', calculation: 'NONE' },
   { id: 'GDP_PER_CAPITA', name: 'Real GDP per Capita', categoryKey: 'i', description: 'Average economic output per person, inflation-adjusted.', unit: 'Chained 2017 Dollars', frequency: 'Quarterly', sourceName: 'BEA/Census via FRED', apiSource: 'FRED', apiIdentifier: 'A939RX0Q048SBEA', chartType: 'line', calculation: 'NONE' },
-  { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'i', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
-  { id: 'PRODUCTIVITY', name: 'Productivity (Output Per Hour)', categoryKey: 'i', description: 'Output per hour in the nonfarm business sector.', unit: 'Index 2012=100', frequency: 'Quarterly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'OPHNFB', chartType: 'line', calculation: 'NONE' },
   {
     id: 'LEI', name: 'Leading Economic Index (LEI)', categoryKey: 'i',
     description: 'Composite index designed to signal peaks and troughs in the business cycle for the U.S. economy.',
@@ -74,6 +71,7 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'U6RATE', name: 'Underemployment Rate (U-6)', categoryKey: 'ii', description: 'Broader measure of labor underutilization.', unit: '%', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'U6RATE', chartType: 'line', calculation: 'NONE' },
   { id: 'QUITRATE', name: 'Quit Rate (JOLTS)', categoryKey: 'ii', description: 'Quits as a % of total employment.', unit: '%', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'JTSQUR', chartType: 'line', calculation: 'NONE' },
   { id: 'HIRERATE', name: 'Hire Rate (JOLTS)', categoryKey: 'ii', description: 'Hires as a % of total employment.', unit: '%', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'JTSHIR', chartType: 'line', calculation: 'NONE' },
+  { id: 'PRODUCTIVITY', name: 'Productivity (Output Per Hour)', categoryKey: 'ii', description: 'Output per hour in the nonfarm business sector.', unit: 'Index 2012=100', frequency: 'Quarterly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'OPHNFB', chartType: 'line', calculation: 'NONE' }, // Moved from Growth
 
   // == Category III: Inflation & Prices ==
   { id: 'CPI_YOY_PCT', name: 'Consumer Price Index (CPI-U, YoY %)', categoryKey: 'iii', description: 'YoY % change in consumer prices (urban).', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'CPIAUCSL', chartType: 'bar', calculation: 'YOY_PERCENT' },
@@ -90,8 +88,7 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'GOLD_PRICE', name: 'Spot Gold Price (API-Ninjas Historical)', categoryKey: 'iii',
     description: 'Historical spot price of gold in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce',
-    frequency: 'Daily',
+    unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
     apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Gold',
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key.'
@@ -99,8 +96,7 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'SILVER_PRICE', name: 'Spot Silver Price (API-Ninjas Historical)', categoryKey: 'iii',
     description: 'Historical spot price of silver in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce',
-    frequency: 'Daily',
+    unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
     apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Silver',
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key.'
@@ -108,8 +104,7 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (API-Ninjas Historical)', categoryKey: 'iii',
     description: 'Historical spot price of platinum in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce',
-    frequency: 'Daily',
+    unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
     apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Platinum',
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key.'
@@ -134,8 +129,10 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'CC_DELINQUENCY', name: 'Credit Card Delinquency Rate', categoryKey: 'iv', description: 'Delinquency rate on credit card loans (all commercial banks).', unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DRCCLACBS', chartType: 'line', calculation: 'NONE' },
 
   // == Category V: Business Activity & Investment ==
-  { id: 'PMI', name: 'ISM Manufacturing PMI (DB.nomics)', categoryKey: 'v', description: 'ISM Manufacturing PMI. >50 indicates expansion.', unit: 'Index', frequency: 'Monthly', sourceName: 'ISM via DB.nomics', sourceLink: 'https://db.nomics.world/ISM/pmi', apiSource: 'DBNOMICS', apiIdentifier: 'ISM/pmi/TOTAL', chartType: 'line', calculation: 'NONE', notes: 'Verify specific series ID for SA composite on DB.nomics.' },
-  { id: 'PMI_SERVICES', name: 'ISM Services PMI (DB.nomics)', categoryKey: 'v', description: 'ISM Services PMI. >50 indicates expansion.', unit: 'Index', frequency: 'Monthly', sourceName: 'ISM via DB.nomics', sourceLink: 'https://db.nomics.world/ISM/non-manufacturing-pmi', apiSource: 'DBNOMICS', apiIdentifier: 'ISM/non-manufacturing-pmi/TOTAL', chartType: 'line', calculation: 'NONE', notes: 'Verify specific series ID for SA composite on DB.nomics.' },
+  { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'v', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' }, // Moved from Growth
+  { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'v', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' }, // Moved from Growth
+  { id: 'PMI', name: 'ISM Manufacturing PMI', categoryKey: 'v', description: 'ISM Manufacturing PMI. >50 indicates expansion.', unit: 'Index', frequency: 'Monthly', sourceName: 'ISM via DB.nomics', sourceLink: 'https://db.nomics.world/ISM/pmi', apiSource: 'DBNOMICS', apiIdentifier: 'ISM/pmi/TOTAL', chartType: 'line', calculation: 'NONE' },
+  { id: 'PMI_SERVICES', name: 'ISM Services PMI', categoryKey: 'v', description: 'ISM Services PMI. >50 indicates expansion.', unit: 'Index', frequency: 'Monthly', sourceName: 'ISM via DB.nomics', sourceLink: 'https://db.nomics.world/ISM/non-manufacturing-pmi', apiSource: 'DBNOMICS', apiIdentifier: 'ISM/non-manufacturing-pmi/TOTAL', chartType: 'line', calculation: 'NONE' },
   { id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for durable goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'DGORDER', chartType: 'bar', calculation: 'MOM_PERCENT', notes: 'Includes transportation.' },
   { id: 'FACTORY_ORDERS_MOM_PCT', name: 'Factory Orders (MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for manufactured goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'AMTMNO', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'BUS_INVENTORIES_MOM_PCT', name: 'Business Inventories (MoM %)', categoryKey: 'v', description: 'MoM % change in total value of business inventories.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'BUSINV', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -152,20 +149,45 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'HOUSING_AFFORD', name: 'Housing Affordability Index', categoryKey: 'vi', description: 'Measures if a typical family can qualify for a mortgage on a typical home.', unit: 'Index', frequency: 'Monthly', sourceName: 'NAR via FRED', apiSource: 'FRED', apiIdentifier: 'FIXHAI', chartType: 'line', calculation: 'NONE' },
   { id: 'MORTGAGE_DELINQUENCY', name: 'Mortgage Delinquency Rate', categoryKey: 'vi', description: 'Delinquency rate on single-family residential mortgages.', unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DRSFRMACBS', chartType: 'line', calculation: 'NONE' },
   { id: 'RENTAL_VACANCY', name: 'Rental Vacancy Rate', categoryKey: 'vi', description: '% of rental housing units vacant and available.', unit: '%', frequency: 'Quarterly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'RRVRUSQ156N', chartType: 'line', calculation: 'NONE' },
+  { id: 'MORTGAGE_RATE', name: '30-Year Fixed Mortgage Rate', categoryKey: 'vi', description: 'Average 30-year fixed mortgage rate in the U.S.', unit: '%', frequency: 'Weekly', sourceName: 'Freddie Mac via FRED', apiSource: 'FRED', apiIdentifier: 'MORTGAGE30US', chartType: 'line', calculation: 'NONE' }, // MOVED HERE
 
   // == Category VII: International Trade ==
   { id: 'TRADE_BALANCE', name: 'Balance of Trade (Goods & Services)', categoryKey: 'vii', description: 'Difference between a country\'s exports and imports.', unit: 'Billions of Dollars', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'BOPGSTB', chartType: 'bar', calculation: 'NONE' },
   { id: 'CURRENT_ACCOUNT', name: 'Current Account Balance', categoryKey: 'vii', description: 'Broad measure of trade including goods, services, income, and transfers.', unit: 'Billions of Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'BOPBCA', chartType: 'bar', calculation: 'NONE' },
 
-  // == Category VIII: Financial Markets & Assets ==
+  // == Category VIII: Financial Markets & Interest Rates ==
   { id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii', description: 'Tracks stock performance of 500 large U.S. companies.', unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P Dow Jones Indices via FRED', apiSource: 'FRED', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE' },
   { id: 'M2_YOY_PCT', name: 'M2 Money Stock (YoY %)', categoryKey: 'viii', description: 'YoY % change in M2 money stock.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'bar', calculation: 'YOY_PERCENT', notes: 'Calculated from M2SL level data.' },
+  { id: 'M2SL', name: 'M2 Money Stock (Level)', categoryKey: 'viii', description: 'Total M2 money supply (SA).', unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE' },
   { id: 'US10Y', name: 'US 10-Year Treasury Yield', categoryKey: 'viii', description: 'Yield on U.S. 10-year government debt.', unit: '%', frequency: 'Daily', sourceName: 'U.S. Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'DGS10', chartType: 'line', calculation: 'NONE' },
-  { id: 'MORTGAGE_RATE', name: '30-Year Fixed Mortgage Rate', categoryKey: 'viii', description: 'Average 30-year fixed mortgage rate in the U.S.', unit: '%', frequency: 'Weekly', sourceName: 'Freddie Mac via FRED', apiSource: 'FRED', apiIdentifier: 'MORTGAGE30US', chartType: 'line', calculation: 'NONE' },
   { id: 'USD_EUR', name: 'USD/EUR Exchange Rate', categoryKey: 'viii', description: 'Value of 1 U.S. Dollar in Euros.', unit: 'EUR per USD', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DEXUSEU', chartType: 'line', calculation: 'NONE' },
   { id: 'VIX', name: 'Volatility Index (VIX)', categoryKey: 'viii', description: 'Market expectation of near-term S&P 500 volatility.', unit: 'Index', frequency: 'Daily', sourceName: 'CBOE via FRED', apiSource: 'FRED', apiIdentifier: 'VIXCLS', chartType: 'line', calculation: 'NONE' },
   { id: 'CORP_BOND_SPREAD_BAA', name: 'Corporate Bond Spread (Baa)', categoryKey: 'viii', description: 'Difference between Moody\'s Baa Corp Bond Yield and 10-Yr Treasury.', unit: '%', frequency: 'Daily', sourceName: 'Moody\'s/Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'BAA10Y', chartType: 'line', calculation: 'NONE' },
-  { id: 'M2SL', name: 'M2 Money Stock (Level)', categoryKey: 'viii', description: 'Total M2 money supply (SA).', unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE' },
+  {
+    id: 'BTC_PRICE_USD', name: 'Bitcoin Price (USD)', categoryKey: 'viii',
+    description: 'Daily closing price of Bitcoin in US Dollars from Coinbase.',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Coinbase via FRED',
+    apiSource: 'FRED', apiIdentifier: 'CBBTCUSD',
+    chartType: 'line', calculation: 'NONE',
+  },
+  {
+    id: 'ETH_PRICE_USD', name: 'Ethereum Price (USD)', categoryKey: 'viii',
+    description: 'Daily closing price of Ethereum in US Dollars from Coinbase.',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Coinbase via FRED',
+    apiSource: 'FRED', apiIdentifier: 'CBETHUSD',
+    chartType: 'line', calculation: 'NONE',
+  },
+  {
+    id: 'CRYPTO_FEAR_GREED', name: 'Crypto Fear & Greed Index', categoryKey: 'viii',
+    description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market.',
+    unit: 'Index (0-100)', frequency: 'Daily',
+    sourceName: 'Alternative.me',
+    apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
+    chartType: 'line', calculation: 'NONE',
+  },
+  // Stock/ETF examples for asset risk section can remain in Financial Markets or have a dedicated "Assets" sub-category if needed
   {
     id: 'JNJ_STOCK', name: 'Johnson & Johnson (JNJ)', categoryKey: 'viii',
     description: 'Stock price for Johnson & Johnson.',
@@ -191,32 +213,16 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'AlphaVantage', apiIdentifier: 'LQD', chartType: 'line', calculation: 'NONE',
   },
   {
-    id: 'VNQ_ETF', name: 'Real Estate ETF (VNQ)', categoryKey: 'viii',
+    id: 'VNQ_ETF', name: 'Real Estate ETF (VNQ)', categoryKey: 'viii', // Could also be Housing, but as an ETF, it fits here too
     description: 'Vanguard Real Estate ETF, tracks a broad U.S. REIT index.',
     unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
     apiSource: 'AlphaVantage', apiIdentifier: 'VNQ', chartType: 'line', calculation: 'NONE',
   },
   {
-    id: 'LAND_REIT', name: 'Gladstone Land Corp (LAND)', categoryKey: 'viii',
+    id: 'LAND_REIT', name: 'Gladstone Land Corp (LAND)', categoryKey: 'viii', // Similar to VNQ
     description: 'A REIT focused on U.S. farmland and farm-related properties.',
     unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
     apiSource: 'AlphaVantage', apiIdentifier: 'LAND', chartType: 'line', calculation: 'NONE',
-  },
-  {
-    id: 'BTC_PRICE_USD', name: 'Bitcoin Price (USD)', categoryKey: 'viii',
-    description: 'Daily closing price of Bitcoin in US Dollars from Coinbase.',
-    unit: 'USD', frequency: 'Daily',
-    sourceName: 'Coinbase via FRED',
-    apiSource: 'FRED', apiIdentifier: 'CBBTCUSD',
-    chartType: 'line', calculation: 'NONE',
-  },
-  {
-    id: 'ETH_PRICE_USD', name: 'Ethereum Price (USD)', categoryKey: 'viii',
-    description: 'Daily closing price of Ethereum in US Dollars from Coinbase.',
-    unit: 'USD', frequency: 'Daily',
-    sourceName: 'Coinbase via FRED',
-    apiSource: 'FRED', apiIdentifier: 'CBETHUSD',
-    chartType: 'line', calculation: 'NONE',
   },
   {
     id: 'JNK_ETF', name: 'High Yield Bond ETF (JNK)', categoryKey: 'viii',
@@ -229,14 +235,6 @@ export const indicators: IndicatorMetadata[] = [
     description: 'Invests in disruptive innovation companies; speculative growth.',
     unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
     apiSource: 'AlphaVantage', apiIdentifier: 'ARKK', chartType: 'line', calculation: 'NONE',
-  },
-  {
-    id: 'CRYPTO_FEAR_GREED', name: 'Crypto Fear & Greed Index', categoryKey: 'viii',
-    description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market.',
-    unit: 'Index (0-100)', frequency: 'Daily',
-    sourceName: 'Alternative.me',
-    apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
-    chartType: 'line', calculation: 'NONE',
   },
 ];
 
