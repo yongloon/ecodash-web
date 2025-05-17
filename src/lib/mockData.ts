@@ -11,7 +11,9 @@ import {
     fetchAlternativeMeFearGreedIndex,
     fetchDbNomicsSeries,
     fetchPolygonIOData,
-    fetchPolygonIOPreviousClose,
+    // fetchPolygonIOPreviousClose, // Removed
+    // fetchPolygonIOLastTrade, // Removed
+    fetchApiNinjasCommodityHistoricalPrice, // Using this for metals
 } from './api';
 import {
     calculateYoYPercent,
@@ -159,7 +161,7 @@ export async function fetchIndicatorData(
         actualDateRangeToUse = { ...defaultApiRange };
     }
     console.log(`[fetchIndicatorData Orchestrator] ID: ${indicator.id}, Source: ${indicator.apiSource}, UI Range: ${actualDateRangeToUse.startDate} to ${actualDateRangeToUse.endDate}`);
-
+    
     let rawFetchedData: TimeSeriesDataPoint[] = [];
     let effectiveDateRangeForApiCall = { ...actualDateRangeToUse };
 
@@ -169,28 +171,15 @@ export async function fetchIndicatorData(
           effectiveDateRangeForApiCall.startDate = format(subYears(originalStartDate, 1), 'yyyy-MM-dd');
            if (parseISO(effectiveDateRangeForApiCall.startDate) >= parseISO(effectiveDateRangeForApiCall.endDate)) {
                 const originalEndDate = parseISO(actualDateRangeToUse.endDate);
-                // If adjusted start is after original end, the effective end date for API call should still be the original UI end date
-                // to ensure we get data up to the point needed for YoY calculation based on the UI's end date.
-                // However, for display, we will later filter to actualDateRangeToUse.
-                // The 'effectiveDateRangeForApiCall.endDate' should remain 'actualDateRangeToUse.endDate' for API call
-                // to ensure enough data is fetched.
-                // No, the previous logic was to adjust end date too, which is not quite right for YoY on short ranges.
-                // We need data UP TO the actualDateRangeToUse.endDate.
-                // The YoY calculation itself will handle the lack of prior year data for the earliest points.
-                // So, effectiveDateRangeForApiCall.endDate should remain actualDateRangeToUse.endDate.
-                // The concern was if adjusted start > original end, then the range is invalid.
-                // Let's ensure the API is called with a valid range at least.
-                if (parseISO(effectiveDateRangeForApiCall.startDate) > parseISO(actualDateRangeToUse.endDate)) {
+                 if (parseISO(effectiveDateRangeForApiCall.startDate) > originalEndDate) {
                     console.warn(`[Orchestrator] YoY adjusted start ${effectiveDateRangeForApiCall.startDate} is after UI end ${actualDateRangeToUse.endDate} for ${indicator.id}. This might lead to empty data before calculation.`);
-                    // Keep effectiveDateRangeForApiCall.endDate as actualDateRangeToUse.endDate
                 }
            }
-        } catch (e) {
+        } catch (e) { 
             console.warn(`[Orchestrator] Could not adjust date range for YoY calc on ${indicator.id}. Using original range. Error:`, e);
-            effectiveDateRangeForApiCall = { ...actualDateRangeToUse };
+            effectiveDateRangeForApiCall = { ...actualDateRangeToUse }; 
         }
     }
-
 
     let apiFetchAttempted = false; let apiErrorOccurred = false;
     try {
@@ -204,29 +193,17 @@ export async function fetchIndicatorData(
         case 'DBNOMICS':
           if (indicator.apiIdentifier) { rawFetchedData = await fetchDbNomicsSeries(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true; }
           break;
-        case 'PolygonIO':
+        case 'PolygonIO': // For historical aggregates from Polygon.io (e.g. stocks, ETFs if configured)
           if (indicator.apiIdentifier) { rawFetchedData = await fetchPolygonIOData(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true; }
           break;
-        case 'PolygonIO_PREV_CLOSE':
+        // PolygonIO_PREV_CLOSE and PolygonIO_LAST_TRADE cases removed
+        case 'ApiNinjasHistorical': // Using the historical endpoint for metals
           if (indicator.apiIdentifier) {
-            const prevClosePoint = await fetchPolygonIOPreviousClose(indicator.apiIdentifier);
+            // For ApiNinjasHistorical, we pass the UI date range directly.
+            // The fetcher itself will handle conversion to timestamps.
+            // We default to '1d' period for daily data.
+            rawFetchedData = await fetchApiNinjasCommodityHistoricalPrice(indicator.apiIdentifier, actualDateRangeToUse, '1d');
             apiFetchAttempted = true;
-            if (prevClosePoint.length > 0) {
-                const latestPricePoint = prevClosePoint[0];
-                let mockHistory = generateMockData(indicator, actualDateRangeToUse);
-                // Ensure the latest point is the real one, merge carefully
-                const existingIndex = mockHistory.findIndex(p => p.date === latestPricePoint.date);
-                if (existingIndex !== -1) {
-                    mockHistory[existingIndex] = latestPricePoint;
-                } else {
-                    mockHistory.push(latestPricePoint);
-                }
-                rawFetchedData = mockHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                console.log(`[Orchestrator] PolygonIO_PREV_CLOSE for ${indicator.id} successful, supplemented with ${mockHistory.length -1} mock points.`);
-            } else {
-                console.warn(`[Orchestrator] PolygonIO_PREV_CLOSE for ${indicator.id} returned no data. Mock data will be used.`);
-                // Let it fall through to the general mock fallback
-            }
           }
           break;
         case 'CoinGeckoAPI':
@@ -249,18 +226,24 @@ export async function fetchIndicatorData(
       }
     } catch (error) { apiErrorOccurred = true; console.error(`[Orchestrator] API call error during switch for ${indicator.id}:`, error); }
 
-    const shouldTrulyUseMock = (indicator.apiSource !== 'PolygonIO_PREV_CLOSE' && ( // if not prev_close, use normal mock logic
-                               indicator.apiSource === 'Mock' ||
-                               (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) ||
-                               (!apiFetchAttempted && indicator.apiSource !== 'Mock')
-                              )) ||
-                              (indicator.apiSource === 'PolygonIO_PREV_CLOSE' && rawFetchedData.length === 0 && apiFetchAttempted); // if prev_close was attempted but failed to get even the single point
+    // Simplified mock fallback: if the primary source was 'Mock' OR if an API was attempted and failed/returned empty.
+    const shouldTrulyUseMock =
+            indicator.apiSource === 'Mock' ||
+            (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) ||
+            (!apiFetchAttempted && indicator.apiSource !== 'Mock' && indicator.apiSource !== 'ApiNinjasHistorical'); // Don't use mock if ApiNinjasHistorical was not attempted and is the source
+            // Refined: Use mock if ApiNinjasHistorical was tried and failed, or if it's explicitly Mock
+            // Or if no API was attempted and it's not Mock (this path shouldn't be hit if all sources are covered)
 
-    if (shouldTrulyUseMock) {
+    if (
+        (indicator.apiSource === 'ApiNinjasHistorical' && apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) || // If ApiNinjasHistorical was tried and failed
+        (indicator.apiSource !== 'ApiNinjasHistorical' && shouldTrulyUseMock) || // Original logic for other sources
+        (indicator.apiSource === 'Mock') // Explicitly mock
+    ) {
       if (indicator.apiSource !== 'Mock') console.warn(`[Orchestrator] Full fallback to mock for ${indicator.id} (Source: ${indicator.apiSource}).`);
       else console.log(`[Orchestrator] Explicitly using full mock data for ${indicator.id}.`);
       rawFetchedData = generateMockData(indicator, actualDateRangeToUse);
     }
+
 
     let processedData: TimeSeriesDataPoint[] = [...rawFetchedData];
 
@@ -293,7 +276,6 @@ export async function fetchIndicatorData(
         if (calcSuccess) console.log(`[Orchestrator] ${indicator.id} after ${indicator.calculation}: ${processedData.length} points`);
     }
 
-    // Final filtering to match the UI-requested date range
     if (actualDateRangeToUse.startDate && isValid(parseISO(actualDateRangeToUse.startDate)) && processedData.length > 0) {
         processedData = processedData.filter(dp => dp.date && isValid(parseISO(dp.date)) && parseISO(dp.date) >= parseISO(actualDateRangeToUse.startDate));
     }

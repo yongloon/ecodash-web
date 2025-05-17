@@ -34,7 +34,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'PolygonIO_PREV_CLOSE';
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjasHistorical'; // Removed PolygonIO_PREV_CLOSE, PolygonIO_LAST_TRADE, ApiNinjas. Added ApiNinjasHistorical
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -57,7 +57,8 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'LEI', name: 'Leading Economic Index (LEI)', categoryKey: 'i',
     description: 'Composite index designed to signal peaks and troughs in the business cycle for the U.S. economy.',
-    unit: 'Index', frequency: 'Monthly', sourceName: 'The Conference Board via FRED',
+    unit: 'Index', frequency: 'Monthly',
+    sourceName: 'The Conference Board via FRED',
     apiSource: 'FRED', apiIdentifier: 'USSLIND',
     chartType: 'line', calculation: 'NONE'
   },
@@ -87,25 +88,31 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
   {
-    id: 'GOLD_PRICE', name: 'Spot Gold Price (Previous Close)', categoryKey: 'iii',
-    description: 'Previous day\'s closing spot price of gold in U.S. Dollars per Troy Ounce.',
-    unit: 'USD per Troy Ounce', frequency: 'Daily', sourceName: 'Polygon.io',
-    apiSource: 'PolygonIO_PREV_CLOSE', apiIdentifier: 'X:XAUUSD',
-    chartType: 'line', calculation: 'NONE', notes: 'Requires Polygon.io API key. Shows previous close.'
+    id: 'GOLD_PRICE', name: 'Spot Gold Price (API-Ninjas Historical)', categoryKey: 'iii',
+    description: 'Historical spot price of gold in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce',
+    frequency: 'Daily',
+    sourceName: 'API-Ninjas.com',
+    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Gold',
+    chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key.'
   },
   {
-    id: 'SILVER_PRICE', name: 'Spot Silver Price (Previous Close)', categoryKey: 'iii',
-    description: 'Previous day\'s closing spot price of silver in U.S. Dollars per Troy Ounce.',
-    unit: 'USD per Troy Ounce', frequency: 'Daily', sourceName: 'Polygon.io',
-    apiSource: 'PolygonIO_PREV_CLOSE', apiIdentifier: 'X:XAGUSD',
-    chartType: 'line', calculation: 'NONE', notes: 'Requires Polygon.io API key. Shows previous close.'
+    id: 'SILVER_PRICE', name: 'Spot Silver Price (API-Ninjas Historical)', categoryKey: 'iii',
+    description: 'Historical spot price of silver in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce',
+    frequency: 'Daily',
+    sourceName: 'API-Ninjas.com',
+    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Silver',
+    chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key.'
   },
   {
-    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (Previous Close)', categoryKey: 'iii',
-    description: 'Previous day\'s closing spot price of platinum in U.S. Dollars per Troy Ounce.',
-    unit: 'USD per Troy Ounce', frequency: 'Daily', sourceName: 'Polygon.io',
-    apiSource: 'PolygonIO_PREV_CLOSE', apiIdentifier: 'X:XPTUSD',
-    chartType: 'line', calculation: 'NONE', notes: 'Requires Polygon.io API key. Shows previous close.'
+    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (API-Ninjas Historical)', categoryKey: 'iii',
+    description: 'Historical spot price of platinum in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce',
+    frequency: 'Daily',
+    sourceName: 'API-Ninjas.com',
+    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Platinum',
+    chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key.'
   },
 
   // == Category IV: Consumer Activity ==
@@ -116,7 +123,8 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'CCI', name: 'Consumer Confidence Index (CCI)', categoryKey: 'iv',
     description: 'The Conference Board\'s measure of consumer optimism.',
-    unit: 'Index 1985=100', frequency: 'Monthly', sourceName: 'The Conference Board via FRED',
+    unit: 'Index 1985=100', frequency: 'Monthly',
+    sourceName: 'The Conference Board via FRED',
     apiSource: 'FRED', apiIdentifier: 'CONSUMERCONF',
     chartType: 'line', notes: 'This is the Conference Board Consumer Confidence Index.', calculation: 'NONE'
   },
@@ -197,14 +205,16 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'BTC_PRICE_USD', name: 'Bitcoin Price (USD)', categoryKey: 'viii',
     description: 'Daily closing price of Bitcoin in US Dollars from Coinbase.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Coinbase via FRED',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Coinbase via FRED',
     apiSource: 'FRED', apiIdentifier: 'CBBTCUSD',
     chartType: 'line', calculation: 'NONE',
   },
   {
     id: 'ETH_PRICE_USD', name: 'Ethereum Price (USD)', categoryKey: 'viii',
     description: 'Daily closing price of Ethereum in US Dollars from Coinbase.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Coinbase via FRED',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Coinbase via FRED',
     apiSource: 'FRED', apiIdentifier: 'CBETHUSD',
     chartType: 'line', calculation: 'NONE',
   },
@@ -223,7 +233,8 @@ export const indicators: IndicatorMetadata[] = [
   {
     id: 'CRYPTO_FEAR_GREED', name: 'Crypto Fear & Greed Index', categoryKey: 'viii',
     description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market.',
-    unit: 'Index (0-100)', frequency: 'Daily', sourceName: 'Alternative.me',
+    unit: 'Index (0-100)', frequency: 'Daily',
+    sourceName: 'Alternative.me',
     apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
     chartType: 'line', calculation: 'NONE',
   },

@@ -19,7 +19,10 @@ const ALTERNATIVE_ME_API_URL = 'https://api.alternative.me/fng/';
 const NEWSAPI_ORG_BASE_URL = 'https://newsapi.org/v2';
 const FINNHUB_API_URL = 'https://finnhub.io/api/v1';
 const DBNOMICS_API_URL_V22 = 'https://api.db.nomics.world/v22';
-const POLYGON_API_URL = 'https://api.polygon.io/v2';
+const POLYGON_API_URL = 'https://api.polygon.io/v2'; // For aggregates
+// const POLYGON_API_V1_URL = 'https://api.polygon.io/v1'; // No longer needed for last_trade if not used
+const API_NINJAS_BASE_URL = 'https://api.api-ninjas.com/v1';
+
 
 // --- Helper for Default API Fetch Date Range (Consistent) ---
 function getApiDefaultDateRange(years: number = 1): { startDate: string; endDate: string } {
@@ -311,7 +314,7 @@ export async function fetchPolygonIOData(
     return [];
   }
 
-  const apiDefaults = getApiDefaultDateRange(2); // Polygon free tier has ~2 years history
+  const apiDefaults = getApiDefaultDateRange(2);
   const startDate = (dateRange?.startDate && isValid(parseISO(dateRange.startDate)))
     ? dateRange.startDate
     : apiDefaults.startDate;
@@ -375,82 +378,117 @@ export async function fetchPolygonIOData(
   }
 }
 
-// --- Polygon.io API Fetcher for Previous Close ---
-interface PolygonPreviousCloseResult {
-  T?: string; // Ticker
-  c: number; // Close price
-  h: number; // High price
-  l: number; // Low price
-  o: number; // Open price
-  t: number; // Timestamp (Unix Msec) - This is the END of the previous trading day.
-  v: number; // Volume
-  vw?: number; // Volume weighted average price
+// --- API-Ninjas.com Commodity Historical Price Fetcher ---
+interface ApiNinjasHistoricalDataPoint {
+  open: number;
+  low: number;
+  high: number;
+  close: number;
+  volume?: number;
+  time: number; // Unix timestamp (seconds)
 }
+type ApiNinjasHistoricalResponse = ApiNinjasHistoricalDataPoint[];
 
-interface PolygonPreviousCloseResponse {
-  ticker?: string;
-  queryCount?: number;
-  resultsCount?: number;
-  adjusted?: boolean;
-  results?: PolygonPreviousCloseResult[]; // It's an array, usually with one item
-  status?: string;
-  request_id?: string;
-  message?: string;
-}
-
-export async function fetchPolygonIOPreviousClose(
-  ticker: string
+export async function fetchApiNinjasCommodityHistoricalPrice(
+  commodityName: string,
+  dateRange?: { startDate?: string; endDate?: string },
+  period: '1h' | '1d' = '1d'
 ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchPolygonIOPreviousClose API - ENTRY] Called with: ticker=${ticker}`);
-  const apiKey = process.env.POLYGON_API_KEY;
+  console.log(`[fetchApiNinjasCommodityHistoricalPrice API - ENTRY] Called for: ${commodityName}, Range: ${JSON.stringify(dateRange)}, Period: ${period}`);
+  const apiKey = process.env.API_NINJAS_KEY;
+  // console.log(`[API API-Ninjas Hist] Using key: ${apiKey ? 'SET (********)' : 'NOT SET'}`); // Keep key obscured
+
   if (!apiKey) {
-    console.error(`[API Polygon.io PrevClose] POLYGON_API_KEY is missing for ${ticker}.`);
+    console.error(`[API API-Ninjas Hist] API_NINJAS_KEY is missing. Cannot fetch for ${commodityName}.`);
+    return [];
+  }
+
+  const apiDefaults = getApiDefaultDateRange(1);
+  const startDateStr = (dateRange?.startDate && isValid(parseISO(dateRange.startDate)))
+    ? dateRange.startDate
+    : apiDefaults.startDate;
+  const endDateStr = (dateRange?.endDate && isValid(parseISO(dateRange.endDate)))
+    ? dateRange.endDate
+    : apiDefaults.endDate;
+
+  const startTimestamp = Math.floor(parseISO(startDateStr).getTime() / 1000);
+  const endTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000);
+
+  if (startTimestamp >= endTimestamp) {
+    console.warn(`[API API-Ninjas Hist] Start timestamp ${startTimestamp} is not before end timestamp ${endTimestamp} for ${commodityName}. Requested range: ${startDateStr} to ${endDateStr}`);
     return [];
   }
 
   const params = new URLSearchParams({
-    adjusted: 'true',
-    apiKey: apiKey,
+    name: commodityName,
+    period: period,
+    start: startTimestamp.toString(),
+    end: endTimestamp.toString(),
   });
-  const url = `${POLYGON_API_URL}/aggs/ticker/${ticker}/prev?${params.toString()}`;
-  console.log(`[API Polygon.io PrevClose] Attempting to fetch: ${ticker} from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
+
+  const url = `${API_NINJAS_BASE_URL}/commoditypricehistorical?${params.toString()}`;
+  console.log(`[API API-Ninjas Hist] Attempting to fetch: ${commodityName} from URL: ${url}`);
 
   try {
-    const response = await fetch(url, { next: { revalidate: 14400 } });
+    const response = await fetch(url, {
+      headers: { 'X-Api-Key': apiKey },
+      next: { revalidate: 14400 }
+    });
+
     if (!response.ok) {
-      const errorBody = await response.text();
-      let errMsg = `Polygon.io PrevClose API Error (${response.status}) for ${ticker}.`;
+      const errorText = await response.text();
+      let errMsg = `API-Ninjas Commodity Hist. Error (${response.status}) for ${commodityName}.`;
       try {
-        const errorJson: PolygonPreviousCloseResponse = JSON.parse(errorBody);
-        if (errorJson.message) errMsg = `Polygon.io PrevClose: ${errorJson.message}`;
-      } catch (e) { /* ignore if not JSON */ }
-      console.error(`[API Polygon.io PrevClose] Error response for ${ticker}: ${response.status} - Body: ${errorBody.substring(0, 500)}`);
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error) errMsg = `API-Ninjas Hist: ${errorJson.error}`;
+        else if (errorJson.message) errMsg = `API-Ninjas Hist: ${errorJson.message}`;
+      } catch (e) { /* ignore */ }
+      console.error(`[API API-Ninjas Hist] Error response for ${commodityName}: ${response.status} - Body: ${errorText.substring(0, 500)}`);
       throw new Error(errMsg);
     }
-    const data: PolygonPreviousCloseResponse = await response.json();
-    // console.log(`[API Polygon.io PrevClose] Raw response for ${ticker}:`, JSON.stringify(data));
 
-    if (data.status === 'ERROR' || (data.message && data.status !== 'OK' && data.status !== 'DELAYED')) {
-      console.error(`[API Polygon.io PrevClose] API returned error for ${ticker}: ${data.message || data.status}`);
-      throw new Error(`Polygon.io PrevClose API Error: ${data.message || data.status}`);
+    const data: ApiNinjasHistoricalResponse = await response.json();
+    // console.log(`[API API-Ninjas Hist] Raw response for ${commodityName}:`, JSON.stringify(data).substring(0, 500));
+
+    if (!Array.isArray(data)) {
+      console.warn(`[API API-Ninjas Hist] Unexpected response format for ${commodityName}. Expected array. Data:`, data);
+      return [];
     }
-
-    if (!data.results || data.results.length === 0 || data.resultsCount === 0) {
-      console.warn(`[API Polygon.io PrevClose] No results in response for ${ticker}. Status: ${data.status}`);
+    if (data.length === 0) {
+      console.warn(`[API API-Ninjas Hist] No data points returned for ${commodityName} for the given range/period.`);
       return [];
     }
 
-    const prevCloseData = data.results[0];
-    const seriesData: TimeSeriesDataPoint[] = [{
-      date: format(new Date(prevCloseData.t), 'yyyy-MM-dd'), // Date of the previous close
-      value: parseFloat(prevCloseData.c.toFixed(4)),
-    }];
+    const seriesData: TimeSeriesDataPoint[] = data
+      .map(item => {
+        if (typeof item.close !== 'number' || typeof item.time !== 'number') {
+          return null;
+        }
+        return {
+          date: format(new Date(item.time * 1000), 'yyyy-MM-dd'),
+          value: parseFloat(item.close.toFixed(4)),
+        };
+      })
+      .filter((point): point is TimeSeriesDataPoint => point !== null)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+    if (period === '1h' && seriesData.length > 0) {
+        const dailyAggregated: TimeSeriesDataPoint[] = [];
+        const tempMap = new Map<string, TimeSeriesDataPoint>();
+        seriesData.forEach(point => {
+            tempMap.set(point.date, point);
+        });
+        dailyAggregated.push(...Array.from(tempMap.values()));
+        dailyAggregated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        console.log(`[API API-Ninjas Hist] Aggregated ${seriesData.length} hourly points to ${dailyAggregated.length} daily points for ${commodityName}.`);
+        return dailyAggregated;
+    }
 
-    console.log(`[API Polygon.io PrevClose] Parsed 1 point for ${ticker}: ${JSON.stringify(seriesData)}`);
+    console.log(`[API API-Ninjas Hist] Parsed ${seriesData.length} points for ${commodityName}`);
     return seriesData;
 
   } catch (error) {
-    console.error(`[API Polygon.io PrevClose] Network or parsing error for ${ticker}:`, error);
+    console.error(`[API API-Ninjas Hist] Network or parsing error for ${commodityName}:`, error);
     return [];
   }
 }
@@ -466,12 +504,12 @@ export async function fetchCoinGeckoPriceHistory(
   const startDateStr = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
   const endDateStr = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
   let fromTimestamp = Math.floor(parseISO(startDateStr).getTime() / 1000);
-  let toTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000) + (60 * 60 * 23); // Ensure end of day
-  if (fromTimestamp > toTimestamp) [fromTimestamp, toTimestamp] = [toTimestamp, fromTimestamp]; // Swap if inverted
+  let toTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000) + (60 * 60 * 23);
+  if (fromTimestamp > toTimestamp) [fromTimestamp, toTimestamp] = [toTimestamp, fromTimestamp];
   const url = `${COINGECKO_API_URL}/coins/${coinId}/market_chart/range?vs_currency=usd&from=${fromTimestamp}&to=${toTimestamp}`;
   console.log(`[API CoinGecko] Attempting to fetch: ${coinId} (${startDateStr} to ${endDateStr}) from URL: ${url}`);
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } }); // Revalidate every hour
+    const response = await fetch(url, { next: { revalidate: 3600 } });
     if (!response.ok) {
       const errBody = await response.text(); let errMsg = `CoinGecko Error (${response.status}) for ${coinId}.`;
       try {errMsg = JSON.parse(errBody).error?.message || JSON.parse(errBody).error || errMsg;} catch(e){}
@@ -484,7 +522,7 @@ export async function fetchCoinGeckoPriceHistory(
     const dailyData: Record<string, TimeSeriesDataPoint> = {};
     data.prices.forEach((p: [number, number]) => {
       const date = format(new Date(p[0]), 'yyyy-MM-dd');
-      dailyData[date] = { date, value: parseFloat(p[1].toFixed(2)) }; // Use the price at the timestamp (usually daily close from CG)
+      dailyData[date] = { date, value: parseFloat(p[1].toFixed(2)) };
     });
     const uniqueDaily = Object.values(dailyData).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     console.log(`[API CoinGecko] Parsed ${uniqueDaily.length} points for ${coinId}`);
@@ -499,18 +537,15 @@ export async function fetchAlternativeMeFearGreedIndex(
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
     console.log(`[fetchAlternativeMeFearGreedIndex API - ENTRY] Called with: dateRange=${JSON.stringify(dateRange)}`);
-    const apiDefaults = getApiDefaultDateRange(5); // Fetch up to 5 years if no range
+    const apiDefaults = getApiDefaultDateRange(5);
     const startConsider = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
     const endConsider = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
-
-    // Alternative.me uses 'limit' param. Calculate days from 'startConsider' to today.
     const daysToStart = Math.max(0, differenceInDays(new Date(), parseISO(startConsider)));
-    const limit = Math.min(daysToStart + 2, 1825); // +2 for buffer, max ~5 years (1825 days)
-
+    const limit = Math.min(daysToStart + 2, 1825);
     const url = `${ALTERNATIVE_ME_API_URL}?limit=${limit}&format=json`;
     console.log(`[API AlternativeMe] Attempting to fetch F&G (limit: ${limit}, UI start: ${startConsider}, UI end: ${endConsider}) from URL: ${url}`);
     try {
-        const res = await fetch(url, { next: { revalidate: 10800 } }); // Revalidate every 3 hours
+        const res = await fetch(url, { next: { revalidate: 10800 } });
         if (!res.ok) {
             const errTxt = await res.text();
             console.error(`[API AlternativeMe] F&G Error: ${res.status} - ${errTxt.substring(0,500)}`);
@@ -520,16 +555,12 @@ export async function fetchAlternativeMeFearGreedIndex(
         // console.log(`[API AlternativeMe] Raw F&G response:`, JSON.stringify(data).substring(0, 500));
         if (data.metadata.error) throw new Error(`Alternative.me API Error: ${data.metadata.error}`);
         if (!data.data?.length) { console.warn(`[API AlternativeMe] No F&G data.`); return []; }
-
         let series: TimeSeriesDataPoint[] = data.data.map(item => ({
-            date: format(new Date(parseInt(item.timestamp) * 1000), 'yyyy-MM-dd'), // Convert Unix timestamp
+            date: format(new Date(parseInt(item.timestamp) * 1000), 'yyyy-MM-dd'),
             value: parseInt(item.value, 10),
         })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        // Filter by actual dateRange from UI after fetching (since API uses limit)
         if (isValid(parseISO(startConsider))) series = series.filter(dp => parseISO(dp.date) >= parseISO(startConsider));
         if (isValid(parseISO(endConsider))) series = series.filter(dp => parseISO(dp.date) <= parseISO(endConsider));
-
         console.log(`[API AlternativeMe] Parsed and filtered ${series.length} F&G points`);
         return series;
     } catch (e) { console.error('[API AlternativeMe] F&G Error:', e); return []; }
@@ -549,7 +580,7 @@ export async function fetchNewsHeadlines(category: string = 'business', country:
   const url = `${NEWSAPI_ORG_BASE_URL}/top-headlines?${params.toString()}`;
   console.log(`[API NewsAPI] Attempting to fetch: ${url.replace(apiKey, "REDACTED_KEY")}`);
   try {
-    const res = await fetch(url, { next: { revalidate: 3600 } }); // Revalidate every hour
+    const res = await fetch(url, { next: { revalidate: 3600 } });
     if (!res.ok) {
       const errData: NewsApiResponse = await res.json().catch(() => ({ status: 'error', articles:[], message: `HTTP ${res.status}`}) as any);
       const errMsg = errData.message || errData.code || `NewsAPI Error (${res.status})`;
@@ -584,7 +615,7 @@ export async function fetchEconomicCalendar(daysAhead: number = 7): Promise<Econ
   const url = `${FINNHUB_API_URL}/calendar/economic?token=${apiKey}&from=${from}&to=${to}`;
   console.log(`[API Finnhub] Attempting to fetch Economic Calendar: ${url.replace(apiKey, "REDACTED_KEY")}`);
   try {
-    const res = await fetch(url, { next: { revalidate: 7200 } }); // Revalidate every 2 hours
+    const res = await fetch(url, { next: { revalidate: 7200 } });
     if (!res.ok) {
       const errTxt = await res.text();
       console.error(`[API Finnhub] Eco Calendar Error ${res.status}: ${errTxt.substring(0,300)}`);
@@ -617,7 +648,7 @@ export async function fetchEarningsCalendar(daysAhead: number = 7): Promise<Earn
   const url = `${FINNHUB_API_URL}/calendar/earnings?token=${apiKey}&from=${from}&to=${to}`;
   console.log(`[API Finnhub] Attempting to fetch Earnings Calendar: ${url.replace(apiKey, "REDACTED_KEY")}`);
   try {
-    const res = await fetch(url, { next: { revalidate: 14400 } }); // Revalidate every 4 hours
+    const res = await fetch(url, { next: { revalidate: 14400 } });
     if (!res.ok) {
       const errTxt = await res.text();
       console.error(`[API Finnhub] Earnings Calendar Error ${res.status}: ${errTxt.substring(0,300)}`);
