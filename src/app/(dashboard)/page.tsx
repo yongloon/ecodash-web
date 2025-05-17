@@ -1,4 +1,5 @@
 // src/app/(dashboard)/page.tsx
+// ... (all existing imports remain the same) ...
 import React from 'react';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
@@ -19,13 +20,25 @@ import { Gem, Star, TrendingUp, Zap, Newspaper, CalendarDays, Briefcase, Shield,
 import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
 
-export const revalidate = 300; // Revalidate data at most every 5 minutes
+
+export const revalidate = 300;
 
 // Configuration for Overview Page
-const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'FEDFUNDS']; // PMI changed to FEDFUNDS
-const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED'];
-const MAX_FAVORITES_ON_OVERVIEW = 3;
+// UPDATED: Added more indicators to headlineIndicatorIds
+const headlineIndicatorIds = [
+    'GDP_GROWTH',           // Overall economic growth
+    'UNRATE',               // Labor market health
+    'CPI_YOY_PCT',          // Inflation
+    'FEDFUNDS',             // Monetary policy
+    'PMI',                  // Manufacturing sector health (from DB.nomics ISM)
+    'RETAIL_SALES_MOM_PCT', // Consumer spending
+    'US10Y',                // Key interest rate, financial conditions
+    'SP500'                 // Broad stock market performance
+];
+const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'OIL_WTI', 'GOLD_PRICE']; // OIL_WTI & GOLD_PRICE added for more snapshot diversity
+const MAX_FAVORITES_ON_OVERVIEW = 3; // Keep this as is or adjust if desired
 
+// ... (riskSpectrumSetup remains the same)
 const riskSpectrumSetup = [
   {
     title: "🟢 Low-Risk Assets",
@@ -62,6 +75,8 @@ const riskSpectrumSetup = [
   },
 ];
 
+
+// ... (getSparklineDataLength function remains the same)
 const getSparklineDataLength = (frequency?: string): number => {
     if (frequency === 'Daily' || frequency === 'Weekly') return 30;
     if (frequency === 'Monthly') return 12;
@@ -69,6 +84,7 @@ const getSparklineDataLength = (frequency?: string): number => {
     return 15;
 };
 
+// ... (fetchDataForRiskAndSummaryLists function remains the same as the version with the fix for 'id is not defined')
 const fetchDataForRiskAndSummaryLists = async (
     ids: string[],
     country: string,
@@ -103,9 +119,9 @@ const fetchDataForRiskAndSummaryLists = async (
             'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT',
             'ETH_PRICE_USD', 'OIL_WTI', 'ARKK_ETF',
             'US10Y', 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT',
-            // Note: FEDFUNDS is US-specific, its fetching depends on `country === 'US'` or `indicator.apiSource === 'Mock'`
             'PMI', 'PMI_SERVICES', // These might be international if using DBNOMICS
-            'CCI', 'CPI_YOY_PCT', 'GDP_GROWTH', 'UNRATE', 'RETAIL_SALES_MOM_PCT'
+            // FEDFUNDS, CCI, CPI_YOY_PCT, GDP_GROWTH, UNRATE, RETAIL_SALES_MOM_PCT are typically US-specific
+            // but their fetching is handled by `country === 'US'` or `indicator.apiSource === 'Mock'`
           ].includes(indicator.id);
           const shouldFetch = country === 'US' || indicator.apiSource === 'Mock' || isGlobalAsset;
 
@@ -170,6 +186,7 @@ const fetchDataForRiskAndSummaryLists = async (
 };
 
 
+// ... (OverviewPage component itself remains the same from where it was last fully provided)
 export default async function OverviewPage({ searchParams }: { searchParams?: { country?: string; startDate?: string; endDate?: string; }; }) {
   const session = await getServerSession(authOptions);
   const userSessionData = session?.user as any;
@@ -270,7 +287,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
           <section>
             {(favoritesSnippetData.length > 0 || riskSpectrumSetup.some(cat => cat.indicatorsDisplayData.length > 0)) && <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
             {!(favoritesSnippetData.length > 0 || riskSpectrumSetup.some(cat => cat.indicatorsDisplayData.length > 0)) && <h2 className="text-xl font-semibold text-foreground mb-3 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"> {/* Adjusted grid columns */}
               {summaryData.length > 0 ? (
                   summaryData
                       .filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id))

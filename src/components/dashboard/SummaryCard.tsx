@@ -3,10 +3,12 @@
 
 import React from 'react';
 import { IndicatorMetadata, TimeSeriesDataPoint, indicatorCategories } from '@/lib/indicators';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// --- Ensure CardFooter is imported ---
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+// --- ---
 import { format, parseISO, isValid } from 'date-fns';
 import Link from 'next/link';
-import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
+import { FaArrowUp, FaArrowDown, FaMinus, FaBullhorn, FaArrowCircleDown, FaQuestionCircle } from 'react-icons/fa';
 import { 
     ResponsiveContainer, 
     AreaChart, 
@@ -14,6 +16,8 @@ import {
     XAxis,
     YAxis 
 } from 'recharts';
+import { getIndicatorSignal, IndicatorSignal } from '@/lib/signals';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SummaryCardProps {
   indicator: IndicatorMetadata;
@@ -21,6 +25,28 @@ interface SummaryCardProps {
   previousValue?: TimeSeriesDataPoint | null;
   sparklineData?: TimeSeriesDataPoint[];
 }
+
+// Helper to get an icon for the signal sentiment
+const getSentimentIcon = (sentiment?: IndicatorSignal['sentiment']) => {
+    switch (sentiment) {
+        case 'bullish': return <FaArrowUp className="h-3 w-3 mr-1" />;
+        case 'bearish': return <FaArrowCircleDown className="h-3 w-3 mr-1" />;
+        case 'neutral': return <FaMinus className="h-3 w-3 mr-1" />;
+        case 'mixed': return <FaQuestionCircle className="h-3 w-3 mr-1" />;
+        default: return null;
+    }
+};
+
+const getSentimentColor = (sentiment?: IndicatorSignal['sentiment']): string => {
+    switch (sentiment) {
+        case 'bullish': return 'text-green-500 dark:text-green-400';
+        case 'bearish': return 'text-red-500 dark:text-red-400';
+        case 'neutral': return 'text-gray-500 dark:text-gray-400';
+        case 'mixed': return 'text-yellow-500 dark:text-yellow-400';
+        default: return 'text-muted-foreground';
+    }
+};
+
 
 export default function SummaryCard({ indicator, latestValue, previousValue, sparklineData }: SummaryCardProps) {
   const displayValue = latestValue?.value !== null && latestValue?.value !== undefined
@@ -83,6 +109,9 @@ export default function SummaryCard({ indicator, latestValue, previousValue, spa
 
   const gradientId = `sparklineGrad-${indicator.id.replace(/[^a-zA-Z0-9-_]/g, '')}`;
 
+  const signal = getIndicatorSignal(indicator, latestValue, previousValue);
+  const SentimentIcon = getSentimentIcon(signal?.sentiment);
+
   return (
      <Link href={linkHref} className="block hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-shadow duration-200 rounded-lg group">
         <Card className="h-full border border-border bg-card text-card-foreground group-hover:border-primary/60 transition-colors duration-200 flex flex-col">
@@ -103,7 +132,7 @@ export default function SummaryCard({ indicator, latestValue, previousValue, spa
                     <span className="text-xs font-normal text-muted-foreground ml-1">{displayUnit}</span>
                 </div>
             </CardHeader>
-            <CardContent className="pt-0 pb-3 px-4 sm:px-5 flex-grow flex flex-col justify-end">
+            <CardContent className="pt-0 pb-1 px-4 sm:px-5 flex-grow flex flex-col justify-end">
                 {validSparklineData.length > 1 ? (
                     <div className="w-full h-[40px] sm:h-[50px] mb-1 -mx-1">
                         <ResponsiveContainer width="100%" height="100%">
@@ -133,10 +162,28 @@ export default function SummaryCard({ indicator, latestValue, previousValue, spa
                         <p className="text-xs text-muted-foreground">No trend data</p>
                     </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-auto text-right w-full pt-1">
+                <p className="text-xs text-muted-foreground mt-auto text-right w-full pt-0">
                     {formattedDate}
                 </p>
             </CardContent>
+            {/* Signal Display Section */}
+            {signal && (
+                <CardFooter className="px-4 pb-3 pt-1.5 sm:px-5 border-t border-border/30">
+                    <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className={`flex items-center text-xs font-medium ${getSentimentColor(signal.sentiment)} cursor-default`}>
+                                    {SentimentIcon}
+                                    <span>{signal.sentiment.charAt(0).toUpperCase() + signal.sentiment.slice(1)} Signal</span>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-[200px] text-xs">
+                                <p>{signal.message}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </CardFooter>
+            )}
         </Card>
     </Link>
   );
