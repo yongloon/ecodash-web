@@ -11,9 +11,8 @@ import {
     fetchAlternativeMeFearGreedIndex,
     fetchDbNomicsSeries,
     fetchPolygonIOData,
-    // fetchPolygonIOPreviousClose, // Removed
-    // fetchPolygonIOLastTrade, // Removed
-    fetchApiNinjasCommodityHistoricalPrice, // Using this for metals
+    fetchApiNinjasMetalPrice, // For latest price using /v1/commodityprice
+    fetchApiNinjasCommodityHistoricalPrice, // For historical data using /v1/commoditypricehistorical
 } from './api';
 import {
     calculateYoYPercent,
@@ -193,16 +192,25 @@ export async function fetchIndicatorData(
         case 'DBNOMICS':
           if (indicator.apiIdentifier) { rawFetchedData = await fetchDbNomicsSeries(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true; }
           break;
-        case 'PolygonIO': // For historical aggregates from Polygon.io (e.g. stocks, ETFs if configured)
+        case 'PolygonIO':
           if (indicator.apiIdentifier) { rawFetchedData = await fetchPolygonIOData(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true; }
           break;
-        // PolygonIO_PREV_CLOSE and PolygonIO_LAST_TRADE cases removed
-        case 'ApiNinjasHistorical': // Using the historical endpoint for metals
+        case 'ApiNinjas': // For single latest price from /v1/commodityprice
           if (indicator.apiIdentifier) {
-            // For ApiNinjasHistorical, we pass the UI date range directly.
-            // The fetcher itself will handle conversion to timestamps.
-            // We default to '1d' period for daily data.
-            rawFetchedData = await fetchApiNinjasCommodityHistoricalPrice(indicator.apiIdentifier, actualDateRangeToUse, '1d');
+            const latestNinjaPricePoint = await fetchApiNinjasMetalPrice(indicator.apiIdentifier);
+            apiFetchAttempted = true;
+            if (latestNinjaPricePoint.length > 0) {
+                // For this source, we ONLY want the latest point, no mock supplementation here.
+                rawFetchedData = latestNinjaPricePoint;
+                console.log(`[Orchestrator] ApiNinjas (latest price) for ${indicator.id} successful. Returning single point.`);
+            } else {
+                console.warn(`[Orchestrator] ApiNinjas (latest price) for ${indicator.id} returned no data. Mock fallback will apply.`);
+            }
+          }
+          break;
+        case 'ApiNinjasHistorical': // For historical prices from /v1/commoditypricehistorical
+          if (indicator.apiIdentifier) {
+            rawFetchedData = await fetchApiNinjasCommodityHistoricalPrice(indicator.apiIdentifier, effectiveDateRangeForApiCall, '1d');
             apiFetchAttempted = true;
           }
           break;
@@ -226,56 +234,67 @@ export async function fetchIndicatorData(
       }
     } catch (error) { apiErrorOccurred = true; console.error(`[Orchestrator] API call error during switch for ${indicator.id}:`, error); }
 
-    // Simplified mock fallback: if the primary source was 'Mock' OR if an API was attempted and failed/returned empty.
-    const shouldTrulyUseMock =
-            indicator.apiSource === 'Mock' ||
-            (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) ||
-            (!apiFetchAttempted && indicator.apiSource !== 'Mock' && indicator.apiSource !== 'ApiNinjasHistorical'); // Don't use mock if ApiNinjasHistorical was not attempted and is the source
-            // Refined: Use mock if ApiNinjasHistorical was tried and failed, or if it's explicitly Mock
-            // Or if no API was attempted and it's not Mock (this path shouldn't be hit if all sources are covered)
+    // Mock data fallback logic:
+    let shouldUseFullMock = false;
+    if (indicator.apiSource === 'Mock') {
+        shouldUseFullMock = true;
+    } else if (indicator.apiSource === 'ApiNinjas') { // Special handling for ApiNinjas latest price
+        if(apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) {
+            shouldUseFullMock = true; // Fallback to full mock if API fails
+        }
+        // Otherwise, rawFetchedData (which is 0 or 1 point) is used directly without further mock supplementation *here*.
+    } else if (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) {
+        shouldUseFullMock = true;
+    } else if (!apiFetchAttempted && indicator.apiSource !== 'Mock') {
+        shouldUseFullMock = true;
+    }
 
-    if (
-        (indicator.apiSource === 'ApiNinjasHistorical' && apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) || // If ApiNinjasHistorical was tried and failed
-        (indicator.apiSource !== 'ApiNinjasHistorical' && shouldTrulyUseMock) || // Original logic for other sources
-        (indicator.apiSource === 'Mock') // Explicitly mock
-    ) {
+
+    if (shouldUseFullMock) {
       if (indicator.apiSource !== 'Mock') console.warn(`[Orchestrator] Full fallback to mock for ${indicator.id} (Source: ${indicator.apiSource}).`);
       else console.log(`[Orchestrator] Explicitly using full mock data for ${indicator.id}.`);
       rawFetchedData = generateMockData(indicator, actualDateRangeToUse);
     }
 
-
     let processedData: TimeSeriesDataPoint[] = [...rawFetchedData];
 
     if (indicator.calculation && indicator.calculation !== 'NONE' && processedData.length > 0) {
-        let calcSuccess = true;
-        let tempCalc: TimeSeriesDataPoint[] = [];
-        switch (indicator.calculation) {
-          case 'YOY_PERCENT':
-            let lookback = 12;
-            if (indicator.frequency === 'Quarterly') lookback = 4;
-            else if (indicator.frequency === 'Weekly') lookback = 52;
-            else if (indicator.frequency === 'Daily') lookback = 365;
-            tempCalc = calculateYoYPercent(processedData, lookback);
-            break;
-          case 'MOM_PERCENT':
-            tempCalc = calculateMoMPercent(processedData);
-            break;
-          case 'QOQ_PERCENT':
-            tempCalc = calculateQoQPercent(processedData);
-            break;
-          case 'MOM_CHANGE':
-            tempCalc = calculateMoMChange(processedData);
-            break;
-          default:
-            calcSuccess = false;
-            tempCalc = processedData;
-            break;
+        // Ensure calculations are not run on a single data point if that's all 'ApiNinjas' returned
+        if (indicator.apiSource === 'ApiNinjas' && processedData.length <= 1 && 
+            (indicator.calculation === 'YOY_PERCENT' || indicator.calculation === 'MOM_PERCENT' || indicator.calculation === 'QOQ_PERCENT' || indicator.calculation === 'MOM_CHANGE')) {
+            console.log(`[Orchestrator] Skipping calculation for ${indicator.id} due to single data point from ApiNinjas.`);
+        } else {
+            let calcSuccess = true;
+            let tempCalc: TimeSeriesDataPoint[] = [];
+            switch (indicator.calculation) {
+              case 'YOY_PERCENT':
+                let lookback = 12;
+                if (indicator.frequency === 'Quarterly') lookback = 4;
+                else if (indicator.frequency === 'Weekly') lookback = 52;
+                else if (indicator.frequency === 'Daily') lookback = 365;
+                tempCalc = calculateYoYPercent(processedData, lookback);
+                break;
+              case 'MOM_PERCENT':
+                tempCalc = calculateMoMPercent(processedData);
+                break;
+              case 'QOQ_PERCENT':
+                tempCalc = calculateQoQPercent(processedData);
+                break;
+              case 'MOM_CHANGE':
+                tempCalc = calculateMoMChange(processedData);
+                break;
+              default:
+                calcSuccess = false;
+                tempCalc = processedData;
+                break;
+            }
+            processedData = tempCalc;
+            if (calcSuccess) console.log(`[Orchestrator] ${indicator.id} after ${indicator.calculation}: ${processedData.length} points`);
         }
-        processedData = tempCalc;
-        if (calcSuccess) console.log(`[Orchestrator] ${indicator.id} after ${indicator.calculation}: ${processedData.length} points`);
     }
 
+    // Final filtering to match the UI-requested date range
+    // This is less critical for ApiNinjas (single point) but harmless
     if (actualDateRangeToUse.startDate && isValid(parseISO(actualDateRangeToUse.startDate)) && processedData.length > 0) {
         processedData = processedData.filter(dp => dp.date && isValid(parseISO(dp.date)) && parseISO(dp.date) >= parseISO(actualDateRangeToUse.startDate));
     }

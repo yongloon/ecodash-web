@@ -20,7 +20,7 @@ const NEWSAPI_ORG_BASE_URL = 'https://newsapi.org/v2';
 const FINNHUB_API_URL = 'https://finnhub.io/api/v1';
 const DBNOMICS_API_URL_V22 = 'https://api.db.nomics.world/v22';
 const POLYGON_API_URL = 'https://api.polygon.io/v2'; // For aggregates
-// const POLYGON_API_V1_URL = 'https://api.polygon.io/v1'; // No longer needed for last_trade if not used
+// const POLYGON_API_V1_URL = 'https://api.polygon.io/v1'; // Not currently used
 const API_NINJAS_BASE_URL = 'https://api.api-ninjas.com/v1';
 
 
@@ -282,14 +282,14 @@ export async function fetchDbNomicsSeries(
 
 // --- Polygon.io API Fetcher for Aggregates (Daily Prices) ---
 interface PolygonAggregatesResult {
-  c: number; // Close price
-  h: number; // High price
-  l: number; // Low price
-  n: number; // Number of transactions
-  o: number; // Open price
-  t: number; // Timestamp (Unix Msec)
-  v: number; // Trading volume
-  vw: number; // Volume weighted average price
+  c: number;
+  h: number;
+  l: number;
+  n: number;
+  o: number;
+  t: number;
+  v: number;
+  vw: number;
 }
 interface PolygonAggregatesResponse {
   ticker?: string;
@@ -300,7 +300,7 @@ interface PolygonAggregatesResponse {
   status?: string;
   request_id?: string;
   count?: number;
-  message?: string; // For errors
+  message?: string;
 }
 
 export async function fetchPolygonIOData(
@@ -378,6 +378,71 @@ export async function fetchPolygonIOData(
   }
 }
 
+// --- API-Ninjas.com Commodity Latest Price Fetcher (using /v1/commodityprice) ---
+interface ApiNinjasCommodityLatestPriceResponse {
+  exchange?: string;
+  name: string;
+  price: number;
+  unit?: string;
+  updated: number; // Unix timestamp (seconds)
+}
+export async function fetchApiNinjasMetalPrice(
+  commodityName: string
+): Promise<TimeSeriesDataPoint[]> {
+  console.log(`[fetchApiNinjasMetalPrice API - ENTRY] Called with: commodityName=${commodityName}`);
+  const apiKey = process.env.API_NINJAS_KEY;
+  // console.log(`[API API-Ninjas Commodity] Using key: ${apiKey ? 'SET (********)' : 'NOT SET'}`); // Keep key obscured for general logs
+
+  if (!apiKey) {
+    console.error(`[API API-Ninjas Commodity] API_NINJAS_KEY is missing. Cannot fetch for ${commodityName}.`);
+    return [];
+  }
+
+  const url = `${API_NINJAS_BASE_URL}/commodityprice?name=${encodeURIComponent(commodityName)}`;
+  console.log(`[API API-Ninjas Commodity] Attempting to fetch: ${commodityName} from URL: ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'X-Api-Key': apiKey },
+      next: { revalidate: 300 }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errMsg = `API-Ninjas Commodity Price Error (${response.status}) for ${commodityName}.`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message) errMsg = `API-Ninjas: ${errorJson.message}`;
+        else if (errorJson.error) errMsg = `API-Ninjas: ${errorJson.error}`; // Some API-Ninjas endpoints use "error"
+      } catch (e) { /* ignore if not JSON */ }
+      console.error(`[API API-Ninjas Commodity] Error response for ${commodityName}: ${response.status} - Body: ${errorText.substring(0, 500)}`);
+      throw new Error(errMsg);
+    }
+
+    const data: ApiNinjasCommodityLatestPriceResponse = await response.json();
+    // console.log(`[API API-Ninjas Commodity] Raw response for ${commodityName}:`, JSON.stringify(data));
+
+    // Check if data is an object and has the required properties
+    if (typeof data !== 'object' || data === null || typeof data.price !== 'number' || typeof data.updated !== 'number') {
+      console.warn(`[API API-Ninjas Commodity] Invalid or incomplete data received for ${commodityName}. Data:`, data);
+      return [];
+    }
+
+    const seriesData: TimeSeriesDataPoint[] = [{
+      date: format(new Date(data.updated * 1000), 'yyyy-MM-dd'),
+      value: parseFloat(data.price.toFixed(4)),
+    }];
+
+    console.log(`[API API-Ninjas Commodity] Parsed 1 point for ${commodityName}: ${JSON.stringify(seriesData)}`);
+    return seriesData;
+
+  } catch (error) {
+    console.error(`[API API-Ninjas Commodity] Network or parsing error for ${commodityName}:`, error);
+    return [];
+  }
+}
+
+
 // --- API-Ninjas.com Commodity Historical Price Fetcher ---
 interface ApiNinjasHistoricalDataPoint {
   open: number;
@@ -396,7 +461,7 @@ export async function fetchApiNinjasCommodityHistoricalPrice(
 ): Promise<TimeSeriesDataPoint[]> {
   console.log(`[fetchApiNinjasCommodityHistoricalPrice API - ENTRY] Called for: ${commodityName}, Range: ${JSON.stringify(dateRange)}, Period: ${period}`);
   const apiKey = process.env.API_NINJAS_KEY;
-  // console.log(`[API API-Ninjas Hist] Using key: ${apiKey ? 'SET (********)' : 'NOT SET'}`); // Keep key obscured
+  // console.log(`[API API-Ninjas Hist] Using key: ${apiKey ? 'SET (********)' : 'NOT SET'}`);
 
   if (!apiKey) {
     console.error(`[API API-Ninjas Hist] API_NINJAS_KEY is missing. Cannot fetch for ${commodityName}.`);

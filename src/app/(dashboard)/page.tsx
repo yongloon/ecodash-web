@@ -21,7 +21,7 @@ import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
 export const revalidate = 300; // Revalidate data at most every 5 minutes
 
 // Configuration for Overview Page
-const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI']; // PMI will now be ISM Mfg or CFNAI
+const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI'];
 const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED'];
 const MAX_FAVORITES_ON_OVERVIEW = 3;
 
@@ -34,7 +34,7 @@ const riskSpectrumSetup = [
     keyIndicatorsConfig: [
       { id: 'US10Y', explanation: "Benchmark for 'risk-free' rate; price moves inversely to yield. Lower yields often signal flight to safety or rate cut expectations." },
       { id: 'GOLD_PRICE', explanation: "Traditionally seen as a store of value and hedge against inflation or geopolitical risk." },
-      { id: 'JNJ_STOCK', explanation: "Represents a stable, blue-chip company with consistent dividends, generally lower volatility." },
+      // JNJ_STOCK was removed based on user request
       { id: 'KO_STOCK', explanation: "A defensive stock known for stable demand and dividends, often less affected by economic downturns." },
       { id: 'XLU_ETF', explanation: "Utilities sector ETF, often considered defensive due to consistent demand for services." },
     ]
@@ -47,7 +47,7 @@ const riskSpectrumSetup = [
       { id: 'LQD_ETF', explanation: "Tracks investment-grade corporate bonds, offering higher yields than Treasuries with moderate credit risk." },
       { id: 'VNQ_ETF', explanation: "Represents diversified real estate investments, sensitive to interest rates and economic growth." },
       { id: 'LAND_REIT', explanation: "Farmland REIT, offering potential inflation hedging and unique asset class exposure." },
-      { id: 'SILVER_PRICE', explanation: "Precious metal with industrial uses, can be more volatile than gold but offers diversification." },
+      // SILVER_PRICE was removed based on user request
       { id: 'PLATINUM_PRICE', explanation: "Industrial precious metal, price influenced by automotive demand and industrial output." },
     ]
   },
@@ -59,7 +59,7 @@ const riskSpectrumSetup = [
       { id: 'BTC_PRICE_USD', explanation: "Highly volatile cryptocurrency, driven by adoption, sentiment, and macroeconomic factors." },
       { id: 'ETH_PRICE_USD', explanation: "Leading smart contract platform cryptocurrency, also highly volatile." },
       { id: 'OIL_WTI', explanation: "Crude oil price, highly sensitive to global supply/demand, geopolitical events, and economic growth." },
-      { id: 'JNK_ETF', explanation: "Tracks high-yield ('junk') corporate bonds, offering higher returns for significantly higher credit risk." },
+      // JNK_ETF was removed based on user request
       { id: 'ARKK_ETF', explanation: "Invests in speculative, disruptive innovation companies, known for high growth potential and volatility." },
     ]
   },
@@ -88,20 +88,24 @@ const fetchDataForRiskAndSummaryLists = async (
     change7D?: number | null;
 }>> => {
   if (!ids || ids.length === 0) return [];
+
+  const indicatorsWithOriginalId = ids.map(id => ({ originalId: id, indicator: getIndicatorById(id) }));
+
   return Promise.all(
-      ids
-      .map(id => getIndicatorById(id))
-      .filter((indicator): indicator is IndicatorMetadata => {
-          if (!indicator) console.warn(`[OverviewPage Fetch Helper] Indicator ID not found during list fetch: ${id}`);
-          return !!indicator;
+      indicatorsWithOriginalId
+      .filter(item => {
+          if (!item.indicator) {
+              console.warn(`[OverviewPage Fetch Helper] Indicator ID not found during list fetch: ${item.originalId}`);
+              return false;
+          }
+          return true;
       })
-      .map(async (indicator) => {
-          // Updated global asset list to include new stock/ETF tickers
+      .map(async ({ indicator }) => { // item.indicator is now guaranteed to be IndicatorMetadata
+          // Updated global asset list to reflect removed indicators
           const isGlobalAsset = [
-            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'SILVER_PRICE', 'PLATINUM_PRICE',
-            'JNJ_STOCK', 'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT',
-            'ETH_PRICE_USD', 'OIL_WTI', 'JNK_ETF', 'ARKK_ETF',
-            // Core global/US-centric indicators often used in multiple places
+            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'PLATINUM_PRICE', // SILVER_PRICE removed
+            'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT', // JNJ_STOCK removed
+            'ETH_PRICE_USD', 'OIL_WTI', 'ARKK_ETF', // JNK_ETF removed
             'US10Y', 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT', 'FED_FUNDS', 'PMI', 'PMI_SERVICES',
             'CCI', 'CPI_YOY_PCT', 'GDP_GROWTH', 'UNRATE', 'RETAIL_SALES_MOM_PCT'
           ].includes(indicator.id);
@@ -129,8 +133,8 @@ const fetchDataForRiskAndSummaryLists = async (
 
               if (latestValue?.value !== null && latestValue?.value !== undefined) {
                 currentValueDisplay = `${latestValue.value.toLocaleString(undefined, {
-                    minimumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('per troy ounce') ? 2 : 0), // Adjusted for commodity prices
-                    maximumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('per troy ounce') ? 2 : (['BTC_PRICE_USD', 'ETH_PRICE_USD'].includes(indicator.id) ? 0 : 2)),
+                    minimumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('per ounce') ? 2 : 0),
+                    maximumFractionDigits: indicator.unit === '%' ? 2 : (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('per ounce') ? 2 : (['BTC_PRICE_USD', 'ETH_PRICE_USD'].includes(indicator.id) ? 0 : 2)),
                 })}`;
 
                 if (previousValue?.value !== null && previousValue?.value !== undefined) {
@@ -197,25 +201,30 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
   const favoritesSnippetData = favoritesInitialData;
 
   const processedRiskSpectrumDisplayData = riskSpectrumSetup.map(categoryConfig => {
-    const indicatorsDisplayData: KeyIndicatorDisplayInfo[] = categoryConfig.keyIndicatorsConfig.map(cfg => {
-      const fetchedIndData = riskSpectrumFetchedData.find(d => d.indicator.id === cfg.id);
-      const indicatorMeta = getIndicatorById(cfg.id);
-      const categoryInfo = indicatorMeta ? getCategoryBySlug(indicatorMeta.categoryKey) : null;
-      const link = (indicatorMeta && categoryInfo)
-        ? `/category/${categoryInfo.slug}?indicator=${indicatorMeta.id}`
-        : (indicatorMeta ? `/category/${indicatorMeta.categoryKey}?indicator=${indicatorMeta.id}` : '/dashboard');
+    const indicatorsDisplayData: KeyIndicatorDisplayInfo[] = categoryConfig.keyIndicatorsConfig
+      .map(cfg => {
+        const fetchedIndData = riskSpectrumFetchedData.find(d => d.indicator.id === cfg.id);
+        const indicatorMeta = getIndicatorById(cfg.id); // This might be undefined if indicator was removed
+        if (!indicatorMeta) return null; // Skip if indicatorMeta is not found (e.g., removed)
 
-      return {
-        id: cfg.id,
-        name: indicatorMeta?.name || cfg.id,
-        unit: indicatorMeta?.unit || '',
-        link: link,
-        currentValueDisplay: fetchedIndData?.currentValueDisplay || "N/A",
-        trendIconName: fetchedIndData?.trendIconName,
-        trendColor: fetchedIndData?.trendColor,
-        explanation: cfg.explanation,
-      };
-    });
+        const categoryInfo = getCategoryBySlug(indicatorMeta.categoryKey);
+        const link = (categoryInfo)
+          ? `/category/${categoryInfo.slug}?indicator=${indicatorMeta.id}`
+          : `/dashboard`; // Fallback link
+
+        return {
+          id: cfg.id,
+          name: indicatorMeta.name,
+          unit: indicatorMeta.unit || '',
+          link: link,
+          currentValueDisplay: fetchedIndData?.currentValueDisplay || "N/A",
+          trendIconName: fetchedIndData?.trendIconName,
+          trendColor: fetchedIndData?.trendColor,
+          explanation: cfg.explanation,
+        };
+      })
+      .filter((item): item is KeyIndicatorDisplayInfo => item !== null); // Filter out null items
+      
     return { ...categoryConfig, indicatorsDisplayData };
   });
 
@@ -250,8 +259,8 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
             </section>
           )}
           <section>
-            {(favoritesSnippetData.length > 0 || riskSpectrumSetup.length > 0) && <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
-            {!(favoritesSnippetData.length > 0 || riskSpectrumSetup.length > 0) && <h2 className="text-xl font-semibold text-foreground mb-3 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
+            {(favoritesSnippetData.length > 0 || riskSpectrumSetup.some(cat => cat.indicatorsDisplayData.length > 0)) && <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
+            {!(favoritesSnippetData.length > 0 || riskSpectrumSetup.some(cat => cat.indicatorsDisplayData.length > 0)) && <h2 className="text-xl font-semibold text-foreground mb-3 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
               {summaryData.length > 0 ? (
                   summaryData
@@ -270,6 +279,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
             </h2>
             <div className="space-y-6">
               {processedRiskSpectrumDisplayData.map(category => {
+                if (category.indicatorsDisplayData.length === 0) return null; // Don't render card if no indicators for it
                 return (
                   <AssetRiskCategoryCard
                     key={category.title}
