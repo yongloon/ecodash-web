@@ -13,7 +13,7 @@ export const indicatorCategories = {
   'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaIndustry },
   'vi': { name: 'Housing Market', slug: 'housing-market', icon: FaHome },
   'vii': { name: 'International Trade', slug: 'international-trade', icon: FaPlaneDeparture },
-  'viii': { name: 'Financial Conditions & Markets', slug: 'financial-conditions', icon: BsBank2 }, // UPDATED NAME AND SLUG
+  'viii': { name: 'Financial Conditions & Markets', slug: 'financial-conditions', icon: BsBank2 },
 } as const;
 
 export type IndicatorCategoryKey = keyof typeof indicatorCategories;
@@ -34,7 +34,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas'; // ApiNinjasHistorical removed from active use for Gold/Plat
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas' | 'ApiNinjasHistorical';
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -85,22 +85,20 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'OIL_WTI', name: 'Crude Oil Price (WTI)', categoryKey: 'iii', description: 'West Texas Intermediate crude oil spot price.', unit: 'USD per Barrel', frequency: 'Daily', sourceName: 'EIA via FRED', apiSource: 'FRED', apiIdentifier: 'WTISPLC', chartType: 'line', calculation: 'NONE' },
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
-{
+  {
     id: 'GOLD_PRICE', name: 'Spot Gold Price (API-Ninjas)', categoryKey: 'iii',
     description: 'Latest spot price of gold in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce',
-    frequency: 'Daily', // Represents latest daily snapshot
+    unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjas', apiIdentifier: 'Gold', // CORRECTED to ApiNinjas
+    apiSource: 'ApiNinjas', apiIdentifier: 'Gold',
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key. Shows latest price.'
   },
   {
     id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (API-Ninjas)', categoryKey: 'iii',
     description: 'Latest spot price of platinum in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce',
-    frequency: 'Daily', // Represents latest daily snapshot
+    unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjas', apiIdentifier: 'Platinum', // CORRECTED to ApiNinjas
+    apiSource: 'ApiNinjas', apiIdentifier: 'Platinum',
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key. Shows latest price.'
   },
 
@@ -109,14 +107,7 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'PERS_INC_MOM_PCT', name: 'Personal Income (MoM %)', categoryKey: 'iv', description: 'MoM % change in income received by individuals.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PI', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'PERS_OUTLAYS_MOM_PCT', name: 'Personal Outlays (PCE, MoM %)', categoryKey: 'iv', description: 'MoM % change in personal consumption expenditures, interest, and transfers.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PCE', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'CONSUMER_CREDIT_YOY_PCT', name: 'Consumer Credit Outstanding (YoY %)', categoryKey: 'iv', description: 'YoY % change in total outstanding consumer debt.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TOTALSL', chartType: 'bar', calculation: 'YOY_PERCENT' },
-  {
-    id: 'CCI', name: 'Consumer Confidence Index (CCI)', categoryKey: 'iv',
-    description: 'The Conference Board\'s measure of consumer optimism.',
-    unit: 'Index 1985=100', frequency: 'Monthly',
-    sourceName: 'The Conference Board via FRED',
-    apiSource: 'FRED', apiIdentifier: 'CONSUMERCONF',
-    chartType: 'line', notes: 'This is the Conference Board Consumer Confidence Index.', calculation: 'NONE'
-  },
+  // CCI (Consumer Confidence Index) REMOVED
   { id: 'UMCSENT', name: 'Consumer Sentiment Index (UMich)', categoryKey: 'iv', description: 'University of Michigan\'s index measuring consumer sentiment.', unit: 'Index Q1 1966=100', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'UMCSENT', chartType: 'line', calculation: 'NONE' },
   { id: 'VEHICLE_SALES', name: 'Light Weight Vehicle Sales', categoryKey: 'iv', description: 'Total sales of new lightweight vehicles (SAAR).', unit: 'Millions of Units (SAAR)', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'ALTSALES', chartType: 'line', calculation: 'NONE' },
   { id: 'SAVINGS_RATE', name: 'Personal Savings Rate', categoryKey: 'iv', description: 'Personal saving as a % of disposable personal income.', unit: '%', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PSAVERT', chartType: 'line', calculation: 'NONE' },
@@ -125,8 +116,15 @@ export const indicators: IndicatorMetadata[] = [
   // == Category V: Business Activity & Investment ==
   { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'v', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' },
   { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'v', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
-  { id: 'PMI', name: 'ISM Manufacturing PMI', categoryKey: 'v', description: 'ISM Manufacturing PMI. >50 indicates expansion.', unit: 'Index', frequency: 'Monthly', sourceName: 'ISM via DB.nomics', sourceLink: 'https://db.nomics.world/ISM/pmi', apiSource: 'DBNOMICS', apiIdentifier: 'ISM/pmi/TOTAL', chartType: 'line', calculation: 'NONE' },
-  { id: 'PMI_SERVICES', name: 'ISM Services PMI', categoryKey: 'v', description: 'ISM Services PMI. >50 indicates expansion.', unit: 'Index', frequency: 'Monthly', sourceName: 'ISM via DB.nomics', sourceLink: 'https://db.nomics.world/ISM/non-manufacturing-pmi', apiSource: 'DBNOMICS', apiIdentifier: 'ISM/non-manufacturing-pmi/TOTAL', chartType: 'line', calculation: 'NONE' },
+  {
+    id: 'PMI', name: 'Manufacturing PMI', categoryKey: 'v',
+    description: 'Purchasing Managers Index for the manufacturing sector. >50 indicates expansion.',
+    unit: 'Index', frequency: 'Monthly',
+    sourceName: 'Investing.com (Mocked)',
+    apiSource: 'Mock', apiIdentifier: 'PMI_MANUFACTURING_INVESTING_MOCK',
+    chartType: 'line', calculation: 'NONE', notes: 'Data is programmatically generated for demonstration.'
+  },
+  // Services PMI REMOVED
   { id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for durable goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'DGORDER', chartType: 'bar', calculation: 'MOM_PERCENT', notes: 'Includes transportation.' },
   { id: 'FACTORY_ORDERS_MOM_PCT', name: 'Factory Orders (MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for manufactured goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'AMTMNO', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'BUS_INVENTORIES_MOM_PCT', name: 'Business Inventories (MoM %)', categoryKey: 'v', description: 'MoM % change in total value of business inventories.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'BUSINV', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -138,7 +136,7 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'HOUSING_STARTS', name: 'Housing Starts', categoryKey: 'vi', description: 'New residential construction projects started (SAAR).', unit: 'Thousands of Units (SAAR)', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'HOUST', chartType: 'area', calculation: 'NONE' },
   { id: 'BUILDING_PERMITS', name: 'Building Permits', categoryKey: 'vi', description: 'Permits authorized for new private housing units (SAAR).', unit: 'Thousands of Units (SAAR)', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'PERMIT', chartType: 'line', calculation: 'NONE' },
   { id: 'EXISTING_HOME_SALES', name: 'Existing Home Sales', categoryKey: 'vi', description: 'Closed sales of previously owned homes (SAAR).', unit: 'Millions of Units (SAAR)', frequency: 'Monthly', sourceName: 'NAR via FRED', apiSource: 'FRED', apiIdentifier: 'EXHOSLUSM495S', chartType: 'line', calculation: 'NONE' },
-  { id: 'PENDING_HOME_SALES', name: 'Pending Home Sales Index', categoryKey: 'vi', description: 'Index of homes under contract but not yet closed.', unit: 'Index 2001=100', frequency: 'Monthly', sourceName: 'NAR via FRED', apiSource: 'FRED', apiIdentifier: 'PENDING', chartType: 'line', calculation: 'NONE' },
+  // PENDING_HOME_SALES REMOVED
   { id: 'NEW_HOME_SALES', name: 'New Home Sales', categoryKey: 'vi', description: 'Newly constructed single-family homes sold (SAAR).', unit: 'Thousands of Units (SAAR)', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'HSN1F', chartType: 'line', calculation: 'NONE' },
   { id: 'HOUSING_AFFORD', name: 'Housing Affordability Index', categoryKey: 'vi', description: 'Measures if a typical family can qualify for a mortgage on a typical home.', unit: 'Index', frequency: 'Monthly', sourceName: 'NAR via FRED', apiSource: 'FRED', apiIdentifier: 'FIXHAI', chartType: 'line', calculation: 'NONE' },
   { id: 'MORTGAGE_DELINQUENCY', name: 'Mortgage Delinquency Rate', categoryKey: 'vi', description: 'Delinquency rate on single-family residential mortgages.', unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DRSFRMACBS', chartType: 'line', calculation: 'NONE' },
