@@ -34,7 +34,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI';
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'PolygonIO_PREV_CLOSE';
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -54,7 +54,13 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'GDP_PER_CAPITA', name: 'Real GDP per Capita', categoryKey: 'i', description: 'Average economic output per person, inflation-adjusted.', unit: 'Chained 2017 Dollars', frequency: 'Quarterly', sourceName: 'BEA/Census via FRED', apiSource: 'FRED', apiIdentifier: 'A939RX0Q048SBEA', chartType: 'line', calculation: 'NONE' },
   { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'i', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
   { id: 'PRODUCTIVITY', name: 'Productivity (Output Per Hour)', categoryKey: 'i', description: 'Output per hour in the nonfarm business sector.', unit: 'Index 2012=100', frequency: 'Quarterly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'OPHNFB', chartType: 'line', calculation: 'NONE' },
-  { id: 'LEI', name: 'Leading Economic Index (LEI)', categoryKey: 'i', description: 'Index by The Conference Board to predict future economic activity.', unit: 'Index', frequency: 'Monthly', sourceName: 'The Conference Board', apiSource: 'Mock', apiIdentifier: 'LEI_MOCK', chartType: 'line', notes: 'Requires subscription, using Mock data.', calculation: 'NONE' },
+  {
+    id: 'LEI', name: 'Leading Economic Index (LEI)', categoryKey: 'i',
+    description: 'Composite index designed to signal peaks and troughs in the business cycle for the U.S. economy.',
+    unit: 'Index', frequency: 'Monthly', sourceName: 'The Conference Board via FRED',
+    apiSource: 'FRED', apiIdentifier: 'USSLIND',
+    chartType: 'line', calculation: 'NONE'
+  },
 
   // == Category II: Labor Market ==
   { id: 'UNRATE', name: 'Unemployment Rate', categoryKey: 'ii', description: '% of labor force unemployed but seeking work.', unit: '%', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'UNRATE', chartType: 'line', calculation: 'NONE' },
@@ -80,13 +86,40 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'OIL_WTI', name: 'Crude Oil Price (WTI)', categoryKey: 'iii', description: 'West Texas Intermediate crude oil spot price.', unit: 'USD per Barrel', frequency: 'Daily', sourceName: 'EIA via FRED', apiSource: 'FRED', apiIdentifier: 'WTISPLC', chartType: 'line', calculation: 'NONE' },
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
+  {
+    id: 'GOLD_PRICE', name: 'Spot Gold Price (Previous Close)', categoryKey: 'iii',
+    description: 'Previous day\'s closing spot price of gold in U.S. Dollars per Troy Ounce.',
+    unit: 'USD per Troy Ounce', frequency: 'Daily', sourceName: 'Polygon.io',
+    apiSource: 'PolygonIO_PREV_CLOSE', apiIdentifier: 'X:XAUUSD',
+    chartType: 'line', calculation: 'NONE', notes: 'Requires Polygon.io API key. Shows previous close.'
+  },
+  {
+    id: 'SILVER_PRICE', name: 'Spot Silver Price (Previous Close)', categoryKey: 'iii',
+    description: 'Previous day\'s closing spot price of silver in U.S. Dollars per Troy Ounce.',
+    unit: 'USD per Troy Ounce', frequency: 'Daily', sourceName: 'Polygon.io',
+    apiSource: 'PolygonIO_PREV_CLOSE', apiIdentifier: 'X:XAGUSD',
+    chartType: 'line', calculation: 'NONE', notes: 'Requires Polygon.io API key. Shows previous close.'
+  },
+  {
+    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (Previous Close)', categoryKey: 'iii',
+    description: 'Previous day\'s closing spot price of platinum in U.S. Dollars per Troy Ounce.',
+    unit: 'USD per Troy Ounce', frequency: 'Daily', sourceName: 'Polygon.io',
+    apiSource: 'PolygonIO_PREV_CLOSE', apiIdentifier: 'X:XPTUSD',
+    chartType: 'line', calculation: 'NONE', notes: 'Requires Polygon.io API key. Shows previous close.'
+  },
 
   // == Category IV: Consumer Activity ==
   { id: 'RETAIL_SALES_MOM_PCT', name: 'Retail Sales (Advance, MoM %)', categoryKey: 'iv', description: 'MoM % change in retail/food services sales.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'RSAFS', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'PERS_INC_MOM_PCT', name: 'Personal Income (MoM %)', categoryKey: 'iv', description: 'MoM % change in income received by individuals.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PI', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'PERS_OUTLAYS_MOM_PCT', name: 'Personal Outlays (PCE, MoM %)', categoryKey: 'iv', description: 'MoM % change in personal consumption expenditures, interest, and transfers.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PCE', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'CONSUMER_CREDIT_YOY_PCT', name: 'Consumer Credit Outstanding (YoY %)', categoryKey: 'iv', description: 'YoY % change in total outstanding consumer debt.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TOTALSL', chartType: 'bar', calculation: 'YOY_PERCENT' },
-  { id: 'CCI', name: 'Consumer Confidence Index (CCI)', categoryKey: 'iv', description: 'The Conference Board\'s measure of consumer optimism.', unit: 'Index 1985=100', frequency: 'Monthly', sourceName: 'The Conference Board', apiSource: 'Mock', apiIdentifier: 'CCI_MOCK', chartType: 'line', notes: 'Requires subscription, using Mock data.', calculation: 'NONE' },
+  {
+    id: 'CCI', name: 'Consumer Confidence Index (CCI)', categoryKey: 'iv',
+    description: 'The Conference Board\'s measure of consumer optimism.',
+    unit: 'Index 1985=100', frequency: 'Monthly', sourceName: 'The Conference Board via FRED',
+    apiSource: 'FRED', apiIdentifier: 'CONSUMERCONF',
+    chartType: 'line', notes: 'This is the Conference Board Consumer Confidence Index.', calculation: 'NONE'
+  },
   { id: 'UMCSENT', name: 'Consumer Sentiment Index (UMich)', categoryKey: 'iv', description: 'University of Michigan\'s index measuring consumer sentiment.', unit: 'Index Q1 1966=100', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'UMCSENT', chartType: 'line', calculation: 'NONE' },
   { id: 'VEHICLE_SALES', name: 'Light Weight Vehicle Sales', categoryKey: 'iv', description: 'Total sales of new lightweight vehicles (SAAR).', unit: 'Millions of Units (SAAR)', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'ALTSALES', chartType: 'line', calculation: 'NONE' },
   { id: 'SAVINGS_RATE', name: 'Personal Savings Rate', categoryKey: 'iv', description: 'Personal saving as a % of disposable personal income.', unit: '%', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PSAVERT', chartType: 'line', calculation: 'NONE' },
@@ -117,7 +150,6 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'CURRENT_ACCOUNT', name: 'Current Account Balance', categoryKey: 'vii', description: 'Broad measure of trade including goods, services, income, and transfers.', unit: 'Billions of Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'BOPBCA', chartType: 'bar', calculation: 'NONE' },
 
   // == Category VIII: Financial Markets & Assets ==
-  // Core Market & Rate Indicators
   { id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii', description: 'Tracks stock performance of 500 large U.S. companies.', unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P Dow Jones Indices via FRED', apiSource: 'FRED', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE' },
   { id: 'M2_YOY_PCT', name: 'M2 Money Stock (YoY %)', categoryKey: 'viii', description: 'YoY % change in M2 money stock.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'bar', calculation: 'YOY_PERCENT', notes: 'Calculated from M2SL level data.' },
   { id: 'US10Y', name: 'US 10-Year Treasury Yield', categoryKey: 'viii', description: 'Yield on U.S. 10-year government debt.', unit: '%', frequency: 'Daily', sourceName: 'U.S. Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'DGS10', chartType: 'line', calculation: 'NONE' },
@@ -126,17 +158,6 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'VIX', name: 'Volatility Index (VIX)', categoryKey: 'viii', description: 'Market expectation of near-term S&P 500 volatility.', unit: 'Index', frequency: 'Daily', sourceName: 'CBOE via FRED', apiSource: 'FRED', apiIdentifier: 'VIXCLS', chartType: 'line', calculation: 'NONE' },
   { id: 'CORP_BOND_SPREAD_BAA', name: 'Corporate Bond Spread (Baa)', categoryKey: 'viii', description: 'Difference between Moody\'s Baa Corp Bond Yield and 10-Yr Treasury.', unit: '%', frequency: 'Daily', sourceName: 'Moody\'s/Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'BAA10Y', chartType: 'line', calculation: 'NONE' },
   { id: 'M2SL', name: 'M2 Money Stock (Level)', categoryKey: 'viii', description: 'Total M2 money supply (SA).', unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE' },
-
-  // Indicators for Asset Risk Section (Low Risk)
-  // US10Y is already defined above.
-  // FED_FUNDS is already defined above.
-  {
-    id: 'GOLD_PRICE', name: 'Spot Gold Price (Finnhub)', categoryKey: 'viii',
-    description: 'Spot price of gold in U.S. Dollars per Troy Ounce.',
-    unit: 'USD per Troy Ounce', frequency: 'Real-time/Delayed', sourceName: 'Finnhub (e.g. OANDA)',
-    apiSource: 'FinnhubQuote', apiIdentifier: 'OANDA:XAU_USD', // <<< MUST VERIFY THIS SYMBOL ON FINNHUB
-    chartType: 'line', calculation: 'NONE', notes: 'Requires Finnhub API key.'
-  },
   {
     id: 'JNJ_STOCK', name: 'Johnson & Johnson (JNJ)', categoryKey: 'viii',
     description: 'Stock price for Johnson & Johnson.',
@@ -155,9 +176,6 @@ export const indicators: IndicatorMetadata[] = [
     unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
     apiSource: 'AlphaVantage', apiIdentifier: 'XLU', chartType: 'line', calculation: 'NONE',
   },
-
-  // Indicators for Asset Risk Section (Medium Risk)
-  // BAA_YIELD is already defined above.
   {
     id: 'LQD_ETF', name: 'Inv. Grade Corp Bond ETF (LQD)', categoryKey: 'viii',
     description: 'iShares iBoxx $ Investment Grade Corporate Bond ETF.',
@@ -177,35 +195,19 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'AlphaVantage', apiIdentifier: 'LAND', chartType: 'line', calculation: 'NONE',
   },
   {
-    id: 'SILVER_PRICE', name: 'Spot Silver Price (Finnhub)', categoryKey: 'viii',
-    description: 'Spot price of silver in U.S. Dollars per Troy Ounce.',
-    unit: 'USD per Troy Ounce', frequency: 'Real-time/Delayed', sourceName: 'Finnhub (e.g. OANDA)',
-    apiSource: 'FinnhubQuote', apiIdentifier: 'OANDA:XAG_USD', // <<< MUST VERIFY THIS SYMBOL ON FINNHUB
-    chartType: 'line', calculation: 'NONE', notes: 'Requires Finnhub API key.'
-  },
-  {
-    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (Finnhub)', categoryKey: 'viii',
-    description: 'Spot price of platinum in U.S. Dollars per Troy Ounce.',
-    unit: 'USD per Troy Ounce', frequency: 'Real-time/Delayed', sourceName: 'Finnhub (e.g. OANDA)',
-    apiSource: 'FinnhubQuote', apiIdentifier: 'OANDA:XPT_USD', // <<< MUST VERIFY THIS SYMBOL ON FINNHUB
-    chartType: 'line', calculation: 'NONE', notes: 'Requires Finnhub API key.'
-  },
-
-  // Indicators for Asset Risk Section (High Risk)
-  // SP500, PMI, RETAIL_SALES_MOM_PCT, VIX, M2_YOY_PCT are already defined above.
-  {
     id: 'BTC_PRICE_USD', name: 'Bitcoin Price (USD)', categoryKey: 'viii',
-    description: 'Daily closing price of Bitcoin in US Dollars.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'CoinGecko',
-    apiSource: 'CoinGeckoAPI', apiIdentifier: 'bitcoin', chartType: 'line', calculation: 'NONE',
+    description: 'Daily closing price of Bitcoin in US Dollars from Coinbase.',
+    unit: 'USD', frequency: 'Daily', sourceName: 'Coinbase via FRED',
+    apiSource: 'FRED', apiIdentifier: 'CBBTCUSD',
+    chartType: 'line', calculation: 'NONE',
   },
   {
     id: 'ETH_PRICE_USD', name: 'Ethereum Price (USD)', categoryKey: 'viii',
-    description: 'Daily closing price of Ethereum in US Dollars.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'CoinGecko',
-    apiSource: 'CoinGeckoAPI', apiIdentifier: 'ethereum', chartType: 'line', calculation: 'NONE',
+    description: 'Daily closing price of Ethereum in US Dollars from Coinbase.',
+    unit: 'USD', frequency: 'Daily', sourceName: 'Coinbase via FRED',
+    apiSource: 'FRED', apiIdentifier: 'CBETHUSD',
+    chartType: 'line', calculation: 'NONE',
   },
-  // OIL_WTI is already defined in Inflation/Prices, but could be used in High Risk too.
   {
     id: 'JNK_ETF', name: 'High Yield Bond ETF (JNK)', categoryKey: 'viii',
     description: 'SPDR Bloomberg High Yield Bond ETF (Junk Bonds).',
@@ -222,7 +224,8 @@ export const indicators: IndicatorMetadata[] = [
     id: 'CRYPTO_FEAR_GREED', name: 'Crypto Fear & Greed Index', categoryKey: 'viii',
     description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market.',
     unit: 'Index (0-100)', frequency: 'Daily', sourceName: 'Alternative.me',
-    apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed', chartType: 'line', calculation: 'NONE',
+    apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
+    chartType: 'line', calculation: 'NONE',
   },
 ];
 
