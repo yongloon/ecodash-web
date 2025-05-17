@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata, indicatorCategories, getCategoryBySlug } from '@/lib/indicators';
 import { fetchIndicatorData } from '@/lib/mockData';
-import { fetchNewsHeadlines, fetchEconomicCalendar, fetchAlphaVantageEarningsCalendar, NewsArticle, EconomicEvent, EarningsEventAV } from '@/lib/api'; // Import widget data fetchers and types
+import { fetchNewsHeadlines, fetchEconomicCalendar, fetchAlphaVantageEarningsCalendar, NewsArticle, EconomicEvent, EarningsEventAV } from '@/lib/api';
 
 // UI Components
 import SummaryCard from '@/components/dashboard/SummaryCard';
@@ -22,7 +22,7 @@ import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
 export const revalidate = 300; // Revalidate data at most every 5 minutes
 
 // Configuration for Overview Page
-const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI'];
+const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'FEDFUNDS']; // PMI changed to FEDFUNDS
 const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED'];
 const MAX_FAVORITES_ON_OVERVIEW = 3;
 
@@ -102,7 +102,9 @@ const fetchDataForRiskAndSummaryLists = async (
             'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'PLATINUM_PRICE',
             'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT',
             'ETH_PRICE_USD', 'OIL_WTI', 'ARKK_ETF',
-            'US10Y', 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT', 'FED_FUNDS', 'PMI', 'PMI_SERVICES',
+            'US10Y', 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT',
+            // Note: FEDFUNDS is US-specific, its fetching depends on `country === 'US'` or `indicator.apiSource === 'Mock'`
+            'PMI', 'PMI_SERVICES', // These might be international if using DBNOMICS
             'CCI', 'CPI_YOY_PCT', 'GDP_GROWTH', 'UNRATE', 'RETAIL_SALES_MOM_PCT'
           ].includes(indicator.id);
           const shouldFetch = country === 'US' || indicator.apiSource === 'Mock' || isGlobalAsset;
@@ -167,6 +169,7 @@ const fetchDataForRiskAndSummaryLists = async (
   );
 };
 
+
 export default async function OverviewPage({ searchParams }: { searchParams?: { country?: string; startDate?: string; endDate?: string; }; }) {
   const session = await getServerSession(authOptions);
   const userSessionData = session?.user as any;
@@ -180,19 +183,18 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
     riskSpectrumSetup.flatMap(category => category.keyIndicatorsConfig.map(ind => ind.id))
   ));
 
-  // Fetch data for widgets server-side
   const newsArticlesPromise = fetchNewsHeadlines('business', 'us', 5);
-  const economicEventsPromise = fetchEconomicCalendar(30); // Default itemCount handled by widget if needed
-  const earningsEventsPromise = fetchAlphaVantageEarningsCalendar('3month', undefined); // Default itemCount by widget
+  const economicEventsPromise = fetchEconomicCalendar(30);
+  const earningsEventsPromise = fetchAlphaVantageEarningsCalendar('3month', undefined);
 
   const [
     summaryData,
     marketSnapshotData,
     favoritesInitialData,
     riskSpectrumFetchedData,
-    newsArticles,         // Resolve widget data
-    economicEvents,       // Resolve widget data
-    earningsEvents        // Resolve widget data
+    newsArticles,
+    economicEvents,
+    earningsEvents
   ] = await Promise.all([
     fetchDataForRiskAndSummaryLists(headlineIndicatorIds, country, dateRange),
     fetchDataForRiskAndSummaryLists(marketSnapshotIndicatorIds, country, dateRange, true),

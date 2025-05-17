@@ -13,7 +13,7 @@ export const indicatorCategories = {
   'v': { name: 'Business Activity & Investment', slug: 'business-activity', icon: FaIndustry },
   'vi': { name: 'Housing Market', slug: 'housing-market', icon: FaHome },
   'vii': { name: 'International Trade', slug: 'international-trade', icon: FaPlaneDeparture },
-  'viii': { name: 'Financial Markets & Interest Rates', slug: 'financial-markets-rates', icon: BsBank2 },
+  'viii': { name: 'Financial Conditions & Markets', slug: 'financial-conditions', icon: BsBank2 }, // UPDATED NAME AND SLUG
 } as const;
 
 export type IndicatorCategoryKey = keyof typeof indicatorCategories;
@@ -34,7 +34,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas'; // Simplified ApiNinjas source type
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas'; // ApiNinjasHistorical removed from active use for Gold/Plat
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -85,20 +85,22 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'OIL_WTI', name: 'Crude Oil Price (WTI)', categoryKey: 'iii', description: 'West Texas Intermediate crude oil spot price.', unit: 'USD per Barrel', frequency: 'Daily', sourceName: 'EIA via FRED', apiSource: 'FRED', apiIdentifier: 'WTISPLC', chartType: 'line', calculation: 'NONE' },
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
-  {
+{
     id: 'GOLD_PRICE', name: 'Spot Gold Price (API-Ninjas)', categoryKey: 'iii',
     description: 'Latest spot price of gold in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', frequency: 'Daily',
+    unit: 'USD per Ounce',
+    frequency: 'Daily', // Represents latest daily snapshot
     sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjas', apiIdentifier: 'Gold', // Using 'ApiNinjas' for the latest price endpoint
+    apiSource: 'ApiNinjas', apiIdentifier: 'Gold', // CORRECTED to ApiNinjas
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key. Shows latest price.'
   },
   {
     id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (API-Ninjas)', categoryKey: 'iii',
     description: 'Latest spot price of platinum in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', frequency: 'Daily',
+    unit: 'USD per Ounce',
+    frequency: 'Daily', // Represents latest daily snapshot
     sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjas', apiIdentifier: 'Platinum', // Using 'ApiNinjas' for the latest price endpoint
+    apiSource: 'ApiNinjas', apiIdentifier: 'Platinum', // CORRECTED to ApiNinjas
     chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key. Shows latest price.'
   },
 
@@ -147,7 +149,16 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'TRADE_BALANCE', name: 'Balance of Trade (Goods & Services)', categoryKey: 'vii', description: 'Difference between a country\'s exports and imports.', unit: 'Billions of Dollars', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'BOPGSTB', chartType: 'bar', calculation: 'NONE' },
   { id: 'CURRENT_ACCOUNT', name: 'Current Account Balance', categoryKey: 'vii', description: 'Broad measure of trade including goods, services, income, and transfers.', unit: 'Billions of Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'BOPBCA', chartType: 'bar', calculation: 'NONE' },
 
-  // == Category VIII: Financial Markets & Interest Rates ==
+  // == Category VIII: Financial Conditions & Markets ==
+  {
+    id: 'FEDFUNDS', name: 'Federal Funds Effective Rate', categoryKey: 'viii',
+    description: 'The interest rate at which commercial banks lend reserves to each other overnight, a key monetary policy tool.',
+    unit: '%', frequency: 'Monthly',
+    sourceName: 'Board of Governors of the Federal Reserve System (US) via FRED',
+    apiSource: 'FRED', apiIdentifier: 'FEDFUNDS',
+    chartType: 'line', calculation: 'NONE',
+    notes: 'Monthly average of daily effective federal funds rate.'
+  },
   { id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii', description: 'Tracks stock performance of 500 large U.S. companies.', unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P Dow Jones Indices via FRED', apiSource: 'FRED', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE' },
   { id: 'M2_YOY_PCT', name: 'M2 Money Stock (YoY %)', categoryKey: 'viii', description: 'YoY % change in M2 money stock.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'bar', calculation: 'YOY_PERCENT', notes: 'Calculated from M2SL level data.' },
   { id: 'M2SL', name: 'M2 Money Stock (Level)', categoryKey: 'viii', description: 'Total M2 money supply (SA).', unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE' },
