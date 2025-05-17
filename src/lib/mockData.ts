@@ -11,7 +11,7 @@ import {
     fetchAlternativeMeFearGreedIndex,
     fetchDbNomicsSeries,
     fetchPolygonIOData,
-    fetchApiNinjasMetalPrice, // For latest price using /v1/commodityprice
+    fetchApiNinjasMetalPrice, // For latest metal price using /v1/commodityprice
     fetchApiNinjasCommodityHistoricalPrice, // For historical data using /v1/commoditypricehistorical
 } from './api';
 import {
@@ -195,20 +195,18 @@ export async function fetchIndicatorData(
         case 'PolygonIO':
           if (indicator.apiIdentifier) { rawFetchedData = await fetchPolygonIOData(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true; }
           break;
-        case 'ApiNinjas': // For single latest price from /v1/commodityprice
+        case 'ApiNinjas': // Fetches only the single latest price using /v1/commodityprice
           if (indicator.apiIdentifier) {
-            const latestNinjaPricePoint = await fetchApiNinjasMetalPrice(indicator.apiIdentifier);
+            rawFetchedData = await fetchApiNinjasMetalPrice(indicator.apiIdentifier);
             apiFetchAttempted = true;
-            if (latestNinjaPricePoint.length > 0) {
-                // For this source, we ONLY want the latest point, no mock supplementation here.
-                rawFetchedData = latestNinjaPricePoint;
-                console.log(`[Orchestrator] ApiNinjas (latest price) for ${indicator.id} successful. Returning single point.`);
+            if (rawFetchedData.length > 0) {
+                console.log(`[Orchestrator] ApiNinjas (latest price) for ${indicator.id} successful. Data points: ${rawFetchedData.length}`);
             } else {
-                console.warn(`[Orchestrator] ApiNinjas (latest price) for ${indicator.id} returned no data. Mock fallback will apply.`);
+                console.warn(`[Orchestrator] ApiNinjas (latest price) for ${indicator.id} returned no data. Mock fallback will apply if needed.`);
             }
           }
           break;
-        case 'ApiNinjasHistorical': // For historical prices from /v1/commoditypricehistorical
+        case 'ApiNinjasHistorical': // Fetches historical prices from /v1/commoditypricehistorical
           if (indicator.apiIdentifier) {
             rawFetchedData = await fetchApiNinjasCommodityHistoricalPrice(indicator.apiIdentifier, effectiveDateRangeForApiCall, '1d');
             apiFetchAttempted = true;
@@ -234,18 +232,18 @@ export async function fetchIndicatorData(
       }
     } catch (error) { apiErrorOccurred = true; console.error(`[Orchestrator] API call error during switch for ${indicator.id}:`, error); }
 
-    // Mock data fallback logic:
     let shouldUseFullMock = false;
     if (indicator.apiSource === 'Mock') {
         shouldUseFullMock = true;
     } else if (indicator.apiSource === 'ApiNinjas') { // Special handling for ApiNinjas latest price
         if(apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) {
-            shouldUseFullMock = true; // Fallback to full mock if API fails
+            shouldUseFullMock = true; // Fallback to full mock if API fails to get the single point
         }
-        // Otherwise, rawFetchedData (which is 0 or 1 point) is used directly without further mock supplementation *here*.
+        // If successful, rawFetchedData contains just the single point, and no further mock supplementation happens here.
     } else if (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) {
+        // For other historical sources
         shouldUseFullMock = true;
-    } else if (!apiFetchAttempted && indicator.apiSource !== 'Mock') {
+    } else if (!apiFetchAttempted && indicator.apiSource !== 'Mock') { // Should not be common
         shouldUseFullMock = true;
     }
 
@@ -259,10 +257,13 @@ export async function fetchIndicatorData(
     let processedData: TimeSeriesDataPoint[] = [...rawFetchedData];
 
     if (indicator.calculation && indicator.calculation !== 'NONE' && processedData.length > 0) {
-        // Ensure calculations are not run on a single data point if that's all 'ApiNinjas' returned
-        if (indicator.apiSource === 'ApiNinjas' && processedData.length <= 1 && 
-            (indicator.calculation === 'YOY_PERCENT' || indicator.calculation === 'MOM_PERCENT' || indicator.calculation === 'QOQ_PERCENT' || indicator.calculation === 'MOM_CHANGE')) {
-            console.log(`[Orchestrator] Skipping calculation for ${indicator.id} due to single data point from ApiNinjas.`);
+        // Prevent calculations if only one data point (common for 'ApiNinjas' latest price source)
+        if (processedData.length <= 1 && 
+            (indicator.calculation === 'YOY_PERCENT' || 
+             indicator.calculation === 'MOM_PERCENT' || 
+             indicator.calculation === 'QOQ_PERCENT' || 
+             indicator.calculation === 'MOM_CHANGE')) {
+            console.log(`[Orchestrator] Skipping calculation for ${indicator.id} due to insufficient data points (${processedData.length}).`);
         } else {
             let calcSuccess = true;
             let tempCalc: TimeSeriesDataPoint[] = [];
@@ -293,8 +294,6 @@ export async function fetchIndicatorData(
         }
     }
 
-    // Final filtering to match the UI-requested date range
-    // This is less critical for ApiNinjas (single point) but harmless
     if (actualDateRangeToUse.startDate && isValid(parseISO(actualDateRangeToUse.startDate)) && processedData.length > 0) {
         processedData = processedData.filter(dp => dp.date && isValid(parseISO(dp.date)) && parseISO(dp.date) >= parseISO(actualDateRangeToUse.startDate));
     }

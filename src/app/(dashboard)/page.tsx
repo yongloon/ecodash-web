@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata, indicatorCategories, getCategoryBySlug } from '@/lib/indicators';
 import { fetchIndicatorData } from '@/lib/mockData';
+import { fetchNewsHeadlines, fetchEconomicCalendar, fetchAlphaVantageEarningsCalendar, NewsArticle, EconomicEvent, EarningsEventAV } from '@/lib/api'; // Import widget data fetchers and types
 
 // UI Components
 import SummaryCard from '@/components/dashboard/SummaryCard';
@@ -25,7 +26,6 @@ const headlineIndicatorIds = ['CPI_YOY_PCT', 'UNRATE', 'GDP_GROWTH', 'PMI'];
 const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED'];
 const MAX_FAVORITES_ON_OVERVIEW = 3;
 
-// Updated Asset Risk Spectrum Configuration
 const riskSpectrumSetup = [
   {
     title: "🟢 Low-Risk Assets",
@@ -34,7 +34,6 @@ const riskSpectrumSetup = [
     keyIndicatorsConfig: [
       { id: 'US10Y', explanation: "Benchmark for 'risk-free' rate; price moves inversely to yield. Lower yields often signal flight to safety or rate cut expectations." },
       { id: 'GOLD_PRICE', explanation: "Traditionally seen as a store of value and hedge against inflation or geopolitical risk." },
-      // JNJ_STOCK was removed based on user request
       { id: 'KO_STOCK', explanation: "A defensive stock known for stable demand and dividends, often less affected by economic downturns." },
       { id: 'XLU_ETF', explanation: "Utilities sector ETF, often considered defensive due to consistent demand for services." },
     ]
@@ -47,7 +46,6 @@ const riskSpectrumSetup = [
       { id: 'LQD_ETF', explanation: "Tracks investment-grade corporate bonds, offering higher yields than Treasuries with moderate credit risk." },
       { id: 'VNQ_ETF', explanation: "Represents diversified real estate investments, sensitive to interest rates and economic growth." },
       { id: 'LAND_REIT', explanation: "Farmland REIT, offering potential inflation hedging and unique asset class exposure." },
-      // SILVER_PRICE was removed based on user request
       { id: 'PLATINUM_PRICE', explanation: "Industrial precious metal, price influenced by automotive demand and industrial output." },
     ]
   },
@@ -59,7 +57,6 @@ const riskSpectrumSetup = [
       { id: 'BTC_PRICE_USD', explanation: "Highly volatile cryptocurrency, driven by adoption, sentiment, and macroeconomic factors." },
       { id: 'ETH_PRICE_USD', explanation: "Leading smart contract platform cryptocurrency, also highly volatile." },
       { id: 'OIL_WTI', explanation: "Crude oil price, highly sensitive to global supply/demand, geopolitical events, and economic growth." },
-      // JNK_ETF was removed based on user request
       { id: 'ARKK_ETF', explanation: "Invests in speculative, disruptive innovation companies, known for high growth potential and volatility." },
     ]
   },
@@ -100,12 +97,11 @@ const fetchDataForRiskAndSummaryLists = async (
           }
           return true;
       })
-      .map(async ({ indicator }) => { // item.indicator is now guaranteed to be IndicatorMetadata
-          // Updated global asset list to reflect removed indicators
+      .map(async ({ indicator }) => {
           const isGlobalAsset = [
-            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'PLATINUM_PRICE', // SILVER_PRICE removed
-            'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT', // JNJ_STOCK removed
-            'ETH_PRICE_USD', 'OIL_WTI', 'ARKK_ETF', // JNK_ETF removed
+            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'PLATINUM_PRICE',
+            'KO_STOCK', 'XLU_ETF', 'LQD_ETF', 'VNQ_ETF', 'LAND_REIT',
+            'ETH_PRICE_USD', 'OIL_WTI', 'ARKK_ETF',
             'US10Y', 'T10Y2Y_SPREAD', 'VIX', 'M2_YOY_PCT', 'FED_FUNDS', 'PMI', 'PMI_SERVICES',
             'CCI', 'CPI_YOY_PCT', 'GDP_GROWTH', 'UNRATE', 'RETAIL_SALES_MOM_PCT'
           ].includes(indicator.id);
@@ -184,11 +180,19 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
     riskSpectrumSetup.flatMap(category => category.keyIndicatorsConfig.map(ind => ind.id))
   ));
 
+  // Fetch data for widgets server-side
+  const newsArticlesPromise = fetchNewsHeadlines('business', 'us', 5);
+  const economicEventsPromise = fetchEconomicCalendar(30); // Default itemCount handled by widget if needed
+  const earningsEventsPromise = fetchAlphaVantageEarningsCalendar('3month', undefined); // Default itemCount by widget
+
   const [
     summaryData,
     marketSnapshotData,
     favoritesInitialData,
-    riskSpectrumFetchedData
+    riskSpectrumFetchedData,
+    newsArticles,         // Resolve widget data
+    economicEvents,       // Resolve widget data
+    earningsEvents        // Resolve widget data
   ] = await Promise.all([
     fetchDataForRiskAndSummaryLists(headlineIndicatorIds, country, dateRange),
     fetchDataForRiskAndSummaryLists(marketSnapshotIndicatorIds, country, dateRange, true),
@@ -196,6 +200,9 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
         ? fetchDataForRiskAndSummaryLists(favoriteIndicatorIdsFromSession.slice(0, MAX_FAVORITES_ON_OVERVIEW), country, dateRange)
         : Promise.resolve([]),
     fetchDataForRiskAndSummaryLists(allRiskSpectrumIndicatorIds, country, dateRange),
+    newsArticlesPromise,
+    economicEventsPromise,
+    earningsEventsPromise,
   ]);
 
   const favoritesSnippetData = favoritesInitialData;
@@ -204,13 +211,13 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
     const indicatorsDisplayData: KeyIndicatorDisplayInfo[] = categoryConfig.keyIndicatorsConfig
       .map(cfg => {
         const fetchedIndData = riskSpectrumFetchedData.find(d => d.indicator.id === cfg.id);
-        const indicatorMeta = getIndicatorById(cfg.id); // This might be undefined if indicator was removed
-        if (!indicatorMeta) return null; // Skip if indicatorMeta is not found (e.g., removed)
+        const indicatorMeta = getIndicatorById(cfg.id);
+        if (!indicatorMeta) return null;
 
         const categoryInfo = getCategoryBySlug(indicatorMeta.categoryKey);
         const link = (categoryInfo)
           ? `/category/${categoryInfo.slug}?indicator=${indicatorMeta.id}`
-          : `/dashboard`; // Fallback link
+          : `/dashboard`;
 
         return {
           id: cfg.id,
@@ -223,7 +230,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
           explanation: cfg.explanation,
         };
       })
-      .filter((item): item is KeyIndicatorDisplayInfo => item !== null); // Filter out null items
+      .filter((item): item is KeyIndicatorDisplayInfo => item !== null);
       
     return { ...categoryConfig, indicatorsDisplayData };
   });
@@ -279,7 +286,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
             </h2>
             <div className="space-y-6">
               {processedRiskSpectrumDisplayData.map(category => {
-                if (category.indicatorsDisplayData.length === 0) return null; // Don't render card if no indicators for it
+                if (category.indicatorsDisplayData.length === 0) return null;
                 return (
                   <AssetRiskCategoryCard
                     key={category.title}
@@ -351,9 +358,9 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
               }) : <p className="text-sm text-muted-foreground p-2.5">Snapshot data unavailable.</p>}
             </CardContent>
           </Card>
-          <NewsFeedWidget itemCount={5} defaultCategory="business" defaultCountry="us" />
-          <EconomicCalendarWidget daysAhead={30} itemCount={4} />
-          <EarningsCalendarWidget daysAhead={30} itemCount={5} />
+          <NewsFeedWidget initialNews={newsArticles} itemCount={5} />
+          <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} />
+          <EarningsCalendarWidget initialEvents={earningsEvents} horizon="3month" itemCount={5} />
         </aside>
       </div>
     </div>

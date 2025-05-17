@@ -20,7 +20,7 @@ const NEWSAPI_ORG_BASE_URL = 'https://newsapi.org/v2';
 const FINNHUB_API_URL = 'https://finnhub.io/api/v1';
 const DBNOMICS_API_URL_V22 = 'https://api.db.nomics.world/v22';
 const POLYGON_API_URL = 'https://api.polygon.io/v2'; // For aggregates
-// const POLYGON_API_V1_URL = 'https://api.polygon.io/v1'; // Not currently used
+// const POLYGON_API_V1_URL = 'https://api.polygon.io/v1'; // No longer used
 const API_NINJAS_BASE_URL = 'https://api.api-ninjas.com/v1';
 
 
@@ -391,7 +391,7 @@ export async function fetchApiNinjasMetalPrice(
 ): Promise<TimeSeriesDataPoint[]> {
   console.log(`[fetchApiNinjasMetalPrice API - ENTRY] Called with: commodityName=${commodityName}`);
   const apiKey = process.env.API_NINJAS_KEY;
-  // console.log(`[API API-Ninjas Commodity] Using key: ${apiKey ? 'SET (********)' : 'NOT SET'}`); // Keep key obscured for general logs
+  // console.log(`[API API-Ninjas Commodity] Using key: ${apiKey ? 'SET (********)' : 'NOT SET'}`);
 
   if (!apiKey) {
     console.error(`[API API-Ninjas Commodity] API_NINJAS_KEY is missing. Cannot fetch for ${commodityName}.`);
@@ -404,7 +404,7 @@ export async function fetchApiNinjasMetalPrice(
   try {
     const response = await fetch(url, {
       headers: { 'X-Api-Key': apiKey },
-      next: { revalidate: 300 }
+      next: { revalidate: 300 } // Fetch latest price frequently
     });
 
     if (!response.ok) {
@@ -413,8 +413,8 @@ export async function fetchApiNinjasMetalPrice(
       try {
         const errorJson = JSON.parse(errorText);
         if (errorJson.message) errMsg = `API-Ninjas: ${errorJson.message}`;
-        else if (errorJson.error) errMsg = `API-Ninjas: ${errorJson.error}`; // Some API-Ninjas endpoints use "error"
-      } catch (e) { /* ignore if not JSON */ }
+        else if (errorJson.error) errMsg = `API-Ninjas: ${errorJson.error}`;
+      } catch (e) { /* ignore */ }
       console.error(`[API API-Ninjas Commodity] Error response for ${commodityName}: ${response.status} - Body: ${errorText.substring(0, 500)}`);
       throw new Error(errMsg);
     }
@@ -422,7 +422,6 @@ export async function fetchApiNinjasMetalPrice(
     const data: ApiNinjasCommodityLatestPriceResponse = await response.json();
     // console.log(`[API API-Ninjas Commodity] Raw response for ${commodityName}:`, JSON.stringify(data));
 
-    // Check if data is an object and has the required properties
     if (typeof data !== 'object' || data === null || typeof data.price !== 'number' || typeof data.updated !== 'number') {
       console.warn(`[API API-Ninjas Commodity] Invalid or incomplete data received for ${commodityName}. Data:`, data);
       return [];
@@ -698,35 +697,95 @@ export async function fetchEconomicCalendar(daysAhead: number = 7): Promise<Econ
   } catch (e) { console.error("[API Finnhub] Eco Calendar Error:", e); return []; }
 }
 
-// --- Finnhub Earnings Calendar Fetcher ---
-export interface EarningsEvent { date: string; epsActual: number | null; epsEstimate: number | null; hour: string; quarter: number; revenueActual: number | null; revenueEstimate: number | null; symbol: string; year: number; }
-export interface EarningsCalendarResponseFinnhub { earningsCalendar: EarningsEvent[]; }
-export async function fetchEarningsCalendar(daysAhead: number = 7): Promise<EarningsEvent[]> {
-  console.log(`[fetchEarningsCalendar API - ENTRY] Called with: daysAhead=${daysAhead}`);
-  const apiKey = process.env.FINNHUB_API_KEY;
+// --- Alpha Vantage Earnings Calendar (replaces Finnhub) ---
+export interface EarningsEventAV {
+  symbol: string;
+  name: string;
+  reportDate: string;
+  fiscalDateEnding: string;
+  estimate: number | null;
+  currency: string;
+}
+
+function parseCSV(csvText: string): Record<string, string>[] {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim());
+  const dataRows = lines.slice(1);
+
+  return dataRows.map(rowText => {
+    const values = rowText.split(',');
+    const rowObject: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      rowObject[header] = values[index] ? values[index].trim() : '';
+    });
+    return rowObject;
+  });
+}
+
+export async function fetchAlphaVantageEarningsCalendar(
+  horizon: '3month' | '6month' | '12month' = '3month',
+  symbol?: string
+): Promise<EarningsEventAV[]> {
+  console.log(`[fetchAlphaVantageEarningsCalendar API - ENTRY] Called with: horizon=${horizon}, symbol=${symbol || 'ALL'}`);
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   if (!apiKey) {
-    console.error("[fetchEarningsCalendar API] FINNHUB_API_KEY missing.");
+    console.error("[API AlphaVantage Earnings] ALPHA_VANTAGE_API_KEY missing.");
     return [];
   }
-  const from = format(new Date(), 'yyyy-MM-dd');
-  const to = format(addDays(new Date(), daysAhead), 'yyyy-MM-dd');
-  const url = `${FINNHUB_API_URL}/calendar/earnings?token=${apiKey}&from=${from}&to=${to}`;
-  console.log(`[API Finnhub] Attempting to fetch Earnings Calendar: ${url.replace(apiKey, "REDACTED_KEY")}`);
+
+  const params = new URLSearchParams({
+    function: 'EARNINGS_CALENDAR',
+    horizon: horizon,
+    apikey: apiKey,
+  });
+
+  if (symbol) {
+    params.set('symbol', symbol);
+  }
+
+  const url = `${ALPHA_VANTAGE_API_URL}?${params.toString()}`;
+  console.log(`[API AlphaVantage Earnings] Attempting to fetch: ${url.replace(apiKey, "REDACTED_KEY")}`);
+
   try {
-    const res = await fetch(url, { next: { revalidate: 14400 } });
-    if (!res.ok) {
-      const errTxt = await res.text();
-      console.error(`[API Finnhub] Earnings Calendar Error ${res.status}: ${errTxt.substring(0,300)}`);
-      throw new Error(`Finnhub Earnings Calendar Error (${res.status}).`);
+    const response = await fetch(url, { next: { revalidate: 14400 } });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[API AlphaVantage Earnings] Error response: ${response.status} - ${errorText.substring(0, 300)}`);
+      throw new Error(`Alpha Vantage Earnings API Error (${response.status}).`);
     }
-    const data: EarningsCalendarResponseFinnhub | { error?: string } = await res.json();
-    // console.log(`[API Finnhub] Raw Earnings Calendar response:`, JSON.stringify(data).substring(0, 500));
-     if ('error' in data && data.error) throw new Error(`Finnhub Earnings Calendar API: ${data.error}`);
-    if (!('earningsCalendar' in data) || !Array.isArray(data.earningsCalendar)) {
-        console.warn("[API Finnhub] No 'earningsCalendar' array."); return [];
+
+    const csvData = await response.text();
+    if (!csvData || csvData.trim() === '' || csvData.toLowerCase().includes("error message") || csvData.toLowerCase().includes("thank you for using alpha vantage")) {
+        console.warn(`[API AlphaVantage Earnings] Received empty or error-like CSV response: ${csvData.substring(0, 200)}`);
+        if (csvData.toLowerCase().includes("thank you for using alpha vantage") && !csvData.toLowerCase().includes("symbol,name")) {
+             console.warn("[API AlphaVantage Earnings] This might be a rate limit or invalid key response disguised as CSV.");
+        }
+        return [];
     }
-    const events = data.earningsCalendar.filter(e => e.symbol).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    console.log(`[API Finnhub] Parsed ${events.length} earnings events.`);
-    return events;
-  } catch (e) { console.error("[API Finnhub] Earnings Calendar Error:", e); return []; }
+
+    const parsedObjects = parseCSV(csvData);
+
+    const earningsEvents: EarningsEventAV[] = parsedObjects.map(obj => {
+      const estimateVal = obj.estimate ? parseFloat(obj.estimate) : null;
+      return {
+        symbol: obj.symbol || 'N/A',
+        name: obj.name || 'Unknown Company',
+        reportDate: obj.reportDate || '',
+        fiscalDateEnding: obj.fiscalDateEnding || '',
+        estimate: isNaN(estimateVal as any) ? null : estimateVal,
+        currency: obj.currency || 'USD',
+      };
+    }).filter(event => event.symbol !== 'N/A' && isValid(parseISO(event.reportDate)))
+      .sort((a,b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime());
+
+    console.log(`[API AlphaVantage Earnings] Parsed and validated ${earningsEvents.length} earnings events.`);
+    return earningsEvents;
+
+  } catch (error) {
+    console.error("[API AlphaVantage Earnings] Network or parsing error:", error);
+    return [];
+  }
 }
