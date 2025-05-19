@@ -327,50 +327,154 @@ export async function fetchAlphaVantageData(
 }
 
 // --- DB.nomics API Fetcher ---
-interface DbNomicsSeriesData { series_code: string; period: string[]; value: (number | null)[]; }
-interface DbNomicsResponse { series: DbNomicsSeriesData[]; docs?: any; message?: string; }
+interface DbNomicsSeriesDoc { // Represents the structure inside series.docs
+  '@frequency'?: string;
+  dataset_code?: string;
+  dataset_name?: string;
+  dimensions?: any;
+  indexed_at?: string;
+  period: string[]; // Array of date strings like "2020-05"
+  period_start_day?: string[]; // Array of date strings like "2020-05-01"
+  provider_code?: string;
+  series_code?: string;
+  series_name?: string;
+  value: (number | null)[]; // Array of values corresponding to period
+}
+
+interface DbNomicsSeriesWrapper { // Represents the structure of series array items
+  docs: DbNomicsSeriesDoc[]; // Array containing one DbNomicsSeriesDoc
+  // ... other potential fields if series has more than just docs
+  limit?: number;
+  num_found?: number;
+  offset?: number;
+}
+
+interface DbNomicsResponse {
+  // 'series' is now an object where keys are series_ids,
+  // or it could be an array if the API behaves differently for other queries.
+  // For a single series_id request, it seems to be an object.
+  // Let's adjust to handle the structure you received.
+  // The top-level structure you provided has "series" as an object with a "docs" array.
+  series: {
+    docs: DbNomicsSeriesDoc[]; // This is what your sample shows for a single series_id
+    limit?: number;
+    num_found?: number;
+    offset?: number;
+  };
+  datasets?: any; // Keeping other potential top-level keys
+  errors?: any;
+  providers?: any;
+  _meta?: any;
+  message?: string; // For API messages
+}
+
 
 export async function fetchDbNomicsSeries(
-  fullSeriesCode: string,
+  fullSeriesCode: string, // e.g., "ISM/pmi/pm"
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
-  // console.log(`[fetchDbNomicsSeries API - ENTRY] Called with: seriesCode=${fullSeriesCode}, dateRange=${JSON.stringify(dateRange)}`);
-  const apiDefaults = getApiDefaultDateRange();
-  const startDate = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
-  const endDate = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
+  console.log(`[fetchDbNomicsSeries API - ENTRY] Called with: seriesCode=${fullSeriesCode}, clientDateRange=${JSON.stringify(dateRange)}`);
+  
+  const params = new URLSearchParams({
+    series_ids: fullSeriesCode,
+    observations: '1', 
+    format: 'json',
+    // metadata: 'true', // This might be implied by observations=1 or could be added
+  });
 
-  const params = new URLSearchParams({ series_ids: fullSeriesCode, observations: '1', format: 'json', start_period: startDate, end_period: endDate });
   const url = `${DBNOMICS_API_URL_V22}/series?${params.toString()}`;
-  // console.log(`[API DB.nomics] Attempting to fetch: ${fullSeriesCode} (Range: ${startDate} to ${endDate}) from URL: ${url}`);
+  console.log(`[API DB.nomics] Attempting to fetch: ${fullSeriesCode} from URL: ${url}`);
 
   try {
     const response = await fetch(url, { next: { revalidate: 21600 } });
     if (!response.ok) {
-      const errorBody = await response.text(); let errMsg = `DB.nomics API Error (${response.status}) for ${fullSeriesCode}.`;
-      try { const errorJson = JSON.parse(errorBody); if (errorJson.message) errMsg = `DB.nomics: ${errorJson.message}`; else if (errorJson.errors?.[0]?.message) errMsg = `DB.nomics: ${errorJson.errors[0].message}`; else if (errorJson.detail) errMsg = `DB.nomics: ${errorJson.detail}`; } catch (e) {}
+      const errorBody = await response.text();
+      let errMsg = `DB.nomics API Error (${response.status}) for ${fullSeriesCode}.`;
+      try {
+        const errorJson = JSON.parse(errorBody);
+        if (errorJson.message) errMsg = `DB.nomics: ${errorJson.message}`;
+        else if (errorJson.errors?.[0]?.message) errMsg = `DB.nomics: ${errorJson.errors[0].message}`;
+        else if (errorJson.detail) errMsg = `DB.nomics: ${errorJson.detail}`;
+      } catch (e) { /* ignore */ }
       console.error(`[API DB.nomics] Error response for ${fullSeriesCode}: ${response.status} - Body: ${errorBody.substring(0, 500)}`);
       throw new Error(errMsg);
     }
     const data: DbNomicsResponse = await response.json();
-    if (data.message?.toLowerCase().includes("error")) throw new Error(`DB.nomics API Error: ${data.message}`);
-    if (data.docs?.series_count === 0 && data.series?.length === 0) { console.warn(`[API DB.nomics] No series found for ${fullSeriesCode}.`); return []; }
-    if (!data.series?.length) { console.warn(`[API DB.nomics] No 'series' data for ${fullSeriesCode}.`); return []; }
+    // console.log(`[API DB.nomics] Raw data for ${fullSeriesCode}:`, JSON.stringify(data, null, 2).substring(0,3000));
 
-    const seriesObject = data.series.find(s => s.series_code === fullSeriesCode);
-    if (!seriesObject?.period || !seriesObject.value) {
-        console.warn(`[API DB.nomics] Series ${fullSeriesCode} malformed. Available: ${data.series.map(s => s.series_code).join(', ')}`); return [];
+
+    if (data.message && data.message.toLowerCase().includes("error")) {
+      console.warn(`[API DB.nomics] API returned message: ${data.message} for ${fullSeriesCode}`);
+      if (data.message.includes("Invalid value")) {
+        throw new Error(`DB.nomics API Error (likely invalid params/ID): ${data.message}`);
+      }
+      return [];
     }
-    const timeSeries: TimeSeriesDataPoint[] = [];
-    for (let i = 0; i < seriesObject.period.length; i++) {
+
+    // Access the series data from series.docs[0]
+    if (!data.series || !data.series.docs || !Array.isArray(data.series.docs) || data.series.docs.length === 0) {
+      console.warn(`[API DB.nomics] No 'series.docs' array or empty 'series.docs' array in response for ${fullSeriesCode}.`);
+      return [];
+    }
+
+    const seriesObject = data.series.docs[0];
+
+    if (!seriesObject) {
+        console.warn(`[API DB.nomics] Series object not found in series.docs for ${fullSeriesCode}.`);
+        return [];
+    }
+    // Optional: Verify series_code if available in seriesObject, though structure implies it's the one requested
+    // if (seriesObject.series_code && seriesObject.provider_code && seriesObject.dataset_code &&
+    //     `${seriesObject.provider_code}/${seriesObject.dataset_code}/${seriesObject.series_code}` !== fullSeriesCode) {
+    //     console.warn(`[API DB.nomics] Mismatched series code. Expected ${fullSeriesCode}, got ${seriesObject.provider_code}/${seriesObject.dataset_code}/${seriesObject.series_code}`);
+    //     // return []; // Could be strict here
+    // }
+    
+    if (!seriesObject.period || !seriesObject.value || !Array.isArray(seriesObject.period) || !Array.isArray(seriesObject.value)) {
+        console.warn(`[API DB.nomics] Series data for ${fullSeriesCode} is malformed (missing period or value arrays in series.docs[0]).`);
+        return [];
+    }
+
+    let timeSeries: TimeSeriesDataPoint[] = [];
+    // DB.nomics provides "period" (e.g., "2020-05") and "period_start_day" (e.g., "2020-05-01")
+    // It's safer to use "period_start_day" if available and fallback to "period" if not.
+    const dateArrayToUse = seriesObject.period_start_day || seriesObject.period;
+
+    for (let i = 0; i < dateArrayToUse.length; i++) {
       const val = seriesObject.value[i];
-      if (seriesObject.period[i] && isValid(parseISO(seriesObject.period[i])) && val !== null && !isNaN(val)) {
-        timeSeries.push({ date: seriesObject.period[i], value: parseFloat(val.toFixed(2)) });
+      const periodDateStr = dateArrayToUse[i];
+      
+      // Ensure the date string becomes a full YYYY-MM-DD if it's just YYYY-MM
+      let fullDateStr = periodDateStr;
+      if (periodDateStr && periodDateStr.length === 7 && periodDateStr.includes('-')) { // Looks like "YYYY-MM"
+        fullDateStr = `${periodDateStr}-01`; // Assume first day of the month
+      }
+
+      if (fullDateStr && isValid(parseISO(fullDateStr)) && val !== null && !isNaN(val)) {
+        timeSeries.push({ date: format(parseISO(fullDateStr), 'yyyy-MM-dd'), value: parseFloat(val.toFixed(2)) });
       }
     }
-    // console.log(`[API DB.nomics] Parsed ${timeSeries.length} points for ${fullSeriesCode}`);
-    return timeSeries;
-  } catch (error) { console.error(`[API DB.nomics] Error for ${fullSeriesCode}:`, error); return []; }
+
+    timeSeries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let filteredTimeSeries = timeSeries;
+    if (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) {
+        const filterStartDate = parseISO(dateRange.startDate);
+        filteredTimeSeries = filteredTimeSeries.filter(dp => parseISO(dp.date) >= filterStartDate);
+    }
+    if (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) {
+        const filterEndDate = parseISO(dateRange.endDate);
+        filteredTimeSeries = filteredTimeSeries.filter(dp => parseISO(dp.date) <= filterEndDate);
+    }
+
+    console.log(`[API DB.nomics] Parsed ${timeSeries.length} total points, ${filteredTimeSeries.length} after date filtering for ${fullSeriesCode}`);
+    return filteredTimeSeries;
+  } catch (error) {
+    console.error(`[API DB.nomics] Error for ${fullSeriesCode}:`, error);
+    return [];
+  }
 }
+
 
 // --- Polygon.io API Fetcher ---
 interface PolygonAggregatesResult { c: number; h: number; l: number; n: number; o: number; t: number; v: number; vw: number; }

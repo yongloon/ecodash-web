@@ -136,12 +136,12 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'v', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' },
   { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'v', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
   {
-  id: 'PMI', name: 'Manufacturing PMI (ISM)', categoryKey: 'v', // Updated name for clarity
+  id: 'PMI', name: 'Manufacturing PMI (ISM)', categoryKey: 'v',
   description: 'Purchasing Managers Index for the manufacturing sector by the Institute for Supply Management. >50 indicates expansion.',
   unit: 'Index', frequency: 'Monthly',
-  sourceName: 'ISM via DB.nomics', // CHANGED
-  apiSource: 'DBNOMICS',            // CHANGED
-  apiIdentifier: 'ISM/MAN_PMI',     // CHANGED - VERIFY THIS ID ON DB.NOMICS
+  sourceName: 'ISM via DB.nomics', 
+  apiSource: 'DBNOMICS',            
+  apiIdentifier: 'ISM/pmi/pm',     // <<< CORRECTED IDENTIFIER
   chartType: 'line', calculation: 'NONE',
   notes: 'A reading above 50 percent indicates that the manufacturing economy is generally expanding; below 50 percent indicates that it is generally contracting.'
 },
