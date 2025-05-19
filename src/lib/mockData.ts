@@ -3,8 +3,7 @@ import { TimeSeriesDataPoint, IndicatorMetadata } from './indicators';
 import {
     subYears, format, parseISO, isValid,
     eachDayOfInterval, eachMonthOfInterval, eachQuarterOfInterval, startOfMonth,
-    // Add any other date-fns functions you might need if expanding logic
-    differenceInDays, 
+    differenceInDays,
 } from 'date-fns';
 import {
     fetchFredSeries,
@@ -15,17 +14,17 @@ import {
     fetchPolygonIOData,
     fetchApiNinjasMetalPrice,
     fetchApiNinjasCommodityHistoricalPrice,
+    fetchTiingoEodData, // Added Tiingo fetcher
 } from './api'; // Ensure this path is correct
 import {
     calculateYoYPercent,
     calculateMoMPercent,
     calculateQoQPercent,
     calculateMoMChange
-    // Add other calculation imports if needed
 } from './calculations'; // Ensure this path is correct
 
 // --- Helper for Default API Fetch Date Range (Consistent) ---
-const getDefaultApiFetchRange = (years: number = 2): { startDate: string; endDate: string } => { // Defaulted to 2 years for broader initial mock/fetch
+const getDefaultApiFetchRange = (years: number = 2): { startDate: string; endDate: string } => {
     const today = new Date();
     const pastDate = subYears(today, years);
     return {
@@ -50,7 +49,7 @@ export function generateMockData(
     dateRange?: { startDate?: string; endDate?: string }
 ): TimeSeriesDataPoint[] {
   const randomFn = seededPseudoRandom(indicator.id + (indicator.apiIdentifier || '') + (indicator.frequency || ''));
-  const apiDefaults = getDefaultApiFetchRange(); // Use the same default range
+  const apiDefaults = getDefaultApiFetchRange();
   const startDateStr = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
   const endDateStr = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
 
@@ -76,7 +75,7 @@ export function generateMockData(
 
   let adjustedStartDateForInterval = new Date(actualStartDate);
   if (indicator.frequency === 'Monthly' || indicator.frequency === 'Quarterly') {
-    adjustedStartDateForInterval = startOfMonth(actualStartDate); // Ensure consistent start for month/quarter based intervals
+    adjustedStartDateForInterval = startOfMonth(actualStartDate);
   }
 
   let dates: Date[] = [];
@@ -90,7 +89,6 @@ export function generateMockData(
        }
    } catch (e) {
        console.error(`Mock Gen: Error generating dates for ${indicator.id}`, e);
-       // Fallback to daily if interval generator fails for some reason with the provided dates
        try { if (actualStartDate <= actualEndDate) dates = eachDayOfInterval({ start: actualStartDate, end: actualEndDate }); } catch (fbE) { return []; }
    }
 
@@ -101,45 +99,49 @@ export function generateMockData(
 
   let baseValue = 100; let volatility = 5;
 
-  // Adjusted base values and volatilities for more realism per indicator
   if (indicator.id === 'SP500') { baseValue = 4000 + randomFn() * 1500; volatility = 50 + randomFn() * 70; }
   else if (indicator.id === 'BTC_PRICE_USD') { baseValue = 35000 + randomFn() * 30000; volatility = 1500 + randomFn() * 1500; }
   else if (indicator.id === 'ETH_PRICE_USD') { baseValue = 2000 + randomFn() * 1500; volatility = 150 + randomFn() * 150; }
   else if (indicator.id === 'GOLD_PRICE' || indicator.id === 'GOLD_PRICE_HISTORICAL') { baseValue = 1800 + randomFn() * 400; volatility = 15 + randomFn() * 15; }
   else if (indicator.id === 'PLATINUM_PRICE' || indicator.id === 'PLATINUM_PRICE_HISTORICAL') { baseValue = 900 + randomFn() * 200; volatility = 10 + randomFn() * 10; }
   else if (indicator.id === 'CRYPTO_FEAR_GREED') { baseValue = 50; volatility = 30; }
-  else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'PMI_MANUFACTURING_INVESTING_MOCK') { baseValue = 45 + randomFn() * 15; volatility = 0.8 + randomFn() * 1.2; }
+  else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'PMI_MANUFACTURING_INVESTING_MOCK' || indicator.apiIdentifier === 'NAPM') { baseValue = 45 + randomFn() * 15; volatility = 0.8 + randomFn() * 1.2; }
   else if (indicator.id === 'PMI_SERVICES' || indicator.apiIdentifier === 'PMI_SERVICES_INVESTING_MOCK') { baseValue = 48 + randomFn() * 15; volatility = 0.8 + randomFn() * 1.2; }
-  else if (indicator.id === 'GDP_REAL') { baseValue = 20000 + randomFn() * 3000; volatility = 50 + randomFn() * 50; } // Billions
-  else if (indicator.id === 'GDP_NOMINAL') { baseValue = 23000 + randomFn() * 4000; volatility = 100 + randomFn() * 100; } // Billions
-  else if (indicator.id === 'GDP_PER_CAPITA') { baseValue = 60000 + randomFn() * 10000; volatility = 300 + randomFn() * 200; } // Dollars
-  else if (indicator.id === 'GDP_NOMINAL_PER_CAPITA') { baseValue = 65000 + randomFn() * 15000; volatility = 500 + randomFn() * 300; } // Dollars
+  else if (indicator.id === 'GDP_REAL') { baseValue = 20000 + randomFn() * 3000; volatility = 50 + randomFn() * 50; }
+  else if (indicator.id === 'GDP_NOMINAL') { baseValue = 23000 + randomFn() * 4000; volatility = 100 + randomFn() * 100; }
+  else if (indicator.id === 'GDP_PER_CAPITA') { baseValue = 60000 + randomFn() * 10000; volatility = 300 + randomFn() * 200; }
+  else if (indicator.id === 'GDP_NOMINAL_PER_CAPITA') { baseValue = 65000 + randomFn() * 15000; volatility = 500 + randomFn() * 300; }
   else if (indicator.id === 'TLT_ETF') { baseValue = 100 + randomFn() * 20; volatility = 0.5 + randomFn() * 1; }
-  else if (indicator.id === 'TQQQ_ETF') { baseValue = 50 + randomFn() * 30; volatility = 2 + randomFn() * 3; } // Highly volatile
+  else if (indicator.id === 'LQD_ETF') { baseValue = 110 + randomFn() * 15; volatility = 0.4 + randomFn() * 0.6; }
+  else if (indicator.id === 'VNQ_ETF') { baseValue = 90 + randomFn() * 25; volatility = 1 + randomFn() * 1.5; }
+  else if (indicator.id === 'ARKK_ETF') { baseValue = 40 + randomFn() * 30; volatility = 1.5 + randomFn() * 2.5; }
+  else if (indicator.id === 'TQQQ_ETF') { baseValue = 45 + randomFn() * 40; volatility = 3 + randomFn() * 4.5; }
   else if (indicator.unit?.includes('%')) { baseValue = 2 + (randomFn() - 0.5) * 5; volatility = 0.1 + randomFn() * 0.4; }
   else if (indicator.unit?.includes('Index') && !indicator.id.includes('FEAR_GREED')) { baseValue = 100 + randomFn() * 20; volatility = 0.5 + randomFn() * 1.5; }
-  else if (indicator.unit?.includes('Thousands of Persons')) { baseValue = 150000 + randomFn() * 10000; volatility = 100 + randomFn() * 200; } // Example for PAYEMS levels
-  else if (indicator.id === 'PAYEMS_MOM_CHG') { baseValue = 150 + (randomFn() -0.5) * 300; volatility = 50 + randomFn() * 100; } // For MoM change
+  else if (indicator.unit?.includes('Thousands of Persons')) { baseValue = 150000 + randomFn() * 10000; volatility = 100 + randomFn() * 200; }
+  else if (indicator.id === 'PAYEMS_MOM_CHG') { baseValue = 150 + (randomFn() -0.5) * 300; volatility = 50 + randomFn() * 100; }
   else if (indicator.unit?.includes('Number') && indicator.id === 'JOBLESSCLAIMS') { baseValue = 200000 + randomFn() * 150000; volatility = 5000 + randomFn() * 10000; }
+  else if (indicator.unit?.includes('USD per')) { baseValue = 50 + randomFn() * 50; volatility = 2 + randomFn() * 3; }
+  else if (indicator.unit?.includes('per USD')) { baseValue = 0.8 + randomFn() * 0.4; volatility = 0.02 + randomFn() * 0.03; }
+
 
   let currentValue = baseValue;
   for (const date of dates) {
-    const trendFactor = (indicator.id === 'SP500' || indicator.id.includes('PRICE')) ? 0.0005 : 0.0001;
-    const trend = trendFactor * volatility * (randomFn() - 0.3); // Slight upward bias for some assets
+    const trendFactor = (indicator.id === 'SP500' || indicator.id.includes('PRICE') || indicator.id.includes('_ETF')) ? 0.0005 : 0.0001;
+    const trend = trendFactor * volatility * (randomFn() - 0.3);
     const noise = (randomFn() - 0.5) * volatility;
     currentValue += trend + noise;
 
-    // Apply constraints
-    if (indicator.id === 'PMI' || indicator.id === 'PMI_SERVICES' || indicator.apiIdentifier?.includes('PMI')) { currentValue = Math.max(30, Math.min(70, currentValue)); }
+    if (indicator.id === 'PMI' || indicator.id === 'PMI_SERVICES' || indicator.apiIdentifier?.includes('PMI') || indicator.apiIdentifier === 'NAPM') { currentValue = Math.max(30, Math.min(70, currentValue)); }
     else if (indicator.id === 'UNRATE' || indicator.id === 'U6RATE') { currentValue = Math.max(2, Math.min(12, currentValue)); }
     else if (indicator.id === 'CRYPTO_FEAR_GREED') { currentValue = Math.max(0, Math.min(100, Math.round(currentValue))); }
     else if (indicator.id === 'CAPUTIL') { currentValue = Math.max(65, Math.min(85, currentValue)); }
     else if (indicator.id === 'UMCSENT' || indicator.id === 'CCI') { currentValue = Math.max(50, Math.min(130, currentValue)); }
     else if (!indicator.unit?.includes('%') && !indicator.id.includes('BALANCE') && !indicator.id.includes('SPREAD') && currentValue < 0 && !indicator.id.includes('_CHG') && !indicator.id.includes('_PCT')) {
-        currentValue = Math.max(currentValue, 0.01); // Prevent most levels from going negative unless they are changes/spreads
+        currentValue = Math.max(currentValue, 0.01);
     }
 
-    const value = randomFn() > 0.015 ? parseFloat(currentValue.toFixed(indicator.unit === '%' || indicator.unit?.includes('Index') ? 1 : 2)) : null; // More decimals for %/Index
+    const value = randomFn() > 0.015 ? parseFloat(currentValue.toFixed(indicator.unit === '%' || indicator.unit?.includes('Index') ? 1 : 2)) : null;
     data.push({ date: format(date, dateFormat), value: value });
   }
 
@@ -172,16 +174,13 @@ export async function fetchIndicatorData(
         console.warn(`[Orchestrator] Correcting invalid date range for ${indicator.id}: start ${actualDateRangeToUse.startDate} > end ${actualDateRangeToUse.endDate}. Using default.`);
         actualDateRangeToUse = { ...defaultApiRange };
     }
-    // console.log(`[fetchIndicatorData Orchestrator] ID: ${indicator.id}, Source: ${indicator.apiSource}, UI Range: ${actualDateRangeToUse.startDate} to ${actualDateRangeToUse.endDate}`);
     
     let rawFetchedData: TimeSeriesDataPoint[] = [];
     let effectiveDateRangeForApiCall = { ...actualDateRangeToUse };
 
-    // Adjust start date for YoY calculations to fetch enough historical data
-    if (indicator.calculation === 'YOY_PERCENT' && effectiveDateRangeForApiCall.startDate && indicator.apiSource !== 'ApiNinjas' && indicator.apiSource !== 'ApiNinjasHistorical') { // ApiNinjas uses its own range logic
+    if (indicator.calculation === 'YOY_PERCENT' && effectiveDateRangeForApiCall.startDate && indicator.apiSource !== 'ApiNinjas' && indicator.apiSource !== 'ApiNinjasHistorical') {
         try {
           const originalStartDate = parseISO(effectiveDateRangeForApiCall.startDate);
-          // Fetch an extra year of data for YoY
           effectiveDateRangeForApiCall.startDate = format(subYears(originalStartDate, 1), 'yyyy-MM-dd');
         } catch (e) { 
             console.warn(`[Orchestrator] Could not adjust date range for YoY calc on ${indicator.id}. Using original range. Error:`, e);
@@ -217,7 +216,6 @@ export async function fetchIndicatorData(
                                 closestPopDateDiff = diff;
                                 chosenPopPointValue = popPoint.value;
                             }
-                            // Heuristic: if we are within ~45 days for quarterly GDP vs annual POP, it's close enough
                             if (indicator.frequency === 'Quarterly' && closestPopDateDiff < 45 * 24 * 60 * 60 * 1000) break;
                         }
                         popValue = chosenPopPointValue;
@@ -256,13 +254,13 @@ export async function fetchIndicatorData(
             case 'PolygonIO':
               if (indicator.apiIdentifier) { rawFetchedData = await fetchPolygonIOData(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true; }
               break;
-            case 'ApiNinjas': // Fetches latest price point
+            case 'ApiNinjas':
               if (indicator.apiIdentifier) {
                 rawFetchedData = await fetchApiNinjasMetalPrice(indicator.apiIdentifier);
                 apiFetchAttempted = true;
               }
               break;
-            case 'ApiNinjasHistorical': // Fetches historical data
+            case 'ApiNinjasHistorical':
                 if (indicator.apiIdentifier) {
                   rawFetchedData = await fetchApiNinjasCommodityHistoricalPrice(indicator.apiIdentifier, effectiveDateRangeForApiCall, '1d');
                   apiFetchAttempted = true;
@@ -274,6 +272,12 @@ export async function fetchIndicatorData(
             case 'AlternativeMeAPI':
               rawFetchedData = await fetchAlternativeMeFearGreedIndex(effectiveDateRangeForApiCall); apiFetchAttempted = true;
               break;
+            case 'Tiingo': // Added Tiingo case
+              if (indicator.apiIdentifier) {
+                rawFetchedData = await fetchTiingoEodData(indicator.apiIdentifier, effectiveDateRangeForApiCall);
+                apiFetchAttempted = true;
+              }
+              break;
             default:
               if (indicator.apiIdentifier && ((indicator.apiSource as string).toUpperCase().includes('FRED') || !indicator.apiSource)) {
                    rawFetchedData = await fetchFredSeries(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true;
@@ -282,19 +286,21 @@ export async function fetchIndicatorData(
               }
               break;
           }
-        } catch (error) { apiErrorOccurred = true; console.error(`[Orchestrator] API call error during switch for ${indicator.id}:`, error); }
+        } catch (error) { 
+            apiErrorOccurred = true; 
+            console.error(`[Orchestrator] API call error during switch for ${indicator.id} (Source: ${indicator.apiSource}):`, error); 
+        }
     }
 
     let shouldUseFullMock = false;
-    if (indicator.apiSource === 'Mock') { // Already handled above
+    if (indicator.apiSource === 'Mock') {
         shouldUseFullMock = rawFetchedData.length === 0;
     } else if (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) {
-        shouldUseFullMock = true; // Fallback if API attempt failed or returned nothing
-    } else if (!apiFetchAttempted && indicator.apiSource !== 'Mock') { // Should not happen if all sources covered
+        shouldUseFullMock = true;
+    } else if (!apiFetchAttempted && indicator.apiSource !== 'Mock') {
         console.warn(`[Orchestrator] API fetch not attempted for ${indicator.id} and not Mock. Falling back to mock.`);
         shouldUseFullMock = true;
     }
-
 
     if (shouldUseFullMock) {
       if (indicator.apiSource !== 'Mock') console.warn(`[Orchestrator] Full fallback to mock data for ${indicator.id} (Source: ${indicator.apiSource}).`);
@@ -309,8 +315,6 @@ export async function fetchIndicatorData(
              indicator.calculation === 'MOM_PERCENT' || 
              indicator.calculation === 'QOQ_PERCENT' || 
              indicator.calculation === 'MOM_CHANGE')) {
-            // console.log(`[Orchestrator] Skipping calculation for ${indicator.id} due to insufficient data points (${processedData.length}). Outputting raw.`);
-            // For % change calculations, if not enough data, it's better to return empty than raw level data.
             if (indicator.unit.includes('%') || indicator.calculation.includes('PERCENT') || indicator.calculation.includes('CHANGE')) {
                 processedData = [];
             }
@@ -319,10 +323,10 @@ export async function fetchIndicatorData(
             let tempCalc: TimeSeriesDataPoint[] = [];
             switch (indicator.calculation) {
               case 'YOY_PERCENT':
-                let lookback = 12;
+                let lookback = 12; // Default for monthly
                 if (indicator.frequency === 'Quarterly') lookback = 4;
                 else if (indicator.frequency === 'Weekly') lookback = 52;
-                else if (indicator.frequency === 'Daily') lookback = 365; // This might be too sparse for FRED daily series if not all days present
+                else if (indicator.frequency === 'Daily') lookback = 252; // Approx trading days, adjust if using calendar days
                 tempCalc = calculateYoYPercent(processedData, lookback);
                 break;
               case 'MOM_PERCENT':
@@ -335,20 +339,17 @@ export async function fetchIndicatorData(
                 tempCalc = calculateMoMChange(processedData);
                 break;
               default:
-                calcSuccess = false; // Should not happen if calculation is not 'NONE'
-                tempCalc = processedData; // Fallback to raw if calculation type unknown
+                calcSuccess = false;
+                tempCalc = processedData;
                 break;
             }
             processedData = tempCalc;
             if (calcSuccess && processedData.length === 0 && rawFetchedData.length > 1) {
-                // console.warn(`[Orchestrator] Calculation for ${indicator.id} (${indicator.calculation}) resulted in 0 points from ${rawFetchedData.length} raw points. This might be due to lookback period vs data length.`);
+                // console.warn(`[Orchestrator] Calculation for ${indicator.id} (${indicator.calculation}) resulted in 0 points from ${rawFetchedData.length} raw points.`);
             }
-            // if (calcSuccess) console.log(`[Orchestrator] ${indicator.id} after ${indicator.calculation}: ${processedData.length} points`);
         }
     }
 
-    // Final date filtering based on the originally requested UI range
-    // This is important because YoY calc might have fetched earlier data
     if (actualDateRangeToUse.startDate && isValid(parseISO(actualDateRangeToUse.startDate)) && processedData.length > 0) {
         processedData = processedData.filter(dp => {
             if (!dp.date || !isValid(parseISO(dp.date))) return false;
@@ -361,6 +362,5 @@ export async function fetchIndicatorData(
             return parseISO(dp.date) <= parseISO(actualDateRangeToUse.endDate);
         });
     }
-    // console.log(`[Orchestrator] Final data count for ${indicator.id}: ${processedData.length}`);
     return processedData;
 }

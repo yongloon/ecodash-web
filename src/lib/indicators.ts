@@ -34,7 +34,7 @@ export interface IndicatorMetadata {
   frequency?: string;
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas' | 'ApiNinjasHistorical';
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas' | 'ApiNinjasHistorical' | 'Tiingo'; // Added Tiingo
   apiIdentifier?: string;
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
@@ -73,12 +73,11 @@ export const indicators: IndicatorMetadata[] = [
     frequency: 'Quarterly',
     sourceName: 'BEA/Census via FRED (Calculated)',
     apiSource: 'FRED',
-    apiIdentifier: 'GDP/POP', // Conceptual, handled in fetchIndicatorData
+    apiIdentifier: 'GDP/POP', 
     chartType: 'line',
     calculation: 'NONE',
     notes: 'Calculated as Nominal GDP divided by Total Population. Fetch requires two series.'
   },
-  // LEI was removed
 
   // == Category II: Labor Market ==
   { id: 'UNRATE', name: 'Unemployment Rate', categoryKey: 'ii', description: '% of labor force unemployed but seeking work.', unit: '%', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'UNRATE', chartType: 'line', calculation: 'NONE' },
@@ -138,7 +137,6 @@ export const indicators: IndicatorMetadata[] = [
     chartType: 'line', calculation: 'NONE'
   },
 
-
   // == Category IV: Consumer Activity ==
   { id: 'RETAIL_SALES_MOM_PCT', name: 'Retail Sales (Advance, MoM %)', categoryKey: 'iv', description: 'MoM % change in retail/food services sales.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'RSAFS', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'PERS_INC_MOM_PCT', name: 'Personal Income (MoM %)', categoryKey: 'iv', description: 'MoM % change in income received by individuals.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PI', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -156,9 +154,9 @@ export const indicators: IndicatorMetadata[] = [
     id: 'PMI', name: 'Manufacturing PMI', categoryKey: 'v',
     description: 'Purchasing Managers Index for the manufacturing sector. >50 indicates expansion.',
     unit: 'Index', frequency: 'Monthly',
-    sourceName: 'Investing.com (Mocked)', // Or actual DBNOMICS source if found
-    apiSource: 'Mock', apiIdentifier: 'PMI_MANUFACTURING_INVESTING_MOCK', // Or DBNOMICS ID
-    chartType: 'line', calculation: 'NONE', notes: 'Data is programmatically generated for demonstration if using Mock.'
+    sourceName: 'ISM via FRED', // More reliable source than mock
+    apiSource: 'FRED', apiIdentifier: 'NAPM', // ISM Manufacturing PMI via FRED
+    chartType: 'line', calculation: 'NONE'
   },
   { id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for durable goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'DGORDER', chartType: 'bar', calculation: 'MOM_PERCENT', notes: 'Includes transportation.' },
   { id: 'FACTORY_ORDERS_MOM_PCT', name: 'Factory Orders (MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for manufactured goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'AMTMNO', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -222,45 +220,53 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
     chartType: 'line', calculation: 'NONE',
   },
-
+  // ETFs now using Tiingo
+  {
+    id: 'TLT_ETF', name: 'iShares 20+ Year Treasury Bond ETF (TLT)', categoryKey: 'viii',
+    description: 'Tracks the performance of U.S. Treasury bonds with remaining maturities greater than twenty years.',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'TLT',
+    chartType: 'line', calculation: 'NONE',
+  },
   {
     id: 'LQD_ETF', name: 'Inv. Grade Corp Bond ETF (LQD)', categoryKey: 'viii',
     description: 'iShares iBoxx $ Investment Grade Corporate Bond ETF.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
-    apiSource: 'AlphaVantage', apiIdentifier: 'LQD', chartType: 'line', calculation: 'NONE',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'LQD',
+    chartType: 'line', calculation: 'NONE',
   },
   {
     id: 'VNQ_ETF', name: 'Real Estate ETF (VNQ)', categoryKey: 'viii',
     description: 'Vanguard Real Estate ETF, tracks a broad U.S. REIT index.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
-    apiSource: 'AlphaVantage', apiIdentifier: 'VNQ', chartType: 'line', calculation: 'NONE',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'VNQ',
+    chartType: 'line', calculation: 'NONE',
   },
-  
   {
     id: 'ARKK_ETF', name: 'ARK Innovation ETF (ARKK)', categoryKey: 'viii',
     description: 'Invests in disruptive innovation companies; speculative growth.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
-    apiSource: 'AlphaVantage', apiIdentifier: 'ARKK', chartType: 'line', calculation: 'NONE',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'ARKK',
+    chartType: 'line', calculation: 'NONE',
   },
   {
-  id: 'TLT_ETF', name: 'iShares 20+ Year Treasury Bond ETF (TLT)', categoryKey: 'viii', // Or a 'bonds' category if you make one
-  description: 'Tracks the performance of U.S. Treasury bonds with remaining maturities greater than twenty years.',
-  unit: 'USD', frequency: 'Daily',
-  sourceName: 'Alpha Vantage', // Or PolygonIO
-  apiSource: 'AlphaVantage', // Or PolygonIO
-  apiIdentifier: 'TLT',
-  chartType: 'line', calculation: 'NONE',
-},
-{
-  id: 'TQQQ_ETF', name: 'ProShares UltraPro QQQ (TQQQ)', categoryKey: 'viii', // Or an 'equities' / 'leveraged' category
-  description: 'Seeks daily investment results, before fees and expenses, that correspond to three times (3x) the daily performance of the Nasdaq-100 Index.',
-  unit: 'USD', frequency: 'Daily',
-  sourceName: 'Alpha Vantage', // Or PolygonIO
-  apiSource: 'AlphaVantage', // Or PolygonIO
-  apiIdentifier: 'TQQQ',
-  chartType: 'line', calculation: 'NONE',
-  notes: 'Highly volatile leveraged ETF, intended for short-term tactical use.'
-},
+    id: 'TQQQ_ETF', name: 'ProShares UltraPro QQQ (TQQQ)', categoryKey: 'viii',
+    description: 'Seeks daily investment results that correspond to three times (3x) the daily performance of the Nasdaq-100 Index.',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'TQQQ',
+    chartType: 'line', calculation: 'NONE',
+    notes: 'Highly volatile leveraged ETF, intended for short-term tactical use.'
+  },
 ];
 
 // Helper functions
