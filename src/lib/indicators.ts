@@ -120,22 +120,7 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'ApiNinjas', apiIdentifier: 'Platinum',
     chartType: 'line', calculation: 'NONE', notes: 'Shows latest price. For history, use Platinum Price (Historical).'
   },
-  {
-    id: 'GOLD_PRICE_HISTORICAL', name: 'Gold Price (Historical)', categoryKey: 'iii',
-    description: 'Historical daily closing price of gold in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', frequency: 'Daily',
-    sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Gold',
-    chartType: 'line', calculation: 'NONE'
-  },
-  {
-    id: 'PLATINUM_PRICE_HISTORICAL', name: 'Platinum Price (Historical)', categoryKey: 'iii',
-    description: 'Historical daily closing price of platinum in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', frequency: 'Daily',
-    sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Platinum',
-    chartType: 'line', calculation: 'NONE'
-  },
+ 
 
   // == Category IV: Consumer Activity ==
   { id: 'RETAIL_SALES_MOM_PCT', name: 'Retail Sales (Advance, MoM %)', categoryKey: 'iv', description: 'MoM % change in retail/food services sales.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'RSAFS', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -151,13 +136,15 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'v', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' },
   { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'v', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
   {
-    id: 'PMI', name: 'Manufacturing PMI', categoryKey: 'v',
-    description: 'Purchasing Managers Index for the manufacturing sector. >50 indicates expansion.',
-    unit: 'Index', frequency: 'Monthly',
-    sourceName: 'ISM via FRED', // More reliable source than mock
-    apiSource: 'FRED', apiIdentifier: 'NAPM', // ISM Manufacturing PMI via FRED
-    chartType: 'line', calculation: 'NONE'
-  },
+  id: 'PMI', name: 'Manufacturing PMI (ISM)', categoryKey: 'v', // Updated name for clarity
+  description: 'Purchasing Managers Index for the manufacturing sector by the Institute for Supply Management. >50 indicates expansion.',
+  unit: 'Index', frequency: 'Monthly',
+  sourceName: 'ISM via DB.nomics', // CHANGED
+  apiSource: 'DBNOMICS',            // CHANGED
+  apiIdentifier: 'ISM/MAN_PMI',     // CHANGED - VERIFY THIS ID ON DB.NOMICS
+  chartType: 'line', calculation: 'NONE',
+  notes: 'A reading above 50 percent indicates that the manufacturing economy is generally expanding; below 50 percent indicates that it is generally contracting.'
+},
   { id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for durable goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'DGORDER', chartType: 'bar', calculation: 'MOM_PERCENT', notes: 'Includes transportation.' },
   { id: 'FACTORY_ORDERS_MOM_PCT', name: 'Factory Orders (MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for manufactured goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'AMTMNO', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'BUS_INVENTORIES_MOM_PCT', name: 'Business Inventories (MoM %)', categoryKey: 'v', description: 'MoM % change in total value of business inventories.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'BUSINV', chartType: 'bar', calculation: 'MOM_PERCENT' },

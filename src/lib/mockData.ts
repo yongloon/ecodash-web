@@ -105,10 +105,10 @@ export function generateMockData(
   else if (indicator.id === 'GOLD_PRICE' || indicator.id === 'GOLD_PRICE_HISTORICAL') { baseValue = 1800 + randomFn() * 400; volatility = 15 + randomFn() * 15; }
   else if (indicator.id === 'PLATINUM_PRICE' || indicator.id === 'PLATINUM_PRICE_HISTORICAL') { baseValue = 900 + randomFn() * 200; volatility = 10 + randomFn() * 10; }
   else if (indicator.id === 'CRYPTO_FEAR_GREED') { baseValue = 50; volatility = 30; }
-  else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'PMI_MANUFACTURING_INVESTING_MOCK' || indicator.apiIdentifier === 'NAPM') { baseValue = 45 + randomFn() * 15; volatility = 0.8 + randomFn() * 1.2; }
-  else if (indicator.id === 'PMI_SERVICES' || indicator.apiIdentifier === 'PMI_SERVICES_INVESTING_MOCK') { baseValue = 48 + randomFn() * 15; volatility = 0.8 + randomFn() * 1.2; }
-  else if (indicator.id === 'GDP_REAL') { baseValue = 20000 + randomFn() * 3000; volatility = 50 + randomFn() * 50; }
-  else if (indicator.id === 'GDP_NOMINAL') { baseValue = 23000 + randomFn() * 4000; volatility = 100 + randomFn() * 100; }
+  else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'ISM/MAN_PMI' || indicator.apiIdentifier === 'NAPM') { 
+      baseValue = 45 + randomFn() * 15; 
+      volatility = 0.8 + randomFn() * 1.2; 
+  }
   else if (indicator.id === 'GDP_PER_CAPITA') { baseValue = 60000 + randomFn() * 10000; volatility = 300 + randomFn() * 200; }
   else if (indicator.id === 'GDP_NOMINAL_PER_CAPITA') { baseValue = 65000 + randomFn() * 15000; volatility = 500 + randomFn() * 300; }
   else if (indicator.id === 'TLT_ETF') { baseValue = 100 + randomFn() * 20; volatility = 0.5 + randomFn() * 1; }

@@ -5,14 +5,14 @@ import {
     format,
     isValid,
     parseISO,
-    differenceInYears,
     differenceInDays,
     addDays,
-    eachDayOfInterval, // Keep if used elsewhere, not directly by Tiingo fetcher
+    subDays, 
 } from 'date-fns';
 
 // --- API Base URLs ---
 const FRED_API_URL = 'https://api.stlouisfed.org/fred/series/observations';
+const FRED_API_RELEASES_URL = 'https://api.stlouisfed.org/fred';
 const ALPHA_VANTAGE_API_URL = 'https://www.alphavantage.co/query';
 const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3';
 const ALTERNATIVE_ME_API_URL = 'https://api.alternative.me/fng/';
@@ -21,7 +21,7 @@ const FINNHUB_API_URL = 'https://finnhub.io/api/v1';
 const DBNOMICS_API_URL_V22 = 'https://api.db.nomics.world/v22';
 const POLYGON_API_URL = 'https://api.polygon.io/v2';
 const API_NINJAS_BASE_URL = 'https://api.api-ninjas.com/v1';
-const TIINGO_API_URL = 'https://api.tiingo.com/tiingo'; // Tiingo Base URL
+const TIINGO_API_URL = 'https://api.tiingo.com/tiingo';
 
 
 // --- Helper for Default API Fetch Date Range (Consistent) ---
@@ -34,13 +34,12 @@ function getApiDefaultDateRange(years: number = 1): { startDate: string; endDate
   };
 }
 
-// --- FRED API Fetcher ---
+// --- FRED API Fetcher (Series Observations) ---
 export async function fetchFredSeries(
   seriesId: string,
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
-  // ... (Keep existing fetchFredSeries implementation)
-  console.log(`[fetchFredSeries API - ENTRY] Called with: seriesId=${seriesId}, dateRange=${JSON.stringify(dateRange)}`);
+  // console.log(`[fetchFredSeries API - ENTRY] Called with: seriesId=${seriesId}, dateRange=${JSON.stringify(dateRange)}`);
   const apiKey = process.env.FRED_API_KEY;
   if (!apiKey) {
     console.error(`[API FRED] FRED_API_KEY is missing for series ${seriesId}. Cannot fetch real data.`);
@@ -69,10 +68,10 @@ export async function fetchFredSeries(
     observation_end: formattedEndDate,
   });
   const url = `${FRED_API_URL}?${params.toString()}`;
-  console.log(`[API FRED] Attempting to fetch: ${seriesId} (${formattedStartDate} to ${formattedEndDate}) from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API FRED] Attempting to fetch: ${seriesId} (${formattedStartDate} to ${formattedEndDate}) from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
 
   try {
-    const response = await fetch(url, { next: { revalidate: 21600 } });
+    const response = await fetch(url, { next: { revalidate: 21600 } }); 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[API FRED] Error response for ${seriesId}: ${response.status} - ${errorText.substring(0,500)}`);
@@ -93,7 +92,7 @@ export async function fetchFredSeries(
       })
       .filter((point): point is TimeSeriesDataPoint => point !== null)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    console.log(`[API FRED] Parsed ${seriesData.length} valid points for ${seriesId}`);
+    // console.log(`[API FRED] Parsed ${seriesData.length} valid points for ${seriesId}`);
     return seriesData;
   } catch (error) {
     console.error(`[API FRED] Network or parsing error for ${seriesId}:`, error);
@@ -101,13 +100,110 @@ export async function fetchFredSeries(
   }
 }
 
+// --- FRED API Fetcher (Releases Calendar) ---
+export interface FredReleaseDate {
+  release_id: number;
+  release_name: string;
+  date: string; 
+}
+export interface FredReleasesDatesResponse {
+  release_dates: FredReleaseDate[];
+  count?: number;
+  offset?: number;
+  limit?: number;
+}
+
+export async function fetchFredReleaseCalendar(
+  _daysAheadForDisplay: number = 30, 
+  includeReleaseDatesWithNoData: boolean = false
+): Promise<FredReleaseDate[]> {
+  // console.log(`[fetchFredReleaseCalendar API - ENTRY] Called`);
+  const apiKey = process.env.FRED_API_KEY;
+  if (!apiKey) {
+    console.error("[API FRED Releases] FRED_API_KEY is missing.");
+    return [];
+  }
+
+  const today = new Date();
+  const queryStartDate = format(subDays(today, 7), 'yyyy-MM-dd'); 
+  const queryEndDate = format(addDays(today, 60), 'yyyy-MM-dd');   
+
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    file_type: 'json',
+    realtime_start: queryStartDate, 
+    realtime_end: queryEndDate,     
+    include_release_dates_with_no_data: String(includeReleaseDatesWithNoData),
+    limit: '200', 
+    sort_order: 'asc', 
+  });
+
+  const url = `${FRED_API_RELEASES_URL}/releases/dates?${params.toString()}`;
+  // console.log(`[API FRED Releases] Attempting to fetch: ${url.replace(apiKey, "REDACTED_KEY")}`);
+
+  try {
+    const response = await fetch(url, { next: { revalidate: 43200 } }); 
+    // console.log(`[API FRED Releases] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[API FRED Releases] Error response: ${response.status} - Body: ${errorText.substring(0, 500)}`);
+      throw new Error(`FRED Releases API Error (${response.status}).`);
+    }
+    const data: FredReleasesDatesResponse = await response.json();
+
+    if (!data || !data.release_dates || !Array.isArray(data.release_dates)) {
+      console.warn(`[API FRED Releases] No valid release_dates array in response. Data:`, data);
+      return [];
+    }
+    // console.log(`[API FRED Releases] Raw release_dates count: ${data.release_dates.length}`);
+        
+    const uniqueReleasesMap = new Map<string, FredReleaseDate>();
+    let validEntriesFromApi = 0;
+    let invalidDateEntries = 0;
+
+    data.release_dates.forEach(current => {
+      if (current.date && current.release_name && current.release_id != null) {
+        if (isValid(parseISO(current.date))) {
+          validEntriesFromApi++;
+          const key = `${current.date}-${current.release_name}`; 
+          if (!uniqueReleasesMap.has(key)) {
+            uniqueReleasesMap.set(key, current);
+          }
+        } else {
+          invalidDateEntries++;
+          // console.warn(`[API FRED Releases] Invalid date format in entry:`, current);
+        }
+      } else {
+        // console.warn(`[API FRED Releases] Entry missing essential fields:`, current);
+      }
+    });
+    // console.log(`[API FRED Releases] Valid entries from API (with date, name, id): ${validEntriesFromApi}`);
+    if (invalidDateEntries > 0) {
+      // console.log(`[API FRED Releases] Entries with invalid date formats skipped: ${invalidDateEntries}`);
+    }
+
+    const allUniqueSortedReleases = Array.from(uniqueReleasesMap.values())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); 
+
+    console.log(`[API FRED Releases] Returning ${allUniqueSortedReleases.length} unique release schedule entries (not filtered for future within API call).`);
+    if (allUniqueSortedReleases.length > 0) {
+        // console.log(`[API FRED Releases] Sample all unique:`, JSON.stringify(allUniqueSortedReleases.slice(0,3), null, 2));
+    }
+    return allUniqueSortedReleases;
+  } catch (error) {
+    console.error(`[API FRED Releases] Network or parsing error:`, error);
+    return [];
+  }
+}
+
+
 // --- Alpha Vantage API Fetcher ---
 export async function fetchAlphaVantageData(
   apiIdentifier: string,
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
-  // ... (Keep existing fetchAlphaVantageData implementation)
-  console.log(`[fetchAlphaVantageData API - ENTRY] Called with: apiIdentifier=${apiIdentifier}, dateRange=${JSON.stringify(dateRange)}`);
+  // console.log(`[fetchAlphaVantageData API - ENTRY] Called with: apiIdentifier=${apiIdentifier}, dateRange=${JSON.stringify(dateRange)}`);
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   if (!apiKey) {
     console.error(`[API AlphaVantage] ALPHA_VANTAGE_API_KEY is missing. Cannot fetch for ${apiIdentifier}.`);
@@ -139,7 +235,6 @@ export async function fetchAlphaVantageData(
       dataKeyInResponse = 'Realtime Currency Exchange Rate';
       valueKeyInDataPoint = '5. Exchange Rate';
       isCurrencyPair = true;
-      console.log(`[API AlphaVantage] Fetching currency exchange rate: ${apiIdentifier}`);
     } else {
       console.error(`[API AlphaVantage] Invalid currency pair format for ${apiIdentifier}. Expected FROM/TO.`);
       return [];
@@ -151,11 +246,10 @@ export async function fetchAlphaVantageData(
     }
     params = new URLSearchParams({ function: 'TIME_SERIES_DAILY_ADJUSTED', symbol: apiIdentifier, apikey: apiKey, outputsize: outputSize });
     dataKeyInResponse = 'Time Series (Daily)'; valueKeyInDataPoint = '5. adjusted close';
-    console.log(`[API AlphaVantage] Fetching stock/ETF: ${apiIdentifier} (output: ${outputSize})`);
   }
 
   const url = `${ALPHA_VANTAGE_API_URL}?${params.toString()}`;
-  console.log(`[API AlphaVantage] Attempting to fetch: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API AlphaVantage] Attempting to fetch: ${url.replace(apiKey, "REDACTED_KEY")}`);
 
   try {
     const response = await fetch(url, { next: { revalidate: isCurrencyPair ? 300 : 14400 } });
@@ -207,7 +301,7 @@ export async function fetchAlphaVantageData(
           .map(dateStr => {
             if (!isValid(parseISO(dateStr))) return null;
             const dayData = responseDataBlock[dateStr];
-            const valueStr = dayData[valueKeyInDataPoint] || dayData['4. close']; // Fallback for unadjusted close
+            const valueStr = dayData[valueKeyInDataPoint] || dayData['4. close'];
             if (valueStr === undefined) return null;
             const value = parseFloat(valueStr);
             return isNaN(value) ? null : { date: dateStr, value: value };
@@ -219,10 +313,10 @@ export async function fetchAlphaVantageData(
         let filteredSeriesData = seriesData;
         if (isValid(parseISO(effectiveStartDateStr))) filteredSeriesData = filteredSeriesData.filter(dp => parseISO(dp.date) >= parseISO(effectiveStartDateStr));
         if (isValid(parseISO(effectiveEndDateStr))) filteredSeriesData = filteredSeriesData.filter(dp => parseISO(dp.date) <= parseISO(effectiveEndDateStr));
-        console.log(`[API AlphaVantage] Parsed ${seriesData.length} raw points, ${filteredSeriesData.length} after date filtering for ${apiIdentifier}`);
+        // console.log(`[API AlphaVantage] Parsed ${seriesData.length} raw points, ${filteredSeriesData.length} after date filtering for ${apiIdentifier}`);
         return filteredSeriesData;
     } else {
-        console.log(`[API AlphaVantage] Parsed ${seriesData.length} points (single quote) for ${apiIdentifier}`);
+        // console.log(`[API AlphaVantage] Parsed ${seriesData.length} points (single quote) for ${apiIdentifier}`);
         return seriesData;
     }
 
@@ -233,7 +327,6 @@ export async function fetchAlphaVantageData(
 }
 
 // --- DB.nomics API Fetcher ---
-// ... (Keep existing fetchDbNomicsSeries implementation)
 interface DbNomicsSeriesData { series_code: string; period: string[]; value: (number | null)[]; }
 interface DbNomicsResponse { series: DbNomicsSeriesData[]; docs?: any; message?: string; }
 
@@ -241,14 +334,14 @@ export async function fetchDbNomicsSeries(
   fullSeriesCode: string,
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchDbNomicsSeries API - ENTRY] Called with: seriesCode=${fullSeriesCode}, dateRange=${JSON.stringify(dateRange)}`);
+  // console.log(`[fetchDbNomicsSeries API - ENTRY] Called with: seriesCode=${fullSeriesCode}, dateRange=${JSON.stringify(dateRange)}`);
   const apiDefaults = getApiDefaultDateRange();
   const startDate = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
   const endDate = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
 
   const params = new URLSearchParams({ series_ids: fullSeriesCode, observations: '1', format: 'json', start_period: startDate, end_period: endDate });
   const url = `${DBNOMICS_API_URL_V22}/series?${params.toString()}`;
-  console.log(`[API DB.nomics] Attempting to fetch: ${fullSeriesCode} (Range: ${startDate} to ${endDate}) from URL: ${url}`);
+  // console.log(`[API DB.nomics] Attempting to fetch: ${fullSeriesCode} (Range: ${startDate} to ${endDate}) from URL: ${url}`);
 
   try {
     const response = await fetch(url, { next: { revalidate: 21600 } });
@@ -274,13 +367,12 @@ export async function fetchDbNomicsSeries(
         timeSeries.push({ date: seriesObject.period[i], value: parseFloat(val.toFixed(2)) });
       }
     }
-    console.log(`[API DB.nomics] Parsed ${timeSeries.length} points for ${fullSeriesCode}`);
+    // console.log(`[API DB.nomics] Parsed ${timeSeries.length} points for ${fullSeriesCode}`);
     return timeSeries;
   } catch (error) { console.error(`[API DB.nomics] Error for ${fullSeriesCode}:`, error); return []; }
 }
 
 // --- Polygon.io API Fetcher ---
-// ... (Keep existing fetchPolygonIOData implementation)
 interface PolygonAggregatesResult { c: number; h: number; l: number; n: number; o: number; t: number; v: number; vw: number; }
 interface PolygonAggregatesResponse { ticker?: string; queryCount?: number; resultsCount?: number; adjusted?: boolean; results?: PolygonAggregatesResult[]; status?: string; request_id?: string; count?: number; message?: string; }
 
@@ -288,27 +380,26 @@ export async function fetchPolygonIOData(
   ticker: string,
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchPolygonIOData API - ENTRY] Called with: ticker=${ticker}, dateRange=${JSON.stringify(dateRange)}`);
+  // console.log(`[fetchPolygonIOData API - ENTRY] Called with: ticker=${ticker}, dateRange=${JSON.stringify(dateRange)}`);
   const apiKey = process.env.POLYGON_API_KEY;
   if (!apiKey) {
     console.error(`[API Polygon.io] POLYGON_API_KEY is missing. Cannot fetch for ${ticker}.`);
     return [];
   }
 
-  const apiDefaults = getApiDefaultDateRange(2);
+  const apiDefaults = getApiDefaultDateRange(2); 
   const startDate = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
   const endDate = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
-  const twoYearsAgo = format(subYears(new Date(), 2), 'yyyy-MM-dd');
-  const effectiveStartDate = startDate < twoYearsAgo ? twoYearsAgo : startDate;
+  const effectiveStartDate = startDate;
 
   if (new Date(effectiveStartDate) > new Date(endDate)) {
-    console.warn(`[API Polygon.io] Corrected start date ${effectiveStartDate} is after end date ${endDate} for ${ticker}. Returning empty.`);
+    console.warn(`[API Polygon.io] Start date ${effectiveStartDate} is after end date ${endDate} for ${ticker}. Returning empty.`);
     return [];
   }
 
-  const params = new URLSearchParams({ adjusted: 'true', sort: 'asc', limit: '50000', apiKey: apiKey, });
+  const params = new URLSearchParams({ adjusted: 'true', sort: 'asc', limit: '5000', apiKey: apiKey, });
   const url = `${POLYGON_API_URL}/aggs/ticker/${ticker}/range/1/day/${effectiveStartDate}/${endDate}?${params.toString()}`;
-  console.log(`[API Polygon.io] Attempting to fetch: ${ticker} (${effectiveStartDate} to ${endDate}) from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API Polygon.io] Attempting to fetch: ${ticker} (${effectiveStartDate} to ${endDate}) from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
 
   try {
     const response = await fetch(url, { next: { revalidate: 14400 } });
@@ -329,23 +420,22 @@ export async function fetchPolygonIOData(
       return [];
     }
     const seriesData: TimeSeriesDataPoint[] = data.results.map((agg: PolygonAggregatesResult) => ({
-      date: format(new Date(agg.t), 'yyyy-MM-dd'),
-      value: parseFloat(agg.c.toFixed(4)),
+      date: format(new Date(agg.t), 'yyyy-MM-dd'), 
+      value: parseFloat(agg.c.toFixed(4)), 
     }));
-    console.log(`[API Polygon.io] Parsed ${seriesData.length} points for ${ticker}`);
+    // console.log(`[API Polygon.io] Parsed ${seriesData.length} points for ${ticker}`);
     return seriesData;
   } catch (error) { console.error(`[API Polygon.io] Network or parsing error for ${ticker}:`, error); return []; }
 }
 
 // --- API-Ninjas.com Commodity Latest Price Fetcher ---
-// ... (Keep existing fetchApiNinjasMetalPrice implementation)
 interface ApiNinjasCommodityLatestPriceResponse { exchange?: string; name: string; price: number; unit?: string; updated: number; }
 export async function fetchApiNinjasMetalPrice( commodityName: string ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchApiNinjasMetalPrice API - ENTRY] Called with: commodityName=${commodityName}`);
+  // console.log(`[fetchApiNinjasMetalPrice API - ENTRY] Called with: commodityName=${commodityName}`);
   const apiKey = process.env.API_NINJAS_KEY;
   if (!apiKey) { console.error(`[API API-Ninjas Commodity] API_NINJAS_KEY is missing. Cannot fetch for ${commodityName}.`); return []; }
   const url = `${API_NINJAS_BASE_URL}/commodityprice?name=${encodeURIComponent(commodityName)}`;
-  console.log(`[API API-Ninjas Commodity] Attempting to fetch: ${commodityName} from URL: ${url}`);
+  // console.log(`[API API-Ninjas Commodity] Attempting to fetch: ${commodityName} from URL: ${url}`);
   try {
     const response = await fetch(url, { headers: { 'X-Api-Key': apiKey }, next: { revalidate: 300 } });
     if (!response.ok) {
@@ -358,17 +448,16 @@ export async function fetchApiNinjasMetalPrice( commodityName: string ): Promise
       console.warn(`[API API-Ninjas Commodity] Invalid or incomplete data received for ${commodityName}. Data:`, data); return [];
     }
     const seriesData: TimeSeriesDataPoint[] = [{ date: format(new Date(data.updated * 1000), 'yyyy-MM-dd'), value: parseFloat(data.price.toFixed(4)), }];
-    console.log(`[API API-Ninjas Commodity] Parsed 1 point for ${commodityName}: ${JSON.stringify(seriesData)}`);
+    // console.log(`[API API-Ninjas Commodity] Parsed 1 point for ${commodityName}: ${JSON.stringify(seriesData)}`);
     return seriesData;
   } catch (error) { console.error(`[API API-Ninjas Commodity] Network or parsing error for ${commodityName}:`, error); return []; }
 }
 
 // --- API-Ninjas.com Commodity Historical Price Fetcher ---
-// ... (Keep existing fetchApiNinjasCommodityHistoricalPrice implementation)
 interface ApiNinjasHistoricalDataPoint { open: number; low: number; high: number; close: number; volume?: number; time: number; }
 type ApiNinjasHistoricalResponse = ApiNinjasHistoricalDataPoint[];
 export async function fetchApiNinjasCommodityHistoricalPrice( commodityName: string, dateRange?: { startDate?: string; endDate?: string }, period: '1h' | '1d' = '1d' ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchApiNinjasCommodityHistoricalPrice API - ENTRY] Called for: ${commodityName}, Range: ${JSON.stringify(dateRange)}, Period: ${period}`);
+  // console.log(`[fetchApiNinjasCommodityHistoricalPrice API - ENTRY] Called for: ${commodityName}, Range: ${JSON.stringify(dateRange)}, Period: ${period}`);
   const apiKey = process.env.API_NINJAS_KEY;
   if (!apiKey) { console.error(`[API API-Ninjas Hist] API_NINJAS_KEY is missing. Cannot fetch for ${commodityName}.`); return []; }
   const apiDefaults = getApiDefaultDateRange(1);
@@ -379,7 +468,7 @@ export async function fetchApiNinjasCommodityHistoricalPrice( commodityName: str
   if (startTimestamp >= endTimestamp) { console.warn(`[API API-Ninjas Hist] Start timestamp not before end for ${commodityName}.`); return []; }
   const params = new URLSearchParams({ name: commodityName, period: period, start: startTimestamp.toString(), end: endTimestamp.toString(), });
   const url = `${API_NINJAS_BASE_URL}/commoditypricehistorical?${params.toString()}`;
-  console.log(`[API API-Ninjas Hist] Attempting to fetch: ${commodityName} from URL: ${url}`);
+  // console.log(`[API API-Ninjas Hist] Attempting to fetch: ${commodityName} from URL: ${url}`);
   try {
     const response = await fetch(url, { headers: { 'X-Api-Key': apiKey }, next: { revalidate: 14400 } });
     if (!response.ok) {
@@ -395,105 +484,126 @@ export async function fetchApiNinjasCommodityHistoricalPrice( commodityName: str
         const dailyAggregated: TimeSeriesDataPoint[] = []; const tempMap = new Map<string, TimeSeriesDataPoint>();
         seriesData.forEach(point => { tempMap.set(point.date, point); });
         dailyAggregated.push(...Array.from(tempMap.values())); dailyAggregated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        console.log(`[API API-Ninjas Hist] Aggregated ${seriesData.length} hourly to ${dailyAggregated.length} daily for ${commodityName}.`);
+        // console.log(`[API API-Ninjas Hist] Aggregated ${seriesData.length} hourly to ${dailyAggregated.length} daily for ${commodityName}.`);
         return dailyAggregated;
     }
-    console.log(`[API API-Ninjas Hist] Parsed ${seriesData.length} points for ${commodityName}`); return seriesData;
+    // console.log(`[API API-Ninjas Hist] Parsed ${seriesData.length} points for ${commodityName}`); 
+    return seriesData;
   } catch (error) { console.error(`[API API-Ninjas Hist] Error for ${commodityName}:`, error); return []; }
 }
 
 // --- CoinGecko API Fetcher ---
-// ... (Keep existing fetchCoinGeckoPriceHistory implementation)
 export async function fetchCoinGeckoPriceHistory( coinId: string, dateRange?: { startDate?: string; endDate?: string } ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchCoinGeckoPriceHistory API - ENTRY] Called with: coinId=${coinId}, dateRange=${JSON.stringify(dateRange)}`);
+  // console.log(`[fetchCoinGeckoPriceHistory API - ENTRY] Called with: coinId=${coinId}, dateRange=${JSON.stringify(dateRange)}`);
   const apiDefaults = getApiDefaultDateRange();
   const startDateStr = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
   const endDateStr = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
-  let fromTimestamp = Math.floor(parseISO(startDateStr).getTime() / 1000); let toTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000) + (60 * 60 * 23);
+  let fromTimestamp = Math.floor(parseISO(startDateStr).getTime() / 1000); 
+  let toTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000) + (60 * 60 * 23);
   if (fromTimestamp > toTimestamp) [fromTimestamp, toTimestamp] = [toTimestamp, fromTimestamp];
+  
   const url = `${COINGECKO_API_URL}/coins/${coinId}/market_chart/range?vs_currency=usd&from=${fromTimestamp}&to=${toTimestamp}`;
-  console.log(`[API CoinGecko] Attempting to fetch: ${coinId} (${startDateStr} to ${endDateStr}) from URL: ${url}`);
+  // console.log(`[API CoinGecko] Attempting to fetch: ${coinId} (${startDateStr} to ${endDateStr}) from URL: ${url}`);
   try {
-    const response = await fetch(url, { next: { revalidate: 3600 } });
-    if (!response.ok) { const errBody = await response.text(); let errMsg = `CoinGecko Error (${response.status}) for ${coinId}.`; try {errMsg = JSON.parse(errBody).error?.message || JSON.parse(errBody).error || errMsg;} catch(e){} console.error(`[API CoinGecko] Error for ${coinId}: ${response.status} - ${errBody.substring(0,500)}`); throw new Error(errMsg); }
+    const response = await fetch(url, { next: { revalidate: 3600 } }); 
+    if (!response.ok) { 
+      const errBody = await response.text(); 
+      let errMsg = `CoinGecko Error (${response.status}) for ${coinId}.`; 
+      try { errMsg = JSON.parse(errBody).error?.message || JSON.parse(errBody).error || errMsg; } catch(e){} 
+      console.error(`[API CoinGecko] Error for ${coinId}: ${response.status} - ${errBody.substring(0,500)}`); 
+      throw new Error(errMsg); 
+    }
     const data = await response.json();
     if (!data.prices?.length) { console.warn(`[API CoinGecko] No prices for ${coinId}.`); return []; }
-    const dailyData: Record<string, TimeSeriesDataPoint> = {}; data.prices.forEach((p: [number, number]) => { const date = format(new Date(p[0]), 'yyyy-MM-dd'); dailyData[date] = { date, value: parseFloat(p[1].toFixed(2)) }; });
+    
+    const dailyData: Record<string, TimeSeriesDataPoint> = {}; 
+    data.prices.forEach((p: [number, number]) => { 
+      const date = format(new Date(p[0]), 'yyyy-MM-dd'); 
+      dailyData[date] = { date, value: parseFloat(p[1].toFixed(2)) }; 
+    });
     const uniqueDaily = Object.values(dailyData).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    console.log(`[API CoinGecko] Parsed ${uniqueDaily.length} points for ${coinId}`); return uniqueDaily;
+    // console.log(`[API CoinGecko] Parsed ${uniqueDaily.length} daily points for ${coinId}`); 
+    return uniqueDaily;
   } catch (error) { console.error(`[API CoinGecko] Error for ${coinId}:`, error); return []; }
 }
 
 // --- Alternative.me Fear & Greed Index Fetcher ---
-// ... (Keep existing fetchAlternativeMeFearGreedIndex implementation)
 interface AlternativeMeFngValue { value: string; timestamp: string; value_classification: string; }
 interface AlternativeMeFngResponse { name: string; data: AlternativeMeFngValue[]; metadata: { error: string | null; }; }
 export async function fetchAlternativeMeFearGreedIndex( dateRange?: { startDate?: string; endDate?: string } ): Promise<TimeSeriesDataPoint[]> {
-    console.log(`[fetchAlternativeMeFearGreedIndex API - ENTRY] Called with: dateRange=${JSON.stringify(dateRange)}`);
+    // console.log(`[fetchAlternativeMeFearGreedIndex API - ENTRY] Called with: dateRange=${JSON.stringify(dateRange)}`);
     const apiDefaults = getApiDefaultDateRange(5);
     const startConsider = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
     const endConsider = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
-    const daysToStart = Math.max(0, differenceInDays(new Date(), parseISO(startConsider))); const limit = Math.min(daysToStart + 2, 1825);
+    
+    const daysFromTodayToStartConsider = differenceInDays(new Date(), parseISO(startConsider));
+    const limit = Math.max(1, Math.min(daysFromTodayToStartConsider + 2, 1825)); 
+
     const url = `${ALTERNATIVE_ME_API_URL}?limit=${limit}&format=json`;
-    console.log(`[API AlternativeMe] Attempting F&G (limit: ${limit}, UI start: ${startConsider}, UI end: ${endConsider}) from URL: ${url}`);
+    // console.log(`[API AlternativeMe] Attempting F&G (limit: ${limit}, UI start: ${startConsider}, UI end: ${endConsider}) from URL: ${url}`);
     try {
-        const res = await fetch(url, { next: { revalidate: 10800 } });
+        const res = await fetch(url, { next: { revalidate: 10800 } }); 
         if (!res.ok) { const errTxt = await res.text(); console.error(`[API AlternativeMe] F&G Error: ${res.status} - ${errTxt.substring(0,500)}`); throw new Error(`Alternative.me Error ${res.status}.`); }
         const data: AlternativeMeFngResponse = await res.json();
         if (data.metadata.error) throw new Error(`Alternative.me API Error: ${data.metadata.error}`);
         if (!data.data?.length) { console.warn(`[API AlternativeMe] No F&G data.`); return []; }
-        let series: TimeSeriesDataPoint[] = data.data.map(item => ({ date: format(new Date(parseInt(item.timestamp) * 1000), 'yyyy-MM-dd'), value: parseInt(item.value, 10), })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        let series: TimeSeriesDataPoint[] = data.data.map(item => ({ 
+            date: format(new Date(parseInt(item.timestamp) * 1000), 'yyyy-MM-dd'), 
+            value: parseInt(item.value, 10), 
+        })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
         if (isValid(parseISO(startConsider))) series = series.filter(dp => parseISO(dp.date) >= parseISO(startConsider));
         if (isValid(parseISO(endConsider))) series = series.filter(dp => parseISO(dp.date) <= parseISO(endConsider));
-        console.log(`[API AlternativeMe] Parsed and filtered ${series.length} F&G points`); return series;
+        
+        // console.log(`[API AlternativeMe] Parsed and filtered ${series.length} F&G points`); 
+        return series;
     } catch (e) { console.error('[API AlternativeMe] F&G Error:', e); return []; }
 }
 
 // --- NewsAPI.org Fetcher ---
-// ... (Keep existing fetchNewsHeadlines implementation)
 export interface NewsArticle { source: { id: string | null; name: string }; author: string | null; title: string; description: string | null; url: string; urlToImage: string | null; publishedAt: string; content: string | null; }
 export interface NewsApiResponse { status: string; totalResults: number; articles: NewsArticle[]; message?: string; code?: string; }
 export async function fetchNewsHeadlines(category: string = 'business', country: string = 'us', pageSize: number = 10): Promise<NewsArticle[]> {
-  console.log(`[fetchNewsHeadlines API - ENTRY] Called: category=${category}, country=${country}, pageSize=${pageSize}`);
+  // console.log(`[fetchNewsHeadlines API - ENTRY] Called: category=${category}, country=${country}, pageSize=${pageSize}`);
   const apiKey = process.env.NEWSAPI_ORG_KEY;
   if (!apiKey) { console.error("[API NewsAPI] NEWSAPI_ORG_KEY missing."); return []; }
   const params = new URLSearchParams({ country, category, pageSize: pageSize.toString(), apiKey });
   const url = `${NEWSAPI_ORG_BASE_URL}/top-headlines?${params.toString()}`;
-  console.log(`[API NewsAPI] Fetching: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API NewsAPI] Fetching: ${url.replace(apiKey, "REDACTED_KEY")}`);
   try {
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetch(url, { next: { revalidate: 3600 } }); 
     if (!res.ok) { const errData: NewsApiResponse = await res.json().catch(() => ({ status: 'error', articles:[], message: `HTTP ${res.status}`}) as any); const errMsg = errData.message || errData.code || `NewsAPI Error (${res.status})`; console.error(`[API NewsAPI] Error for ${category}/${country}: ${errMsg}`); throw new Error(errMsg); }
     const data: NewsApiResponse = await res.json();
     if (data.status !== 'ok') { console.warn(`[API NewsAPI] Status not 'ok' for ${category}/${country}: ${data.message || data.code}`); if (['apiKeyDisabled', 'apiKeyInvalid', 'keyInvalid'].includes(data.code||'')) console.error("[API NewsAPI] Key issue."); return []; }
     const articles = data.articles?.filter(a => a.title && a.url) || [];
-    console.log(`[API NewsAPI] Parsed ${articles.length} articles for ${category}/${country}`); return articles;
+    // console.log(`[API NewsAPI] Parsed ${articles.length} articles for ${category}/${country}`); 
+    return articles;
   } catch (e) { console.error("[API NewsAPI] Error:", e); return []; }
 }
 
 // --- Finnhub Economic Calendar Fetcher ---
-// ... (Keep existing fetchEconomicCalendar implementation)
 export interface EconomicEvent { actual: number | null; country: string; estimate: number | null; event: string; impact: string; prev: number | null; time: string; unit: string; calendarId?: string; }
 export interface EconomicCalendarResponse { economicCalendar: EconomicEvent[]; }
 export async function fetchEconomicCalendar(daysAhead: number = 30): Promise<EconomicEvent[]> {
-  console.log(`[fetchEconomicCalendar API - ENTRY] Called: daysAhead=${daysAhead}`);
+  // console.log(`[fetchEconomicCalendar API - ENTRY] Called: daysAhead=${daysAhead}`);
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey) { console.error("[API Finnhub] FINNHUB_API_KEY missing."); return []; }
   const from = format(new Date(), 'yyyy-MM-dd'); const to = format(addDays(new Date(), daysAhead), 'yyyy-MM-dd');
   const url = `${FINNHUB_API_URL}/calendar/economic?token=${apiKey}&from=${from}&to=${to}`;
-  console.log(`[API Finnhub] Fetching Eco Calendar: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API Finnhub] Fetching Eco Calendar: ${url.replace(apiKey, "REDACTED_KEY")}`);
   try {
-    const res = await fetch(url, { next: { revalidate: 7200 } });
+    const res = await fetch(url, { next: { revalidate: 7200 } }); 
     if (!res.ok) { const errTxt = await res.text(); console.error(`[API Finnhub] Eco Calendar Error ${res.status}: ${errTxt.substring(0,300)}`); throw new Error(`Finnhub Eco Calendar Error (${res.status}).`); }
     const data: EconomicCalendarResponse | { error?: string } = await res.json();
     if ('error' in data && data.error) throw new Error(`Finnhub Eco Calendar API: ${data.error}`);
     if (!('economicCalendar' in data) || !Array.isArray(data.economicCalendar)) { console.warn("[API Finnhub] No 'economicCalendar' array."); return []; }
     const events = data.economicCalendar.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-    console.log(`[API Finnhub] Parsed ${events.length} economic events.`); return events;
+    // console.log(`[API Finnhub] Parsed ${events.length} economic events.`); 
+    return events;
   } catch (e) { console.error("[API Finnhub] Eco Calendar Error:", e); return []; }
 }
 
 // --- Alpha Vantage Earnings Calendar ---
-// ... (Keep existing fetchAlphaVantageEarningsCalendar implementation)
 export interface EarningsEventAV { symbol: string; name: string; reportDate: string; fiscalDateEnding: string; estimate: number | null; currency: string; }
 function parseCSV(csvText: string): Record<string, string>[] {
   const lines = csvText.trim().split('\n'); if (lines.length < 2) return [];
@@ -501,48 +611,48 @@ function parseCSV(csvText: string): Record<string, string>[] {
   return dataRows.map(rowText => { const values = rowText.split(','); const rowObject: Record<string, string> = {}; headers.forEach((header, index) => { rowObject[header] = values[index] ? values[index].trim() : ''; }); return rowObject; });
 }
 export async function fetchAlphaVantageEarningsCalendar( horizon: '3month' | '6month' | '12month' = '3month', symbol?: string ): Promise<EarningsEventAV[]> {
-  console.log(`[fetchAlphaVantageEarningsCalendar API - ENTRY] Called: horizon=${horizon}, symbol=${symbol || 'ALL'}`);
+  // console.log(`[fetchAlphaVantageEarningsCalendar API - ENTRY] Called: horizon=${horizon}, symbol=${symbol || 'ALL'}`);
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   if (!apiKey) { console.error("[API AlphaVantage Earnings] ALPHA_VANTAGE_API_KEY missing."); return []; }
   const params = new URLSearchParams({ function: 'EARNINGS_CALENDAR', horizon: horizon, apikey: apiKey, });
   if (symbol) { params.set('symbol', symbol); }
   const url = `${ALPHA_VANTAGE_API_URL}?${params.toString()}`;
-  console.log(`[API AlphaVantage Earnings] Fetching: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API AlphaVantage Earnings] Fetching: ${url.replace(apiKey, "REDACTED_KEY")}`);
   try {
-    const response = await fetch(url, { next: { revalidate: 14400 } });
+    const response = await fetch(url, { next: { revalidate: 14400 } }); 
     if (!response.ok) { const errorText = await response.text(); console.error(`[API AlphaVantage Earnings] Error: ${response.status} - ${errorText.substring(0, 300)}`); throw new Error(`Alpha Vantage Earnings API Error (${response.status}).`); }
     const csvData = await response.text();
     if (!csvData || csvData.trim() === '' || csvData.toLowerCase().includes("error message") || csvData.toLowerCase().includes("thank you for using alpha vantage")) { console.warn(`[API AlphaVantage Earnings] Empty/error CSV: ${csvData.substring(0, 200)}`); if (csvData.toLowerCase().includes("thank you for using alpha vantage") && !csvData.toLowerCase().includes("symbol,name")) { console.warn("[API AlphaVantage Earnings] Possible rate limit/key issue."); } return []; }
     const parsedObjects = parseCSV(csvData);
-    const earningsEvents: EarningsEventAV[] = parsedObjects.map(obj => { const estimateVal = obj.estimate ? parseFloat(obj.estimate) : null; return { symbol: obj.symbol || 'N/A', name: obj.name || 'Unknown Company', reportDate: obj.reportDate || '', fiscalDateEnding: obj.fiscalDateEnding || '', estimate: isNaN(estimateVal as any) ? null : estimateVal, currency: obj.currency || 'USD', }; }).filter(event => event.symbol !== 'N/A' && isValid(parseISO(event.reportDate))).sort((a,b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime());
-    console.log(`[API AlphaVantage Earnings] Parsed ${earningsEvents.length} events.`); return earningsEvents;
+    const earningsEvents: EarningsEventAV[] = parsedObjects.map(obj => { const estimateVal = obj.estimate ? parseFloat(obj.estimate) : null; return { symbol: obj.symbol || 'N/A', name: obj.name || 'Unknown Company', reportDate: obj.reportDate || '', fiscalDateEnding: obj.fiscalDateEnding || '', estimate: isNaN(estimateVal as any) ? null : estimateVal, currency: obj.currency || 'USD', }; }).filter(event => event.symbol !== 'N/A' && isValid(parseISO(event.reportDate))).sort((a,b) => new Date(a.reportDate).getTime() - new Date(b.date).getTime());
+    // console.log(`[API AlphaVantage Earnings] Parsed ${earningsEvents.length} events.`); 
+    return earningsEvents;
   } catch (error) { console.error("[API AlphaVantage Earnings] Error:", error); return []; }
 }
 
-// --- Tiingo EOD Price Fetcher --- (NEW)
+// --- Tiingo EOD Price Fetcher ---
 interface TiingoEodPrice {
-  date: string;       // Example: "2024-01-05T00:00:00.000Z"
+  date: string;      
   close: number;
   adjClose: number;
   open?: number;
   high?: number;
   low?: number;
   volume?: number;
-  // ... other fields Tiingo might return
 }
 
 export async function fetchTiingoEodData(
   ticker: string,
   dateRange?: { startDate?: string; endDate?: string }
 ): Promise<TimeSeriesDataPoint[]> {
-  console.log(`[fetchTiingoEodData API - ENTRY] Called with: ticker=${ticker}, dateRange=${JSON.stringify(dateRange)}`);
+  // console.log(`[fetchTiingoEodData API - ENTRY] Called with: ticker=${ticker}, dateRange=${JSON.stringify(dateRange)}`);
   const apiKey = process.env.TIINGO_API_KEY;
   if (!apiKey) {
     console.error(`[API Tiingo] TIINGO_API_KEY is missing. Cannot fetch for ${ticker}.`);
     return [];
   }
 
-  const apiDefaults = getApiDefaultDateRange();
+  const apiDefaults = getApiDefaultDateRange(); 
   const startDate = (dateRange?.startDate && isValid(parseISO(dateRange.startDate)))
     ? dateRange.startDate
     : apiDefaults.startDate;
@@ -557,7 +667,7 @@ export async function fetchTiingoEodData(
 
   const url = `${TIINGO_API_URL}/daily/${ticker.toLowerCase()}/prices?startDate=${startDate}&endDate=${endDate}&token=${apiKey}&format=json&resampleFreq=daily`;
   
-  console.log(`[API Tiingo] Attempting to fetch: ${ticker} (${startDate} to ${endDate}) from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
+  // console.log(`[API Tiingo] Attempting to fetch: ${ticker} (${startDate} to ${endDate}) from URL: ${url.replace(apiKey, "REDACTED_KEY")}`);
 
   try {
     const response = await fetch(url, { next: { revalidate: 14400 } }); 
@@ -594,7 +704,7 @@ export async function fetchTiingoEodData(
       .filter((point): point is TimeSeriesDataPoint => point !== null)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    console.log(`[API Tiingo] Parsed ${seriesData.length} points for ${ticker}`);
+    // console.log(`[API Tiingo] Parsed ${seriesData.length} points for ${ticker}`);
     return seriesData;
 
   } catch (error) {
