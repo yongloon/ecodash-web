@@ -141,7 +141,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
   const isDataEffectivelyUnavailable = historicalData.length === 0 && latestValue === null;
 
   return (
-    <Card className="flex flex-col h-full border bg-card text-card-foreground shadow-sm hover:shadow-lg transition-shadow duration-200 relative overflow-hidden">
+    <Card id={`indicator-${indicator.id}`} className="flex flex-col h-full border bg-card text-card-foreground shadow-sm hover:shadow-lg transition-shadow duration-200 relative overflow-hidden group">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
           <div className='flex-1 min-w-0'>

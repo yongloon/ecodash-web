@@ -31,7 +31,7 @@ export function getIndicatorSignal(
   const currentValue = latestValue.value;
   const prevValue = previousValue?.value;
   const changeDirection = compareValues(currentValue, prevValue);
-  const indicatorName = indicator.name.replace(' (API-Ninjas Historical)', '').replace(' (API-Ninjas)', '').replace(' (DB.nomics)', '').replace(' (FRED)', '').replace(' (USD)', '');
+  const indicatorName = indicator.name.replace(' (USD)', '');
 
 
   switch (indicator.id) {

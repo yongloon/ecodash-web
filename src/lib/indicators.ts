@@ -49,16 +49,36 @@ export const indicators: IndicatorMetadata[] = [
   // == Category I: Economic Output & Growth ==
   { id: 'GDP_REAL', name: 'Real Gross Domestic Product', categoryKey: 'i', description: 'Value of final goods/services, inflation-adjusted.', unit: 'Billions of Chained 2017 Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'GDPC1', chartType: 'line', calculation: 'NONE' },
   { id: 'GDP_GROWTH', name: 'Real GDP Growth Rate', categoryKey: 'i', description: '% change in real GDP, annualized.', unit: '% Change (Annualized)', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'A191RL1Q225SBEA', chartType: 'bar', calculation: 'NONE' },
+  {
+    id: 'GDP_NOMINAL',
+    name: 'Nominal Gross Domestic Product',
+    categoryKey: 'i',
+    description: 'Market value of all final goods and services produced within a country, not adjusted for inflation.',
+    unit: 'Billions of Dollars',
+    frequency: 'Quarterly',
+    sourceName: 'BEA via FRED',
+    apiSource: 'FRED',
+    apiIdentifier: 'GDP',
+    chartType: 'line',
+    calculation: 'NONE'
+  },
   { id: 'GNP', name: 'Gross National Product', categoryKey: 'i', description: 'Total income earned by a nation\'s people and businesses.', unit: 'Billions of Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'GNP', chartType: 'line', calculation: 'NONE' },
   { id: 'GDP_PER_CAPITA', name: 'Real GDP per Capita', categoryKey: 'i', description: 'Average economic output per person, inflation-adjusted.', unit: 'Chained 2017 Dollars', frequency: 'Quarterly', sourceName: 'BEA/Census via FRED', apiSource: 'FRED', apiIdentifier: 'A939RX0Q048SBEA', chartType: 'line', calculation: 'NONE' },
   {
-    id: 'LEI', name: 'Leading Economic Index (LEI)', categoryKey: 'i',
-    description: 'Composite index designed to signal peaks and troughs in the business cycle for the U.S. economy.',
-    unit: 'Index', frequency: 'Monthly',
-    sourceName: 'The Conference Board via FRED',
-    apiSource: 'FRED', apiIdentifier: 'USSLIND',
-    chartType: 'line', calculation: 'NONE'
+    id: 'GDP_NOMINAL_PER_CAPITA',
+    name: 'Nominal GDP per Capita',
+    categoryKey: 'i',
+    description: 'Average economic output per person, not adjusted for inflation.',
+    unit: 'Dollars',
+    frequency: 'Quarterly',
+    sourceName: 'BEA/Census via FRED (Calculated)',
+    apiSource: 'FRED',
+    apiIdentifier: 'GDP/POP', // Conceptual, handled in fetchIndicatorData
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Calculated as Nominal GDP divided by Total Population. Fetch requires two series.'
   },
+  // LEI was removed
 
   // == Category II: Labor Market ==
   { id: 'UNRATE', name: 'Unemployment Rate', categoryKey: 'ii', description: '% of labor force unemployed but seeking work.', unit: '%', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'UNRATE', chartType: 'line', calculation: 'NONE' },
@@ -86,28 +106,44 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
   {
-    id: 'GOLD_PRICE', name: 'Spot Gold Price (API-Ninjas)', categoryKey: 'iii',
+    id: 'GOLD_PRICE', name: 'Spot Gold Price', categoryKey: 'iii',
     description: 'Latest spot price of gold in U.S. Dollars per troy ounce.',
     unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
     apiSource: 'ApiNinjas', apiIdentifier: 'Gold',
-    chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key. Shows latest price.'
+    chartType: 'line', calculation: 'NONE', notes: 'Shows latest price. For history, use Gold Price (Historical).'
   },
   {
-    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price (API-Ninjas)', categoryKey: 'iii',
+    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price', categoryKey: 'iii',
     description: 'Latest spot price of platinum in U.S. Dollars per troy ounce.',
     unit: 'USD per Ounce', frequency: 'Daily',
     sourceName: 'API-Ninjas.com',
     apiSource: 'ApiNinjas', apiIdentifier: 'Platinum',
-    chartType: 'line', calculation: 'NONE', notes: 'Requires API-Ninjas API key. Shows latest price.'
+    chartType: 'line', calculation: 'NONE', notes: 'Shows latest price. For history, use Platinum Price (Historical).'
   },
+  {
+    id: 'GOLD_PRICE_HISTORICAL', name: 'Gold Price (Historical)', categoryKey: 'iii',
+    description: 'Historical daily closing price of gold in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce', frequency: 'Daily',
+    sourceName: 'API-Ninjas.com',
+    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Gold',
+    chartType: 'line', calculation: 'NONE'
+  },
+  {
+    id: 'PLATINUM_PRICE_HISTORICAL', name: 'Platinum Price (Historical)', categoryKey: 'iii',
+    description: 'Historical daily closing price of platinum in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce', frequency: 'Daily',
+    sourceName: 'API-Ninjas.com',
+    apiSource: 'ApiNinjasHistorical', apiIdentifier: 'Platinum',
+    chartType: 'line', calculation: 'NONE'
+  },
+
 
   // == Category IV: Consumer Activity ==
   { id: 'RETAIL_SALES_MOM_PCT', name: 'Retail Sales (Advance, MoM %)', categoryKey: 'iv', description: 'MoM % change in retail/food services sales.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'RSAFS', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'PERS_INC_MOM_PCT', name: 'Personal Income (MoM %)', categoryKey: 'iv', description: 'MoM % change in income received by individuals.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PI', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'PERS_OUTLAYS_MOM_PCT', name: 'Personal Outlays (PCE, MoM %)', categoryKey: 'iv', description: 'MoM % change in personal consumption expenditures, interest, and transfers.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PCE', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'CONSUMER_CREDIT_YOY_PCT', name: 'Consumer Credit Outstanding (YoY %)', categoryKey: 'iv', description: 'YoY % change in total outstanding consumer debt.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TOTALSL', chartType: 'bar', calculation: 'YOY_PERCENT' },
-  // CCI (Consumer Confidence Index) REMOVED
   { id: 'UMCSENT', name: 'Consumer Sentiment Index (UMich)', categoryKey: 'iv', description: 'University of Michigan\'s index measuring consumer sentiment.', unit: 'Index Q1 1966=100', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'UMCSENT', chartType: 'line', calculation: 'NONE' },
   { id: 'VEHICLE_SALES', name: 'Light Weight Vehicle Sales', categoryKey: 'iv', description: 'Total sales of new lightweight vehicles (SAAR).', unit: 'Millions of Units (SAAR)', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'ALTSALES', chartType: 'line', calculation: 'NONE' },
   { id: 'SAVINGS_RATE', name: 'Personal Savings Rate', categoryKey: 'iv', description: 'Personal saving as a % of disposable personal income.', unit: '%', frequency: 'Monthly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'PSAVERT', chartType: 'line', calculation: 'NONE' },
@@ -120,11 +156,10 @@ export const indicators: IndicatorMetadata[] = [
     id: 'PMI', name: 'Manufacturing PMI', categoryKey: 'v',
     description: 'Purchasing Managers Index for the manufacturing sector. >50 indicates expansion.',
     unit: 'Index', frequency: 'Monthly',
-    sourceName: 'Investing.com (Mocked)',
-    apiSource: 'Mock', apiIdentifier: 'PMI_MANUFACTURING_INVESTING_MOCK',
-    chartType: 'line', calculation: 'NONE', notes: 'Data is programmatically generated for demonstration.'
+    sourceName: 'Investing.com (Mocked)', // Or actual DBNOMICS source if found
+    apiSource: 'Mock', apiIdentifier: 'PMI_MANUFACTURING_INVESTING_MOCK', // Or DBNOMICS ID
+    chartType: 'line', calculation: 'NONE', notes: 'Data is programmatically generated for demonstration if using Mock.'
   },
-  // Services PMI REMOVED
   { id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for durable goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'DGORDER', chartType: 'bar', calculation: 'MOM_PERCENT', notes: 'Includes transportation.' },
   { id: 'FACTORY_ORDERS_MOM_PCT', name: 'Factory Orders (MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for manufactured goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'AMTMNO', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'BUS_INVENTORIES_MOM_PCT', name: 'Business Inventories (MoM %)', categoryKey: 'v', description: 'MoM % change in total value of business inventories.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'BUSINV', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -136,7 +171,6 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'HOUSING_STARTS', name: 'Housing Starts', categoryKey: 'vi', description: 'New residential construction projects started (SAAR).', unit: 'Thousands of Units (SAAR)', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'HOUST', chartType: 'area', calculation: 'NONE' },
   { id: 'BUILDING_PERMITS', name: 'Building Permits', categoryKey: 'vi', description: 'Permits authorized for new private housing units (SAAR).', unit: 'Thousands of Units (SAAR)', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'PERMIT', chartType: 'line', calculation: 'NONE' },
   { id: 'EXISTING_HOME_SALES', name: 'Existing Home Sales', categoryKey: 'vi', description: 'Closed sales of previously owned homes (SAAR).', unit: 'Millions of Units (SAAR)', frequency: 'Monthly', sourceName: 'NAR via FRED', apiSource: 'FRED', apiIdentifier: 'EXHOSLUSM495S', chartType: 'line', calculation: 'NONE' },
-  // PENDING_HOME_SALES REMOVED
   { id: 'NEW_HOME_SALES', name: 'New Home Sales', categoryKey: 'vi', description: 'Newly constructed single-family homes sold (SAAR).', unit: 'Thousands of Units (SAAR)', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'HSN1F', chartType: 'line', calculation: 'NONE' },
   { id: 'HOUSING_AFFORD', name: 'Housing Affordability Index', categoryKey: 'vi', description: 'Measures if a typical family can qualify for a mortgage on a typical home.', unit: 'Index', frequency: 'Monthly', sourceName: 'NAR via FRED', apiSource: 'FRED', apiIdentifier: 'FIXHAI', chartType: 'line', calculation: 'NONE' },
   { id: 'MORTGAGE_DELINQUENCY', name: 'Mortgage Delinquency Rate', categoryKey: 'vi', description: 'Delinquency rate on single-family residential mortgages.', unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DRSFRMACBS', chartType: 'line', calculation: 'NONE' },
@@ -188,18 +222,7 @@ export const indicators: IndicatorMetadata[] = [
     apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
     chartType: 'line', calculation: 'NONE',
   },
-  {
-    id: 'KO_STOCK', name: 'Coca-Cola (KO)', categoryKey: 'viii',
-    description: 'Stock price for The Coca-Cola Company.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
-    apiSource: 'AlphaVantage', apiIdentifier: 'KO', chartType: 'line', calculation: 'NONE',
-  },
-  {
-    id: 'XLU_ETF', name: 'Utilities ETF (XLU)', categoryKey: 'viii',
-    description: 'Utilities Select Sector SPDR Fund.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
-    apiSource: 'AlphaVantage', apiIdentifier: 'XLU', chartType: 'line', calculation: 'NONE',
-  },
+
   {
     id: 'LQD_ETF', name: 'Inv. Grade Corp Bond ETF (LQD)', categoryKey: 'viii',
     description: 'iShares iBoxx $ Investment Grade Corporate Bond ETF.',
@@ -212,18 +235,32 @@ export const indicators: IndicatorMetadata[] = [
     unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
     apiSource: 'AlphaVantage', apiIdentifier: 'VNQ', chartType: 'line', calculation: 'NONE',
   },
-  {
-    id: 'LAND_REIT', name: 'Gladstone Land Corp (LAND)', categoryKey: 'viii',
-    description: 'A REIT focused on U.S. farmland and farm-related properties.',
-    unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
-    apiSource: 'AlphaVantage', apiIdentifier: 'LAND', chartType: 'line', calculation: 'NONE',
-  },
+  
   {
     id: 'ARKK_ETF', name: 'ARK Innovation ETF (ARKK)', categoryKey: 'viii',
     description: 'Invests in disruptive innovation companies; speculative growth.',
     unit: 'USD', frequency: 'Daily', sourceName: 'Alpha Vantage',
     apiSource: 'AlphaVantage', apiIdentifier: 'ARKK', chartType: 'line', calculation: 'NONE',
   },
+  {
+  id: 'TLT_ETF', name: 'iShares 20+ Year Treasury Bond ETF (TLT)', categoryKey: 'viii', // Or a 'bonds' category if you make one
+  description: 'Tracks the performance of U.S. Treasury bonds with remaining maturities greater than twenty years.',
+  unit: 'USD', frequency: 'Daily',
+  sourceName: 'Alpha Vantage', // Or PolygonIO
+  apiSource: 'AlphaVantage', // Or PolygonIO
+  apiIdentifier: 'TLT',
+  chartType: 'line', calculation: 'NONE',
+},
+{
+  id: 'TQQQ_ETF', name: 'ProShares UltraPro QQQ (TQQQ)', categoryKey: 'viii', // Or an 'equities' / 'leveraged' category
+  description: 'Seeks daily investment results, before fees and expenses, that correspond to three times (3x) the daily performance of the Nasdaq-100 Index.',
+  unit: 'USD', frequency: 'Daily',
+  sourceName: 'Alpha Vantage', // Or PolygonIO
+  apiSource: 'AlphaVantage', // Or PolygonIO
+  apiIdentifier: 'TQQQ',
+  chartType: 'line', calculation: 'NONE',
+  notes: 'Highly volatile leveraged ETF, intended for short-term tactical use.'
+},
 ];
 
 // Helper functions

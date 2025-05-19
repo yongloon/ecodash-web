@@ -26,14 +26,15 @@ export const revalidate = 300;
 // Configuration for Overview Page
 // UPDATED: Added more indicators to headlineIndicatorIds
 const headlineIndicatorIds = [
-    'GDP_GROWTH',           // Overall economic growth
-    'UNRATE',               // Labor market health
-    'CPI_YOY_PCT',          // Inflation
-    'FEDFUNDS',             // Monetary policy
-    'PMI',                  // Manufacturing sector health (from DB.nomics ISM)
-    'RETAIL_SALES_MOM_PCT', // Consumer spending
-    'US10Y',                // Key interest rate, financial conditions
-    'SP500'                 // Broad stock market performance
+    'GDP_NOMINAL',          // NEW
+    'UNRATE',
+    'CPI_YOY_PCT',
+    'FEDFUNDS',
+    'PMI',
+    'RETAIL_SALES_MOM_PCT',
+    'US10Y',
+    'SP500',
+    'M2_YOY_PCT',           // This makes it 9
 ];
 const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'OIL_WTI', 'GOLD_PRICE']; // OIL_WTI & GOLD_PRICE added for more snapshot diversity
 const MAX_FAVORITES_ON_OVERVIEW = 3; // Keep this as is or adjust if desired
@@ -42,37 +43,64 @@ const MAX_FAVORITES_ON_OVERVIEW = 3; // Keep this as is or adjust if desired
 const riskSpectrumSetup = [
   {
     title: "🟢 Low-Risk Assets",
-    iconLucide: Shield,
-    description: "Often preferred during economic uncertainty for capital preservation; sensitive to interest rates and inflation.",
+    iconLucide: Shield, // Keep or change icon as desired
+    description: "Typically less volatile; often sought for capital preservation or income during uncertainty. Sensitive to interest rate changes.",
     keyIndicatorsConfig: [
-      { id: 'US10Y', explanation: "Benchmark for 'risk-free' rate; price moves inversely to yield. Lower yields often signal flight to safety or rate cut expectations." },
-      { id: 'GOLD_PRICE', explanation: "Traditionally seen as a store of value and hedge against inflation or geopolitical risk." },
-      { id: 'KO_STOCK', explanation: "A defensive stock known for stable demand and dividends, often less affected by economic downturns." },
-      { id: 'XLU_ETF', explanation: "Utilities sector ETF, often considered defensive due to consistent demand for services." },
+      {
+        id: 'TLT_ETF', // NEW - Assumes you'll create this IndicatorMetadata for iShares 20+ Year Treasury Bond ETF
+        explanation: "Tracks long-term U.S. Treasury bonds. Price generally moves inversely to long-term interest rates."
+      },
+      {
+        id: 'LQD_ETF', // Existing - iShares Investment Grade Corporate Bond ETF
+        explanation: "Tracks investment-grade corporate bonds, offering higher yields than Treasuries with moderate credit risk."
+      },
+      {
+        id: 'GOLD_PRICE', // Assuming you want the chartable historical gold price here
+        explanation: "Traditionally seen as a store of value and hedge against inflation or geopolitical risk."
+      },
+      // You can add a 4th if desired, or keep it at 3.
+      // { id: 'US10Y', explanation: "Benchmark 10-year Treasury yield; influences borrowing costs and reflects economic outlook." },
     ]
   },
   {
-    title: "🟡 Medium-Risk Assets",
-    iconLucide: Scale,
-    description: "Typically offer a balance of income and growth; moderately affected by economic cycles and corporate health.",
+    title: "⚖️ Medium-Risk Assets",
+    iconLucide: Scale, // Keep or change icon
+    description: "Generally offer a balance of potential income and growth; moderately affected by economic cycles and broad market sentiment.",
     keyIndicatorsConfig: [
-      { id: 'LQD_ETF', explanation: "Tracks investment-grade corporate bonds, offering higher yields than Treasuries with moderate credit risk." },
-      { id: 'VNQ_ETF', explanation: "Represents diversified real estate investments, sensitive to interest rates and economic growth." },
-      { id: 'LAND_REIT', explanation: "Farmland REIT, offering potential inflation hedging and unique asset class exposure." },
-      { id: 'PLATINUM_PRICE', explanation: "Industrial precious metal, price influenced by automotive demand and industrial output." },
+      {
+        id: 'SP500', // Existing or 'SPX500_INDEX' if you created a separate one
+        explanation: "Tracks 500 large-cap U.S. stocks, representing broad market performance and economic health."
+      },
+      {
+        id: 'VNQ_ETF', // Existing - Vanguard Real Estate ETF
+        explanation: "Represents diversified real estate investments (REITs), sensitive to interest rates and economic growth."
+      },
+      {
+        id: 'PLATINUM_PRICE', // Assuming you want the chartable historical platinum price
+        explanation: "Industrial precious metal, price influenced by automotive demand (catalytic converters) and industrial output."
+      },
+      // { id: 'LAND_REIT', explanation: "Farmland REIT, offering potential inflation hedging and unique asset class exposure." }, // Example of a 4th
     ]
   },
   {
-    title: "🔴 High-Risk Assets",
-    iconLucide: TrendingUp,
-    description: "Highly sensitive to growth expectations, market sentiment, liquidity, and risk appetite.",
+    title: "🚀 High-Risk Assets",
+    iconLucide: TrendingUp, // Keep or change icon
+    description: "Can offer high growth potential but come with greater volatility; highly sensitive to market sentiment, liquidity, and risk appetite.",
     keyIndicatorsConfig: [
-      { id: 'BTC_PRICE_USD', explanation: "Highly volatile cryptocurrency, driven by adoption, sentiment, and macroeconomic factors." },
-      { id: 'ETH_PRICE_USD', explanation: "Leading smart contract platform cryptocurrency, also highly volatile." },
-      { id: 'OIL_WTI', explanation: "Crude oil price, highly sensitive to global supply/demand, geopolitical events, and economic growth." },
-      { id: 'ARKK_ETF', explanation: "Invests in speculative, disruptive innovation companies, known for high growth potential and volatility." },
+      {
+        id: 'ARKK_ETF', // Existing - ARK Innovation ETF
+        explanation: "Invests in speculative, disruptive innovation companies, known for high growth potential and volatility."
+      },
+      {
+        id: 'BTC_PRICE_USD', // Existing - Bitcoin (USD)
+        explanation: "Highly volatile cryptocurrency, driven by adoption, sentiment, and macroeconomic factors."
+      },
+      {
+        id: 'TQQQ_ETF', // NEW - Assumes you'll create this IndicatorMetadata for ProShares UltraPro QQQ (3x Nasdaq 100)
+        explanation: "Leveraged ETF seeking 3x daily return of the Nasdaq-100 Index, inherently very high risk and volatility."
+      },
     ]
-  },
+  }
 ];
 
 
@@ -284,18 +312,19 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
               </div>
             </section>
           )}
-          <section>
+         <section>
             {(favoritesSnippetData.length > 0 || riskSpectrumSetup.some(cat => cat.indicatorsDisplayData.length > 0)) && <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
             {!(favoritesSnippetData.length > 0 || riskSpectrumSetup.some(cat => cat.indicatorsDisplayData.length > 0)) && <h2 className="text-xl font-semibold text-foreground mb-3 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"> {/* Adjusted grid columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6"> {/* MODIFIED: md:grid-cols-3, removed lg:grid-cols-4 */}
               {summaryData.length > 0 ? (
                   summaryData
                       .filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id))
+                      .slice(0, 9) // ADDED: Ensure only up to 9 indicators are mapped
                       .map(({ indicator, latestValue, previousValue, sparklineData }) => (
                   <SummaryCard key={indicator.id} indicator={indicator} latestValue={latestValue} previousValue={previousValue} sparklineData={sparklineData}/> ))
               ) : ( <p className="col-span-full text-center text-muted-foreground py-8">No key indicators to display.</p> )}
-              {summaryData.length > 0 && summaryData.filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id)).length === 0 && (
-                  <p className="col-span-full text-center text-muted-foreground py-8">Key indicators are currently unavailable.</p> )}
+              {summaryData.length > 0 && summaryData.filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id)).slice(0, 9).length === 0 && (
+                  <p className="col-span-full text-center text-muted-foreground py-8">Key indicators are currently unavailable for the selected criteria.</p> )}
             </div>
           </section>
 
@@ -348,7 +377,19 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
                   else if (trendIconNameToUse === 'down') TrendIconToRender = FaArrowDown;
 
                   const categoryInfo = getCategoryBySlug(indicator.categoryKey);
-                  const indicatorLink = categoryInfo ? `/category/${categoryInfo.slug}?indicator=${indicator.id}` : '/dashboard';
+                  let indicatorLink = '/dashboard'; // Default fallback
+                  if (categoryInfo) {
+                      indicatorLink = `/category/${categoryInfo.slug}?indicator=${indicator.id}`;
+                  } else if (indicator.id) {
+                      // Fallback to a sensible default category if direct categoryKey isn't found
+                      // For market assets, 'financial-conditions' might be a good default if 'viii' isn't set explicitly on all of them
+                      const financialCategory = getCategoryBySlug('financial-conditions'); // Assuming 'financial-conditions' is a valid slug for categoryKey 'viii'
+                      if (financialCategory) {
+                          indicatorLink = `/category/${financialCategory.slug}?indicator=${indicator.id}`;
+                      } else {
+                          console.warn(`Market Snapshot: Could not determine category link for ${indicator.id}. Defaulting to dashboard.`);
+                      }
+                  }
 
                   return (
                     <Link href={indicatorLink} key={`snap-${indicator.id}`} className="block p-2.5 rounded-md hover:bg-muted/50 transition-colors group border-b border-border/30 last:border-b-0">
