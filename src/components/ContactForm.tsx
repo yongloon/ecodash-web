@@ -1,87 +1,56 @@
-// src/components/ContactForm.tsx
+// File: src/components/ContactForm.tsx
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, FormEvent, useRef, useEffect } from 'react'; // Added useRef, useEffect
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { submitContactFormAction } from '@/app/actions'; // Adjust path if you put actions.ts elsewhere (e.g., '@/lib/actions')
+import { useFormState } from 'react-dom'; // Recommended for handling form state with server actions
 
-// Define the server action (can be in this file or imported)
-async function submitContactFormAction(formData: FormData) {
-  // "use server"; // Server Action directive if defined in the same file or a separate actions.ts
-  console.log("Server Action: Form submission started.");
-  const name = formData.get('name') as string;
-  const email = formData.get('email') as string;
-  const subject = formData.get('subject') as string;
-  const message = formData.get('message') as string;
-
-  // Simulate delay and processing
-  await new Promise(resolve => setTimeout(resolve, 1500));
-
-  if (!name || !email || !subject || !message) {
-    console.error("Server Action Error: All fields are required.");
-    return { success: false, error: "All fields are required." };
-  }
-
-  // Here you would:
-  // 1. Validate the data further.
-  // 2. Send an email using Resend (e.g., to yourself with the contact message).
-  //    const { data, error } = await resend.emails.send({...});
-  // 3. Or save to a database if needed.
-
-  console.log("Server Action: Contact Form Data:", { name, email, subject, message });
-  // Example: Send email to yourself
-  // try {
-  //   const { data, error } = await resend.emails.send({
-  //     from: 'Contact Form <onboarding@resend.dev>', // Your verified Resend domain
-  //     to: ['your-email@example.com'], // Your email
-  //     subject: `New Contact Form Submission: ${subject}`,
-  //     reply_to: email,
-  //     html: `<p>Name: ${name}</p><p>Email: ${email}</p><p>Subject: ${subject}</p><p>Message: ${message}</p>`,
-  //   });
-  //   if (error) throw error;
-  //   return { success: true, message: "Message sent successfully!" };
-  // } catch (e) {
-  //   console.error("Server Action Error sending email:", e);
-  //   return { success: false, error: "Failed to send message." };
-  // }
-  return { success: true, message: "Message sent successfully! (Simulated)" };
-}
-
+const initialState = {
+  success: null as boolean | null,
+  message: null as string | null,
+  error: null as string | null,
+};
 
 export default function ContactForm() {
+  // Using useFormState for better state management with server actions
+  const [formState, formAction] = useFormState(submitContactFormAction, initialState);
   const [isPending, startTransition] = useTransition();
-  const [formState, setFormState] = useState<{ success: boolean | null; message: string | null; error: string | null }>({
-    success: null,
-    message: null,
-    error: null,
-  });
+  const formRef = useRef<HTMLFormElement>(null); // Ref to reset the form
+
+  // Effect to reset the form if submission was successful
+  useEffect(() => {
+    if (formState.success === true && formRef.current) {
+      formRef.current.reset();
+    }
+  }, [formState.success]);
+
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     
-    startTransition(async () => {
-        // If submitContactFormAction is defined with "use server" in another file:
-        // const result = await submitContactFormAction(formData); 
-        
-        // If submitContactFormAction is defined in this file (needs "use server" at its top if so, or call API)
-        // For this example, assuming it's a local async function that simulates server action behavior
-        const result = await submitContactFormAction(formData);
-        
-        if (result.success) {
-            setFormState({ success: true, message: result.message, error: null });
-            (event.target as HTMLFormElement).reset(); // Reset form on success
-        } else {
-            setFormState({ success: false, message: null, error: result.error });
-        }
+    startTransition(() => {
+        formAction(formData); // Directly call the action wrapped by useFormState
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {formState.message && <p className={`text-sm p-3 rounded-md ${formState.success ? 'bg-green-500/10 text-green-700' : 'bg-destructive/10 text-destructive'}`}>{formState.message}</p>}
-      {formState.error && <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{formState.error}</p>}
+    // Pass formAction to the <form> element's action prop when using useFormState directly
+    // Or handle with onSubmit and startTransition as shown
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6"> 
+      {formState.message && (
+        <p className={`text-sm p-3 rounded-md ${formState.success ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700' : 'bg-destructive/10 text-destructive border-destructive/20'}`}>
+          {formState.message}
+        </p>
+      )}
+      {formState.error && (
+        <p className="text-sm p-3 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+          {formState.error}
+        </p>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -95,11 +64,11 @@ export default function ContactForm() {
       </div>
       <div className="space-y-2">
         <label htmlFor="subject_contact_form" className="text-sm font-medium">Subject</label>
-        <Input id="subject_contact_form" name="subject" placeholder="Question about Pro Plan" required disabled={isPending} />
+        <Input id="subject_contact_form" name="subject" placeholder="Feedback about..." required disabled={isPending} />
       </div>
       <div className="space-y-2">
         <label htmlFor="message_contact_form" className="text-sm font-medium">Message</label>
-        <Textarea id="message_contact_form" name="message" placeholder="Your message..." rows={5} required disabled={isPending} />
+        <Textarea id="message_contact_form" name="message" placeholder="Your detailed feedback or question..." rows={5} required disabled={isPending} />
       </div>
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? 'Sending...' : 'Send Message'}

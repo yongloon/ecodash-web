@@ -1,3 +1,4 @@
+// File: src/components/dashboard/SidebarNav.tsx
 // src/components/dashboard/SidebarNav.tsx
 "use client";
 
@@ -5,9 +6,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
 import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa';
-import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3 } from 'lucide-react';
+import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3, MessageSquare } from 'lucide-react'; // Added MessageSquare
 import { useSession } from 'next-auth/react';
-import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Ensure path is correct
+import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 
 const FAVORITES_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['basic', 'pro']; 
 const PRO_TOOLS_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['pro'];
@@ -45,7 +46,6 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
 
   return (
     <>
-      {/* Overlay for mobile when menu is open */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm md:hidden"
@@ -69,7 +69,6 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
         <div className="flex items-center justify-center h-16 border-b border-border/60 px-4 flex-shrink-0">
           <Link href="/" className="flex items-center gap-2 group" onClick={handleLinkClick}>
              <BarChart3 className="h-7 w-7 text-primary group-hover:opacity-80 transition-opacity" />
-             {/* Removed EcoDash text title from here */}
           </Link>
         </div>
         <nav className="mt-4 px-2 pb-4 space-y-1 flex-grow flex flex-col">
@@ -126,7 +125,6 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
             </>
           )}
           
-          {/* Conditional Pricing Link */}
           {!isLoadingSession && (!isLoggedIn || !hasActivePaidSubscription) && (
             <Link
               href="/pricing"
@@ -139,13 +137,24 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
             </Link>
           )}
 
-          {/* Spacer to push account link to bottom */}
+           {/* Feedback Link */}
+            <hr className="my-3 border-border/60" />
+            <Link
+              href="/contact?subject=EcoDash%20Beta%20Feedback"
+              className={navLinkClasses(pathname === '/contact')}
+              title="Beta Feedback"
+              onClick={handleLinkClick}
+            >
+              <MessageSquare className="h-4 w-4 mr-3 flex-shrink-0" />
+              <span>Provide Feedback</span>
+            </Link>
+
           <div className="flex-grow"></div> 
 
           {!isLoadingSession && isLoggedIn && (
                <Link
                   href="/account/profile"
-                  className={`${navLinkClasses(pathname === '/account/profile')} mt-2`} // Added mt-2
+                  className={`${navLinkClasses(pathname === '/account/profile')} mt-2`}
                   title="My Account"
                   onClick={handleLinkClick}
               >

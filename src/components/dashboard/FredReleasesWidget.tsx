@@ -1,36 +1,35 @@
-// src/components/dashboard/FredReleasesWidget.tsx
+// File: src/components/dashboard/FredReleasesWidget.tsx
+// (Adding dataTimestamp prop)
 "use client";
 
 import React from 'react';
 import { FredReleaseDate } from '@/lib/api'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarCheck, Info } from 'lucide-react';
-import { format, parseISO, isToday, isTomorrow, isValid, startOfToday } from 'date-fns'; // Added startOfToday
+import { format, parseISO, isToday, isTomorrow, isValid, startOfToday, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FredReleasesWidgetProps {
     initialReleases?: FredReleaseDate[];
-    itemCount?: number; // You requested latest 5 for this widget
+    itemCount?: number;
+    dataTimestamp?: string; // For "Last Updated" display
 }
 
 export default function FredReleasesWidget({
     initialReleases = [],
-    itemCount = 5, // Defaulting to 5 as requested
+    itemCount = 5,
+    dataTimestamp
 }: FredReleasesWidgetProps) {
-  // console.log(`[FredReleasesWidget] Raw initialReleases count: ${initialReleases.length}`);
+  const today = startOfToday();
 
-  const today = startOfToday(); // Get the start of today for comparison
-
-  // Filter for releases that are scheduled for today or in the future, then sort
   const futureAndTodayReleases = initialReleases
     .filter(release => {
         if (!release.date || !isValid(parseISO(release.date))) return false;
-        return parseISO(release.date) >= today; // Compare with start of today
+        return parseISO(release.date) >= today;
     })
-    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Ensure sorted by actual release date
+    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const releasesToDisplay = futureAndTodayReleases.slice(0, itemCount);
-  // console.log(`[FredReleasesWidget] Releases to display after filtering for future and slicing: ${releasesToDisplay.length}`);
 
   const getDateDisplay = (dateStr: string): string => {
     if (!dateStr || !isValid(parseISO(dateStr))) return "Date N/A";
@@ -64,7 +63,7 @@ export default function FredReleasesWidget({
             {releasesToDisplay.map((release) => (
               <li key={`${release.release_id}-${release.date}`} className="border-b border-border/30 pb-2.5 last:border-b-0 last:pb-0 text-xs">
                 <div className="flex justify-between items-center mb-0.5">
-                    <span className="font-semibold text-sm text-foreground hover:text-primary transition-colors truncate cursor-default" title={release.release_name}>
+                    <span className="font-semibold text-sm text-foreground hover:text-primary transition-colors truncate cursor-default max-w-[70%]" title={release.release_name}>
                         {release.release_name}
                     </span>
                     <span className="text-muted-foreground font-medium">{getDateDisplay(release.date)}</span>
@@ -81,7 +80,12 @@ export default function FredReleasesWidget({
             ))}
           </ul>
         )}
-         <div className="mt-4 text-center">
+        {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+            <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                Release schedule as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+            </p>
+        )}
+         <div className="mt-1 text-center">
             <a href="https://fred.stlouisfed.org/releases" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 Data release calendar by FRED
             </a>

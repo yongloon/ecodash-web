@@ -1,28 +1,29 @@
-// src/components/dashboard/AlphaNewsSentimentWidget.tsx
+// File: src/components/dashboard/AlphaNewsSentimentWidget.tsx
+// (Adding dataTimestamp prop similar to NewsFeedWidget)
 "use client";
 
 import React from 'react';
-import { NewsSentimentArticle } from '@/lib/api'; // Adjust path if needed
+import { NewsSentimentArticle } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { NewspaperIcon, MessageSquareText, TrendingUp, TrendingDown, MinusCircle, Info } from 'lucide-react'; // Using MessageSquareText
-import { format, parseISO } from 'date-fns';
+import { NewspaperIcon, MessageSquareText, TrendingUp, TrendingDown, MinusCircle, Info } from 'lucide-react';
+import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns'; // Added isValid, formatDistanceToNowStrict
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AlphaNewsSentimentWidgetProps {
     initialArticles?: NewsSentimentArticle[];
     itemCount?: number;
     title?: string;
+    dataTimestamp?: string; // For "Last Updated" display
 }
 
 const getSentimentIconAndColor = (label: string): { icon: React.ElementType, color: string } => {
     const lowerLabel = label.toLowerCase();
     if (lowerLabel.includes("bullish")) return { icon: TrendingUp, color: "text-green-500 dark:text-green-400" };
     if (lowerLabel.includes("bearish")) return { icon: TrendingDown, color: "text-red-500 dark:text-red-400" };
-    return { icon: MinusCircle, color: "text-gray-500 dark:text-gray-400" }; // Neutral, Somewhat-Neutral
+    return { icon: MinusCircle, color: "text-gray-500 dark:text-gray-400" };
 };
 
 const formatPublishedTime = (timeStr: string): string => {
-    // Format: "20231026T153000"
     try {
         const year = timeStr.substring(0, 4);
         const month = timeStr.substring(4, 6);
@@ -30,6 +31,7 @@ const formatPublishedTime = (timeStr: string): string => {
         const hour = timeStr.substring(9, 11);
         const minute = timeStr.substring(11, 13);
         const dateObj = parseISO(`${year}-${month}-${day}T${hour}:${minute}:00`);
+        if (!isValid(dateObj)) return "Invalid Date";
         return format(dateObj, "MMM d, HH:mm");
     } catch {
         return "Invalid Date";
@@ -38,8 +40,9 @@ const formatPublishedTime = (timeStr: string): string => {
 
 export default function AlphaNewsSentimentWidget({
     initialArticles = [],
-    itemCount = 3, // Show fewer articles due to more detail per article
-    title = "Market News & Sentiment"
+    itemCount = 3,
+    title = "Market News & Sentiment",
+    dataTimestamp
 }: AlphaNewsSentimentWidgetProps) {
     const articlesToDisplay = initialArticles.slice(0, itemCount);
 
@@ -88,7 +91,12 @@ export default function AlphaNewsSentimentWidget({
                         })}
                     </ul>
                 )}
-                <div className="mt-4 text-center">
+                {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+                    <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                        Sentiment data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+                    </p>
+                )}
+                <div className="mt-1 text-center">
                     <a href="https://www.alphavantage.co" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                         News & Sentiment by Alpha Vantage
                     </a>

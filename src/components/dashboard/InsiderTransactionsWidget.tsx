@@ -1,23 +1,25 @@
-// src/components/dashboard/InsiderTransactionsWidget.tsx
+// File: src/components/dashboard/InsiderTransactionsWidget.tsx
+// (Adding dataTimestamp prop)
 "use client";
 
 import React from 'react';
-import { InsiderTransaction } from '@/lib/api'; // Adjust path
+import { InsiderTransaction } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UsersRound, DollarSign, ArrowRightLeft, Info } from 'lucide-react'; // Using UsersRound
-import { format, parseISO, isValid } from 'date-fns';
+import { UsersRound, DollarSign, ArrowRightLeft, Info } from 'lucide-react';
+import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface InsiderTransactionsWidgetProps {
     initialTransactions?: InsiderTransaction[];
     itemCount?: number;
     title?: string;
+    dataTimestamp?: string; // For "Last Updated" display
 }
 
 const formatTransactionType = (code: string, type: string): string => {
     if (code === 'P' || type.toLowerCase().includes('purchase')) return "Purchase";
     if (code === 'S' || type.toLowerCase().includes('sale')) return "Sale";
-    return type; // Fallback
+    return type;
 };
 
 const getTransactionColor = (code: string): string => {
@@ -29,7 +31,8 @@ const getTransactionColor = (code: string): string => {
 export default function InsiderTransactionsWidget({
     initialTransactions = [],
     itemCount = 5,
-    title = "Recent Insider Trades"
+    title = "Recent Insider Trades",
+    dataTimestamp
 }: InsiderTransactionsWidgetProps) {
     const transactionsToDisplay = initialTransactions.slice(0, itemCount);
 
@@ -43,13 +46,13 @@ export default function InsiderTransactionsWidget({
                  {transactionsToDisplay.length === 0 && (
                      <TooltipProvider delayDuration={100}><Tooltip>
                         <TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs text-xs"><p>No recent insider transactions found or data is unavailable.</p></TooltipContent>
+                        <TooltipContent side="top" className="max-w-xs text-xs"><p>No recent insider transactions found or data is unavailable for the default ticker (AAPL).</p></TooltipContent>
                      </Tooltip></TooltipProvider>
                 )}
             </CardHeader>
             <CardContent>
                 {transactionsToDisplay.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">No recent insider transactions to display.</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">No recent insider transactions to display for {title.includes("AAPL") ? "AAPL" : "the selected ticker"}.</p>
                 )}
                 {transactionsToDisplay.length > 0 && (
                     <ul className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
@@ -71,13 +74,17 @@ export default function InsiderTransactionsWidget({
                                 </div>
                                 <div className="text-xs text-muted-foreground/70 mt-0.5">
                                     Transaction: {isValid(parseISO(tx.transactionDate)) ? format(parseISO(tx.transactionDate), 'MMM d, yyyy') : tx.transactionDate}
-                                    {/* Filing: {isValid(parseISO(tx.filingDate)) ? format(parseISO(tx.filingDate), 'MMM d, yyyy') : tx.filingDate} */}
                                 </div>
                             </li>
                         ))}
                     </ul>
                 )}
-                <div className="mt-4 text-center">
+                {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+                    <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                        Insider data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+                    </p>
+                )}
+                <div className="mt-1 text-center">
                     <a href="https://www.alphavantage.co" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                         Insider transaction data by Alpha Vantage
                     </a>

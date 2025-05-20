@@ -1,3 +1,4 @@
+// File: src/app/(dashboard)/page.tsx
 // src/app/(dashboard)/page.tsx
 import React from 'react';
 import Link from 'next/link';
@@ -191,6 +192,8 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
   const DEFAULT_INSIDER_TICKER_FOR_OVERVIEW = "AAPL"; 
 
   const allRiskSpectrumIndicatorIds = Array.from(new Set( riskSpectrumSetup.flatMap(cat => cat.keyIndicatorsConfig.map(ind => ind.id)) ));
+  
+  const dataFetchTimestamp = new Date().toISOString(); // For "Last Updated" display
 
   const newsApiHeadlinesPromise = fetchNewsHeadlines('business', 'us', 5);
   const alphaNewsPromise = fetchAlphaVantageNewsSentiment(undefined, "economy,financial_markets,earnings", 3); 
@@ -351,12 +354,12 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
               }) : <p className="text-sm text-muted-foreground p-2.5">Snapshot data unavailable.</p>}
             </CardContent>
           </Card>
-          <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} />
-          <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News"/>
-          <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} />
-          <FredReleasesWidget initialReleases={fredReleases} itemCount={5} />
-          <EarningsCalendarWidget initialEvents={earningsEvents} horizon="3month" itemCount={5} />
-          <InsiderTransactionsWidget initialTransactions={insiderTransactionsData} itemCount={5} />
+          <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News" dataTimestamp={dataFetchTimestamp} />
+          <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} dataTimestamp={dataFetchTimestamp} />
+          <FredReleasesWidget initialReleases={fredReleases} itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <EarningsCalendarWidget initialEvents={earningsEvents} horizon="3month" itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <InsiderTransactionsWidget initialTransactions={insiderTransactionsData} itemCount={5} dataTimestamp={dataFetchTimestamp} />
         </aside>
       </div>
     </div>

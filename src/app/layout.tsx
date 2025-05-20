@@ -1,12 +1,14 @@
+// File: src/app/layout.tsx
 // src/app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css"; // Ensure your globals.css has theme variables
+import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "@/components/theme-provider"; // Your custom theme provider
-import { NextAuthProvider } from "@/context/NextAuthProvider"; // NextAuth SessionProvider wrapper
+import { ThemeProvider } from "@/components/theme-provider";
+import { NextAuthProvider } from "@/context/NextAuthProvider";
+import BetaWelcomeBanner from '@/components/BetaWelcomeBanner'; // Added import
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" }); // Added variable for Tailwind
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "EcoDash - Economic Indicators Dashboard",
@@ -28,8 +30,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <TooltipProvider delayDuration={100}> {/* Sensible default delay */}
+            <TooltipProvider delayDuration={100}>
                {children}
+               <BetaWelcomeBanner /> {/* Added banner here */}
             </TooltipProvider>
           </ThemeProvider>
         </NextAuthProvider>

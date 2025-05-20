@@ -1,34 +1,36 @@
-// src/components/dashboard/EarningsCalendarWidget.tsx
+// File: src/components/dashboard/EarningsCalendarWidget.tsx
+// (Adding dataTimestamp prop)
 "use client";
 
 import React from 'react';
-import { EarningsEventAV } from '@/lib/api'; // Ensure this path is correct
+import { EarningsEventAV } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Briefcase, Info } from 'lucide-react';
-import { format, parseISO, isToday, isTomorrow, isValid, isFuture, startOfToday } from 'date-fns'; // Added isFuture, startOfToday
+import { format, parseISO, isToday, isTomorrow, isValid, isFuture, startOfToday, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EarningsCalendarWidgetProps {
     initialEvents?: EarningsEventAV[];
     horizon?: '3month' | '6month' | '12month';
     itemCount?: number;
+    dataTimestamp?: string; // For "Last Updated" display
 }
 
 export default function EarningsCalendarWidget({
     initialEvents = [],
-    horizon = '3month', // This prop is mainly for context in the "no data" message now
-    itemCount = 5,      // Default to 5
+    horizon = '3month',
+    itemCount = 5,
+    dataTimestamp
 }: EarningsCalendarWidgetProps) {
   
-  const today = startOfToday(); // Get start of today for consistent comparison
+  const today = startOfToday();
 
-  // Filter for events that are today or in the future, then sort, then take itemCount
   const upcomingEvents = initialEvents
     .filter(event => {
         if (!event.reportDate || !isValid(parseISO(event.reportDate))) return false;
         return parseISO(event.reportDate) >= today;
     })
-    .sort((a,b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime()); // Ensure sorted chronologically
+    .sort((a,b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime());
   
   const eventsToDisplay = upcomingEvents.slice(0, itemCount);
 
@@ -37,7 +39,7 @@ export default function EarningsCalendarWidget({
     const date = parseISO(dateStr);
     if (isToday(date)) return "Today";
     if (isTomorrow(date)) return "Tomorrow";
-    return format(date, "MMM d"); // Shortened date format
+    return format(date, "MMM d");
   };
 
   return (
@@ -75,7 +77,7 @@ export default function EarningsCalendarWidget({
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <span className="font-semibold text-sm text-foreground hover:text-primary transition-colors truncate cursor-default max-w-[60%]" title={event.name}>
-                                    {event.name || event.symbol} {/* Show name, fallback to symbol */}
+                                    {event.name || event.symbol}
                                 </span>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-xs">
@@ -87,7 +89,7 @@ export default function EarningsCalendarWidget({
                 </div>
                 <div className="flex justify-between items-center text-xs">
                     <span className="text-muted-foreground">Symbol: {event.symbol}</span>
-                    {event.estimate !== null && event.estimate !== undefined ? ( // Check for undefined too
+                    {event.estimate !== null && event.estimate !== undefined ? (
                         <p className="text-muted-foreground">EPS Est: {event.estimate.toFixed(2)} ({event.currency})</p>
                     ) : (
                         <p className="text-muted-foreground">EPS Est: N/A</p>
@@ -97,7 +99,12 @@ export default function EarningsCalendarWidget({
             ))}
           </ul>
         )}
-         <div className="mt-4 text-center">
+        {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+            <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                Earnings data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+            </p>
+        )}
+         <div className="mt-1 text-center">
             <a href="https://www.alphavantage.co" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 Earnings data powered by Alpha Vantage
             </a>

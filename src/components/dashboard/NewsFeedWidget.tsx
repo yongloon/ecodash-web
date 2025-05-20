@@ -1,24 +1,25 @@
+// File: src/components/dashboard/NewsFeedWidget.tsx
 // src/components/dashboard/NewsFeedWidget.tsx
 "use client";
 
-import React from 'react'; // Removed useState, useEffect
-import { NewsArticle } from '@/lib/api'; // Keep the type
+import React from 'react';
+import { NewsArticle } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Newspaper, Info } from 'lucide-react';
-import { formatDistanceToNowStrict } from 'date-fns';
+import { formatDistanceToNowStrict, parseISO, isValid } from 'date-fns'; // Added parseISO, isValid
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NewsFeedWidgetProps {
   initialNews?: NewsArticle[];
   itemCount?: number;
-  // defaultCategory and defaultCountry are no longer needed if data is always passed via props
+  dataTimestamp?: string; // For "Last Updated" display
 }
 
 export default function NewsFeedWidget({
-    initialNews = [], // Default to empty array if no data is passed
-    itemCount = 5
+    initialNews = [],
+    itemCount = 5,
+    dataTimestamp 
 }: NewsFeedWidgetProps) {
-  // Data is now passed via props, no internal fetching or loading/error state needed here
   const articlesToDisplay = initialNews.slice(0, itemCount);
 
   return (
@@ -61,9 +62,9 @@ export default function NewsFeedWidget({
                     {article.title}
                   </h4>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                    <span>{article.source.name}</span>
-                    {article.publishedAt && (
-                        <span>{formatDistanceToNowStrict(new Date(article.publishedAt), { addSuffix: true })}</span>
+                    <span className="truncate max-w-[60%]" title={article.source.name}>{article.source.name}</span>
+                    {article.publishedAt && isValid(parseISO(article.publishedAt)) && (
+                        <span>{formatDistanceToNowStrict(parseISO(article.publishedAt), { addSuffix: true })}</span>
                     )}
                   </div>
                 </a>
@@ -71,7 +72,12 @@ export default function NewsFeedWidget({
             ))}
           </ul>
         )}
-         <div className="mt-4 text-center">
+        {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+            <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                Headlines as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+            </p>
+        )}
+         <div className="mt-1 text-center"> {/* Adjusted margin for NewsAPI link */}
             <a href="https://newsapi.org" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 News powered by NewsAPI.org
             </a>

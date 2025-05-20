@@ -1,29 +1,30 @@
-// src/components/dashboard/EconomicCalendarWidget.tsx
+// File: src/components/dashboard/EconomicCalendarWidget.tsx
+// (Adding dataTimestamp prop)
 "use client";
 
-import React from 'react'; // Removed useState, useEffect
-import { EconomicEvent } from '@/lib/api'; // Keep the type
+import React from 'react';
+import { EconomicEvent } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Info } from 'lucide-react';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EconomicCalendarWidgetProps {
     initialEvents?: EconomicEvent[];
-    daysAhead?: number; // Can still be passed for context, though fetch happens in parent
+    daysAhead?: number;
     itemCount?: number;
+    dataTimestamp?: string; // For "Last Updated" display
 }
 
 export default function EconomicCalendarWidget({
-    initialEvents = [], // Default to empty array
+    initialEvents = [],
     daysAhead = 30,
     itemCount = 5,
+    dataTimestamp
 }: EconomicCalendarWidgetProps) {
-  // Data is now passed via props
   const eventsToDisplay = initialEvents
     .filter(event => event.country === 'US' && (event.impact === 'high' || event.impact === 'medium'))
     .slice(0, itemCount);
-
 
   const getImpactColor = (impact: string | null | undefined) => {
     if (impact === 'high') return 'text-red-500 dark:text-red-400';
@@ -41,9 +42,7 @@ export default function EconomicCalendarWidget({
         {eventsToDisplay.length === 0 && (
             <TooltipProvider delayDuration={100}>
                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
+                    <TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs text-xs">
                         <p>No major US events (high/medium impact) found for the upcoming period. This could be due to API limitations or a quiet period.</p>
                     </TooltipContent>
@@ -80,7 +79,12 @@ export default function EconomicCalendarWidget({
             ))}
           </ul>
         )}
-         <div className="mt-4 text-center">
+        {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+            <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                Calendar data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+            </p>
+        )}
+         <div className="mt-1 text-center">
             <a href="https://finnhub.io" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 Economic data powered by Finnhub.io
             </a>
