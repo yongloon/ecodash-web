@@ -94,7 +94,7 @@ export function getIndicatorSignal(
       if (changeDirection === 'decrease' && prevValue && currentValue < prevValue * 0.90) return { sentiment: 'bullish', strength: 'moderate', message: `Oil prices falling significantly, may ease inflationary pressures.` };
       return { sentiment: 'neutral', message: `Oil price relatively stable.` };
     case 'GOLD_PRICE':
-    case 'PLATINUM_PRICE':
+    case 'SILVER_PRICE': // Add SILVER_PRICE to share logic with GOLD_PRICE
         if (changeDirection === 'increase') return { sentiment: 'bullish', message: `${indicatorName} price increasing; often seen as safe haven or inflation hedge.`};
         if (changeDirection === 'decrease') return { sentiment: 'mixed', message: `${indicatorName} price decreasing; may indicate rising risk appetite or deflationary pressures.`};
         return { sentiment: 'neutral', message: `${indicatorName} price is stable.` };

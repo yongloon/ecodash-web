@@ -102,8 +102,8 @@ export function generateMockData(
   if (indicator.id === 'SP500') { baseValue = 4000 + randomFn() * 1500; volatility = 50 + randomFn() * 70; }
   else if (indicator.id === 'BTC_PRICE_USD') { baseValue = 35000 + randomFn() * 30000; volatility = 1500 + randomFn() * 1500; }
   else if (indicator.id === 'ETH_PRICE_USD') { baseValue = 2000 + randomFn() * 1500; volatility = 150 + randomFn() * 150; }
-  else if (indicator.id === 'GOLD_PRICE' || indicator.id === 'GOLD_PRICE_HISTORICAL') { baseValue = 1800 + randomFn() * 400; volatility = 15 + randomFn() * 15; }
-  else if (indicator.id === 'PLATINUM_PRICE' || indicator.id === 'PLATINUM_PRICE_HISTORICAL') { baseValue = 900 + randomFn() * 200; volatility = 10 + randomFn() * 10; }
+  else if (indicator.id === 'GOLD_PRICE') { baseValue = 1900 + randomFn() * 400; volatility = 20 + randomFn() * 20; } // USD per Ounce
+  else if (indicator.id === 'SILVER_PRICE') { baseValue = 22 + randomFn() * 8; volatility = 0.5 + randomFn() * 1; }
   else if (indicator.id === 'CRYPTO_FEAR_GREED') { baseValue = 50; volatility = 30; }
   else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'ISM/MAN_PMI' || indicator.apiIdentifier === 'NAPM') { 
       baseValue = 45 + randomFn() * 15; 

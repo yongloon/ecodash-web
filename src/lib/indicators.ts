@@ -105,20 +105,32 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
   {
-    id: 'GOLD_PRICE', name: 'Spot Gold Price', categoryKey: 'iii',
-    description: 'Latest spot price of gold in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', frequency: 'Daily',
-    sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjas', apiIdentifier: 'Gold',
-    chartType: 'line', calculation: 'NONE', notes: 'Shows latest price. For history, use Gold Price (Historical).'
+    id: 'GOLD_PRICE', // This will now be Tiingo Spot Gold
+    name: 'Spot Gold Price',
+    categoryKey: 'iii',
+    description: 'Spot price of gold in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce', // Or just USD if Tiingo provides it as XAU/USD
+    frequency: 'Daily',
+    sourceName: 'Tiingo',           // CHANGED
+    apiSource: 'Tiingo',            // CHANGED
+    apiIdentifier: 'XAUUSD',        // ASSUMPTION - VERIFY THIS TICKER ON TIINGO
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Data sourced from Tiingo. Represents daily closing/spot price.'
   },
   {
-    id: 'PLATINUM_PRICE', name: 'Spot Platinum Price', categoryKey: 'iii',
-    description: 'Latest spot price of platinum in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', frequency: 'Daily',
-    sourceName: 'API-Ninjas.com',
-    apiSource: 'ApiNinjas', apiIdentifier: 'Platinum',
-    chartType: 'line', calculation: 'NONE', notes: 'Shows latest price. For history, use Platinum Price (Historical).'
+    id: 'SILVER_PRICE', // NEW - Tiingo Spot Silver
+    name: 'Spot Silver Price',
+    categoryKey: 'iii',
+    description: 'Spot price of silver in U.S. Dollars per troy ounce.',
+    unit: 'USD per Ounce', // Or just USD
+    frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'XAGUSD',        // ASSUMPTION - VERIFY THIS TICKER ON TIINGO
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Data sourced from Tiingo. Represents daily closing/spot price.'
   },
  
 

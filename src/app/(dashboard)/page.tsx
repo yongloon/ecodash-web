@@ -6,22 +6,28 @@ import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata, indicatorCategories, getCategoryBySlug } from '@/lib/indicators';
 import { fetchIndicatorData } from '@/lib/mockData';
 import {
-  fetchNewsHeadlines,
-  fetchEconomicCalendar, // Finnhub
+  fetchNewsHeadlines, 
+  fetchEconomicCalendar, 
   fetchAlphaVantageEarningsCalendar,
-  fetchFredReleaseCalendar, // FRED Releases
-  NewsArticle,
+  fetchFredReleaseCalendar, 
+  fetchAlphaVantageNewsSentiment,     
+  fetchAlphaVantageInsiderTransactions, 
+  NewsArticle, 
   EconomicEvent,
   EarningsEventAV,
-  FredReleaseDate // FRED Release Date type
+  FredReleaseDate,
+  NewsSentimentArticle,            
+  InsiderTransaction                
 } from '@/lib/api';
 
 // UI Components
 import SummaryCard from '@/components/dashboard/SummaryCard';
-import NewsFeedWidget from '@/components/dashboard/NewsFeedWidget';
+import NewsFeedWidget from '@/components/dashboard/NewsFeedWidget'; 
+import AlphaNewsSentimentWidget from '@/components/dashboard/AlphaNewsSentimentWidget'; 
 import EconomicCalendarWidget from '@/components/dashboard/EconomicCalendarWidget';
 import EarningsCalendarWidget from '@/components/dashboard/EarningsCalendarWidget';
 import FredReleasesWidget from '@/components/dashboard/FredReleasesWidget';
+import InsiderTransactionsWidget from '@/components/dashboard/InsiderTransactionsWidget';
 import AssetRiskCategoryCard, { KeyIndicatorDisplayInfo } from '@/components/dashboard/AssetRiskCategoryCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,89 +36,50 @@ import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
 
 
-export const revalidate = 300; // Revalidate every 5 minutes
+export const revalidate = 300; 
 
-// Configuration for Overview Page
 const headlineIndicatorIds = [
-    'GDP_NOMINAL',
-    'UNRATE',
-    'CPI_YOY_PCT',
-    'FEDFUNDS',
-    'PMI', 
-    'RETAIL_SALES_MOM_PCT',
-    'US10Y',
-    'SP500',
-    'M2_YOY_PCT',
+    'GDP_NOMINAL', 'UNRATE', 'CPI_YOY_PCT', 'FEDFUNDS', 'PMI', 
+    'RETAIL_SALES_MOM_PCT', 'US10Y', 'SP500', 'M2_YOY_PCT',
 ];
-const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'OIL_WTI', 'GOLD_PRICE']; // Using non-historical GOLD_PRICE
+const marketSnapshotIndicatorIds = ['SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'OIL_WTI', 'GOLD_PRICE', 'SILVER_PRICE'];
 const MAX_FAVORITES_ON_OVERVIEW = 3;
 
 const riskSpectrumSetup = [
   {
-    title: "🟢 Low-Risk Assets",
-    iconLucide: Shield,
+    title: "🟢 Low-Risk Assets", iconLucide: Shield,
     description: "Typically less volatile; often sought for capital preservation or income during uncertainty. Sensitive to interest rate changes.",
     keyIndicatorsConfig: [
-      {
-        id: 'TLT_ETF', 
-        explanation: "Tracks long-term U.S. Treasury bonds. Price generally moves inversely to long-term interest rates."
-      },
-      {
-        id: 'LQD_ETF', 
-        explanation: "Tracks investment-grade corporate bonds, offering higher yields than Treasuries with moderate credit risk."
-      },
-      {
-        id: 'GOLD_PRICE', // Using non-historical GOLD_PRICE
-        explanation: "Traditionally seen as a store of value and hedge against inflation or geopolitical risk. (Latest Spot Price)"
-      },
+      { id: 'TLT_ETF', explanation: "Tracks long-term U.S. Treasury bonds." },
+      { id: 'LQD_ETF', explanation: "Tracks investment-grade corporate bonds." },
+      { id: 'GOLD_PRICE', explanation: "Spot Gold Price (via Tiingo)." },
     ]
   },
   {
-    title: "⚖️ Medium-Risk Assets",
-    iconLucide: Scale,
-    description: "Generally offer a balance of potential income and growth; moderately affected by economic cycles and broad market sentiment.",
+    title: "⚖️ Medium-Risk Assets", iconLucide: Scale,
+    description: "Generally offer a balance of potential income and growth; moderately affected by economic cycles.",
     keyIndicatorsConfig: [
-      {
-        id: 'SP500', 
-        explanation: "Tracks 500 large-cap U.S. stocks, representing broad market performance and economic health."
-      },
-      {
-        id: 'VNQ_ETF', 
-        explanation: "Represents diversified real estate investments (REITs), sensitive to interest rates and economic growth."
-      },
-      {
-        id: 'PLATINUM_PRICE', // Using non-historical PLATINUM_PRICE
-        explanation: "Industrial precious metal, price influenced by automotive demand (catalytic converters) and industrial output. (Latest Spot Price)"
-      },
+      { id: 'SP500', explanation: "Tracks 500 large-cap U.S. stocks." },
+      { id: 'VNQ_ETF', explanation: "Represents diversified real estate investments (REITs)." },
+      { id: 'SILVER_PRICE', explanation: "Spot Silver Price (via Tiingo)." },
     ]
   },
   {
-    title: "🚀 High-Risk Assets",
-    iconLucide: TrendingUp,
-    description: "Can offer high growth potential but come with greater volatility; highly sensitive to market sentiment, liquidity, and risk appetite.",
+    title: "🚀 High-Risk Assets", iconLucide: TrendingUp,
+    description: "Can offer high growth potential but come with greater volatility; highly sensitive to market sentiment.",
     keyIndicatorsConfig: [
-      {
-        id: 'ARKK_ETF', 
-        explanation: "Invests in speculative, disruptive innovation companies, known for high growth potential and volatility."
-      },
-      {
-        id: 'BTC_PRICE_USD', 
-        explanation: "Highly volatile cryptocurrency, driven by adoption, sentiment, and macroeconomic factors."
-      },
-      {
-        id: 'TQQQ_ETF', 
-        explanation: "Leveraged ETF seeking 3x daily return of the Nasdaq-100 Index, inherently very high risk and volatility."
-      },
+      { id: 'ARKK_ETF', explanation: "Invests in speculative, disruptive innovation companies." },
+      { id: 'BTC_PRICE_USD', explanation: "Highly volatile cryptocurrency." },
+      { id: 'TQQQ_ETF', explanation: "Leveraged ETF seeking 3x daily return of the Nasdaq-100." },
     ]
   },
 ];
-
 
 const getSparklineDataLength = (frequency?: string): number => {
     if (frequency === 'Daily' || frequency === 'Weekly') return 30;
     if (frequency === 'Monthly') return 12;
     if (frequency === 'Quarterly') return 8;
-    return 15; // Default
+    return 15;
 };
 
 const fetchDataForRiskAndSummaryLists = async (
@@ -131,130 +98,87 @@ const fetchDataForRiskAndSummaryLists = async (
     change7D?: number | null;
 }>> => {
   if (!ids || ids.length === 0) return [];
-
   const indicatorsWithOriginalId = ids.map(id => ({ originalId: id, indicator: getIndicatorById(id) }));
 
   return Promise.all(
       indicatorsWithOriginalId
       .filter(item => {
-          if (!item.indicator) {
-              console.warn(`[OverviewPage Fetch Helper] Indicator ID not found during list fetch: ${item.originalId}`);
-              return false;
-          }
+          if (!item.indicator) { return false; }
           return true;
       })
       .map(async ({ indicator }) => { 
           const isGlobalAsset = [ 
-            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 
-            'GOLD_PRICE', 'PLATINUM_PRICE', // Using non-historical
+            'SP500', 'BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GOLD_PRICE', 'SILVER_PRICE', 
             'OIL_WTI', 'TLT_ETF', 'LQD_ETF', 'VNQ_ETF', 'ARKK_ETF', 'TQQQ_ETF',
-            'US10Y', 'VIX', 'M2_YOY_PCT', 
-            'PMI' 
+            'US10Y', 'VIX', 'M2_YOY_PCT', 'PMI' 
           ].includes(indicator.id);
           const shouldFetch = country === 'US' || indicator.apiSource === 'Mock' || isGlobalAsset;
 
           let latestValue: TimeSeriesDataPoint | null = null;
           let previousValue: TimeSeriesDataPoint | null = null;
-          let sparklineData: TimeSeriesDataPoint[] = [];
+          let sparklineDataToUse: TimeSeriesDataPoint[] = [];
           let currentValueDisplay = "N/A";
           let trendIconName: 'up' | 'down' | 'neutral' | undefined;
           let trendColor: string | undefined;
           let change7D: number | null = null;
 
           if (shouldFetch) {
-              let historyFetchRange = { ...dateRange };
+              let historyFetchRange = { ...dateRange }; 
+              let mainFetchedData: TimeSeriesDataPoint[] = [];
+
               if (fetchExtraForChanges && indicator.frequency === 'Daily') {
-                const today = new Date();
-                historyFetchRange.startDate = format(subDays(today, 40), 'yyyy-MM-dd');
-                historyFetchRange.endDate = format(today, 'yyyy-MM-dd');
+                  const today = new Date();
+                  historyFetchRange.startDate = format(subDays(today, 40), 'yyyy-MM-dd');
+                  historyFetchRange.endDate = format(today, 'yyyy-MM-dd');
               }
-
-              // For ApiNinjas latest price, dateRange might not be used by the fetcher,
-              // but historicalData might be an array of one point.
-              const historicalData = await fetchIndicatorData(indicator, historyFetchRange);
-              latestValue = historicalData.length > 0 ? historicalData[historicalData.length - 1] : null;
+              mainFetchedData = await fetchIndicatorData(indicator, historyFetchRange);
+              latestValue = mainFetchedData.length > 0 ? mainFetchedData[mainFetchedData.length - 1] : null;
+              previousValue = mainFetchedData.length > 1 ? mainFetchedData[mainFetchedData.length - 2] : null;
+              sparklineDataToUse = mainFetchedData; 
               
-              // For single-point data (like latest spot price), previousValue might be null unless
-              // fetchIndicatorData or this logic is adapted to get a prior point specifically.
-              previousValue = historicalData.length > 1 ? historicalData[historicalData.length - 2] : null;
-
-
               if (latestValue?.value !== null && latestValue?.value !== undefined) {
-                  let minDigits = 0;
-                  let maxDigits = 2;
-
-                  if (indicator.unit === '%') {
-                      minDigits = 1;
-                      maxDigits = 2;
-                  } else if (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('ounce') || indicator.unit === 'Index Value') {
-                      minDigits = 2;
-                      maxDigits = 2;
-                  }
-                  
-                  if (indicator.id === 'BTC_PRICE_USD' || indicator.id === 'ETH_PRICE_USD') {
-                      minDigits = 0;
-                      maxDigits = 0;
-                  } else if (indicator.id === 'CRYPTO_FEAR_GREED') {
-                      minDigits = 0;
-                      maxDigits = 0;
-                  }
-                  
-                  if (maxDigits < minDigits) {
-                      maxDigits = minDigits;
-                  }
-
-                  currentValueDisplay = `${latestValue.value.toLocaleString(undefined, {
-                      minimumFractionDigits: minDigits,
-                      maximumFractionDigits: maxDigits,
-                  })}`;
-
-                if (previousValue?.value !== null && previousValue?.value !== undefined) {
+                  let minDigits = 0; let maxDigits = 2;
+                  if (indicator.unit === '%') { minDigits = 1; maxDigits = 2; } 
+                  else if (indicator.unit?.toLowerCase().includes('usd') || indicator.unit?.toLowerCase().includes('ounce') || indicator.unit === 'Index Value') { minDigits = 2; maxDigits = 2; }
+                  if (indicator.id === 'BTC_PRICE_USD' || indicator.id === 'ETH_PRICE_USD' || indicator.id === 'CRYPTO_FEAR_GREED') { minDigits = 0; maxDigits = 0;} 
+                  else if (indicator.id === 'GOLD_PRICE' || indicator.id === 'SILVER_PRICE') { minDigits = 2; maxDigits = 2; }
+                  if (maxDigits < minDigits) maxDigits = minDigits;
+                  currentValueDisplay = `${latestValue.value.toLocaleString(undefined, { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits, })}`;
+                  if (previousValue?.value !== null && previousValue?.value !== undefined) {
                     if (latestValue.value > previousValue.value) { trendIconName = 'up'; trendColor = 'text-[hsl(var(--chart-green))]'; }
                     else if (latestValue.value < previousValue.value) { trendIconName = 'down'; trendColor = 'text-[hsl(var(--chart-red))]'; }
                     else { trendIconName = 'neutral'; trendColor = 'text-muted-foreground'; }
-                }
+                  }
               }
-
-              if (fetchExtraForChanges && latestValue?.date && latestValue.value !== null && historicalData.length > 0 && indicator.frequency === 'Daily') {
-                const findValueDaysAgo = (days: number) => {
-                    const latestDate = parseISO(latestValue!.date!);
-                    const targetDate = subDays(latestDate, days);
-                    let closestPoint: TimeSeriesDataPoint | undefined = undefined; 
-                    let minAbsDiff = Infinity;
-
-                    for (let i = historicalData.length - 1; i >= 0; i--) {
-                        const point = historicalData[i]; 
+              
+              const dataFor7DChange = mainFetchedData;
+              if (fetchExtraForChanges && latestValue?.date && latestValue.value !== null && dataFor7DChange.length > 0 && indicator.frequency === 'Daily') {
+                const findValueDaysAgo = (days: number, sourceData: TimeSeriesDataPoint[]) => {
+                    const latestDate = parseISO(latestValue!.date!); const targetDate = subDays(latestDate, days);
+                    let closestPoint: TimeSeriesDataPoint | undefined = undefined; let minAbsDiff = Infinity;
+                    for (let i = sourceData.length - 1; i >= 0; i--) {
+                        const point = sourceData[i]; 
                         if (!point.date || point.value === null || point.date === latestValue!.date!) continue;
-                        
                         const pointDate = parseISO(point.date); 
                         if (!isValid(pointDate) || pointDate > latestDate) continue;
-
                         const currentAbsDiff = Math.abs(differenceInDays(targetDate, pointDate));
-                        
-                        if (currentAbsDiff < minAbsDiff) { 
-                            minAbsDiff = currentAbsDiff; 
-                            closestPoint = point; 
-                        } else if (currentAbsDiff === minAbsDiff && closestPoint && pointDate > parseISO(closestPoint.date)) {
-                            closestPoint = point; 
-                        }
+                        if (currentAbsDiff < minAbsDiff) { minAbsDiff = currentAbsDiff; closestPoint = point; } 
+                        else if (currentAbsDiff === minAbsDiff && closestPoint && pointDate > parseISO(closestPoint.date)) { closestPoint = point; }
                         if (pointDate < subDays(targetDate, days / 2) && minAbsDiff <= days / 2) break;
-                    } 
-                    return closestPoint;
+                    } return closestPoint;
                 };
-                const value7DaysAgo = findValueDaysAgo(7);
+                const value7DaysAgo = findValueDaysAgo(7, dataFor7DChange);
                 if (value7DaysAgo?.value && latestValue.value) {
                     change7D = ((latestValue.value - value7DaysAgo.value) / Math.abs(value7DaysAgo.value === 0 ? 1 : value7DaysAgo.value)) * 100;
                 }
               }
               const sparklineLength = getSparklineDataLength(indicator.frequency);
-              // If historicalData has only one point (e.g. from ApiNinjas latest), sparklineData will also have one.
-              sparklineData = historicalData.slice(Math.max(0, historicalData.length - sparklineLength));
+              sparklineDataToUse = sparklineDataToUse.slice(Math.max(0, sparklineDataToUse.length - sparklineLength));
           }
-          return { indicator, latestValue, previousValue, sparklineData, currentValueDisplay, trendIconName, trendColor, change7D };
+          return { indicator, latestValue, previousValue, sparklineData: sparklineDataToUse, currentValueDisplay, trendIconName, trendColor, change7D };
       })
   );
 };
-
 
 export default async function OverviewPage({ searchParams }: { searchParams?: { country?: string; startDate?: string; endDate?: string; }; }) {
   const session = await getServerSession(authOptions);
@@ -264,25 +188,20 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
   const favoriteIndicatorIdsFromSession: string[] = userSessionData?.favoriteIndicatorIds || [];
   const country = searchParams?.country || 'US';
   const dateRange = { startDate: searchParams?.startDate, endDate: searchParams?.endDate };
+  const DEFAULT_INSIDER_TICKER_FOR_OVERVIEW = "AAPL"; 
 
-  const allRiskSpectrumIndicatorIds = Array.from(new Set(
-    riskSpectrumSetup.flatMap(category => category.keyIndicatorsConfig.map(ind => ind.id))
-  ));
+  const allRiskSpectrumIndicatorIds = Array.from(new Set( riskSpectrumSetup.flatMap(cat => cat.keyIndicatorsConfig.map(ind => ind.id)) ));
 
-  const newsArticlesPromise = fetchNewsHeadlines('business', 'us', 5);
+  const newsApiHeadlinesPromise = fetchNewsHeadlines('business', 'us', 5);
+  const alphaNewsPromise = fetchAlphaVantageNewsSentiment(undefined, "economy,financial_markets,earnings", 3); 
   const economicEventsPromise = fetchEconomicCalendar(30);
   const fredReleasesPromise = fetchFredReleaseCalendar(30);
-  const earningsEventsPromise = fetchAlphaVantageEarningsCalendar('3month', undefined);
+  const earningsEventsPromise = fetchAlphaVantageEarningsCalendar('3month', undefined); 
+  const insiderTradesPromise = fetchAlphaVantageInsiderTransactions(DEFAULT_INSIDER_TICKER_FOR_OVERVIEW, 5); 
 
   const [
-    summaryData,
-    marketSnapshotData,
-    favoritesInitialData,
-    riskSpectrumFetchedData,
-    newsArticles,
-    economicEvents,
-    fredReleases,
-    earningsEvents
+    summaryData, marketSnapshotData, favoritesInitialData, riskSpectrumFetchedData,
+    newsApiArticles, alphaNewsArticles, economicEvents, fredReleases, earningsEvents, insiderTransactionsData
   ] = await Promise.all([
     fetchDataForRiskAndSummaryLists(headlineIndicatorIds, country, dateRange),
     fetchDataForRiskAndSummaryLists(marketSnapshotIndicatorIds, country, dateRange, true),
@@ -290,39 +209,25 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
         ? fetchDataForRiskAndSummaryLists(favoriteIndicatorIdsFromSession.slice(0, MAX_FAVORITES_ON_OVERVIEW), country, dateRange)
         : Promise.resolve([]),
     fetchDataForRiskAndSummaryLists(allRiskSpectrumIndicatorIds, country, dateRange),
-    newsArticlesPromise,
-    economicEventsPromise,
-    fredReleasesPromise,
-    earningsEventsPromise,
+    newsApiHeadlinesPromise, alphaNewsPromise, economicEventsPromise, fredReleasesPromise, earningsEventsPromise, insiderTradesPromise,
   ]);
 
   const favoritesSnippetData = favoritesInitialData;
-
   const processedRiskSpectrumDisplayData = riskSpectrumSetup.map(categoryConfig => {
     const indicatorsDisplayData: KeyIndicatorDisplayInfo[] = categoryConfig.keyIndicatorsConfig
       .map(cfg => {
         const fetchedIndData = riskSpectrumFetchedData.find(d => d.indicator.id === cfg.id);
         const indicatorMeta = getIndicatorById(cfg.id);
         if (!indicatorMeta) return null;
-
         const categoryInfo = getCategoryBySlug(indicatorMeta.categoryKey);
-        const link = (categoryInfo)
-          ? `/category/${categoryInfo.slug}?indicator=${indicatorMeta.id}`
-          : `/dashboard`; 
-
+        const link = categoryInfo ? `/category/${categoryInfo.slug}?indicator=${indicatorMeta.id}` : `/dashboard`; 
         return {
-          id: cfg.id,
-          name: indicatorMeta.name,
-          unit: indicatorMeta.unit || '',
-          link: link,
+          id: cfg.id, name: indicatorMeta.name, unit: indicatorMeta.unit || '', link,
           currentValueDisplay: fetchedIndData?.currentValueDisplay || "N/A",
-          trendIconName: fetchedIndData?.trendIconName,
-          trendColor: fetchedIndData?.trendColor,
+          trendIconName: fetchedIndData?.trendIconName, trendColor: fetchedIndData?.trendColor,
           explanation: cfg.explanation,
         };
-      })
-      .filter((item): item is KeyIndicatorDisplayInfo => item !== null);
-      
+      }).filter((item): item is KeyIndicatorDisplayInfo => item !== null);
     return { ...categoryConfig, indicatorsDisplayData };
   });
 
@@ -378,15 +283,8 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
             <div className="space-y-6">
               {processedRiskSpectrumDisplayData.map(category => {
                 if (category.indicatorsDisplayData.length === 0) return null;
-                return (
-                  <AssetRiskCategoryCard
-                    key={category.title}
-                    title={category.title}
-                    description={category.description}
-                    indicatorsDisplayData={category.indicatorsDisplayData}
-                  />
-                );
-                })}
+                return ( <AssetRiskCategoryCard key={category.title} title={category.title} description={category.description} indicatorsDisplayData={category.indicatorsDisplayData} /> );
+              })}
             </div>
           </section>
         </div>
@@ -402,8 +300,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
                   let displayChangeLabel = "Prev";
 
                   if (change7D !== null && change7D !== undefined) {
-                      displayChangeValue = change7D;
-                      displayChangeLabel = "7D";
+                      displayChangeValue = change7D; displayChangeLabel = "7D";
                       if (change7D > 0) { trendIconNameToUse = 'up'; trendColorForSnapshot = 'text-[hsl(var(--chart-green))]'; }
                       else if (change7D < 0) { trendIconNameToUse = 'down'; trendColorForSnapshot = 'text-[hsl(var(--chart-red))]'; }
                       else { trendIconNameToUse = 'neutral'; trendColorForSnapshot = 'text-muted-foreground'; }
@@ -421,13 +318,10 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
 
                   const categoryInfo = getCategoryBySlug(indicator.categoryKey);
                   let indicatorLink = '/dashboard';
-                    if (categoryInfo) {
-                        indicatorLink = `/category/${categoryInfo.slug}?indicator=${indicator.id}`;
-                    } else if (indicator.id) {
-                        const financialCategory = getCategoryBySlug('financial-conditions'); // Default to 'financial-conditions' for market assets
-                        if (financialCategory) {
-                            indicatorLink = `/category/${financialCategory.slug}?indicator=${indicator.id}`;
-                        } else { console.warn(`Market Snapshot: Category 'financial-conditions' not found for ${indicator.id}.`); }
+                    if (categoryInfo) indicatorLink = `/category/${categoryInfo.slug}?indicator=${indicator.id}`;
+                    else if (indicator.id) {
+                        const financialCategory = getCategoryBySlug('financial-conditions'); 
+                        if (financialCategory) indicatorLink = `/category/${financialCategory.slug}?indicator=${indicator.id}`;
                     }
 
                   return (
@@ -440,11 +334,11 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
                         </div>
                         <div className="text-lg font-semibold text-foreground">
                             {latestValue?.value?.toLocaleString(undefined, {
-                                minimumFractionDigits: indicator.id === 'CRYPTO_FEAR_GREED' ? 0 : (indicator.unit === '%' ? 1:0),
+                                minimumFractionDigits: indicator.id === 'CRYPTO_FEAR_GREED' ? 0 : (indicator.unit === '%' ? 1: (indicator.id === 'GOLD_PRICE' || indicator.id === 'SILVER_PRICE' ? 2 : 0)),
                                 maximumFractionDigits: 2
                             }) ?? 'N/A'}
                             <span className="text-xs ml-1 text-muted-foreground">
-                                {indicator.unit !== 'Index (0-100)' && indicator.unit !== 'Index Value' ? indicator.unit : ''}
+                                {indicator.unit !== 'Index (0-100)' && indicator.unit !== 'Index Value' && indicator.unit !== 'USD per Ounce' ? indicator.unit : ''} 
                             </span>
                         </div>
                         {displayChangeValue !== null && (
@@ -457,10 +351,12 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
               }) : <p className="text-sm text-muted-foreground p-2.5">Snapshot data unavailable.</p>}
             </CardContent>
           </Card>
-          <NewsFeedWidget initialNews={newsArticles} itemCount={5} />
+          <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} />
+          <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News"/>
           <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} />
-          <FredReleasesWidget initialReleases={fredReleases} itemCount={4} />
+          <FredReleasesWidget initialReleases={fredReleases} itemCount={5} />
           <EarningsCalendarWidget initialEvents={earningsEvents} horizon="3month" itemCount={5} />
+          <InsiderTransactionsWidget initialTransactions={insiderTransactionsData} itemCount={5} />
         </aside>
       </div>
     </div>
