@@ -1,26 +1,41 @@
-// File: src/components/dashboard/NewsFeedWidget.tsx
 // src/components/dashboard/NewsFeedWidget.tsx
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { NewsArticle } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Newspaper, Info } from 'lucide-react';
-import { formatDistanceToNowStrict, parseISO, isValid } from 'date-fns'; // Added parseISO, isValid
+import { formatDistanceToNowStrict, parseISO, isValid } from 'date-fns'; // Import parseISO and isValid
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NewsFeedWidgetProps {
   initialNews?: NewsArticle[];
   itemCount?: number;
-  dataTimestamp?: string; // For "Last Updated" display
 }
+
+// Helper function to format time, to be used client-side
+const formatPublishedTimeClient = (publishedAt: string | null | undefined): string => {
+  if (!publishedAt) return '';
+  try {
+    const date = parseISO(publishedAt);
+    if (!isValid(date)) return 'Invalid date';
+    return formatDistanceToNowStrict(date, { addSuffix: true });
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    return 'Error in date';
+  }
+};
 
 export default function NewsFeedWidget({
     initialNews = [],
-    itemCount = 5,
-    dataTimestamp 
+    itemCount = 5
 }: NewsFeedWidgetProps) {
   const articlesToDisplay = initialNews.slice(0, itemCount);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true); // This will set to true only on the client-side after mount
+  }, []);
 
   return (
     <Card>
@@ -30,16 +45,10 @@ export default function NewsFeedWidget({
           Latest Headlines
         </CardTitle>
         {articlesToDisplay.length === 0 && (
-            <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                        <p>No articles found. This could be due to API limitations or no recent news matching the criteria.</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <TooltipProvider delayDuration={100}><Tooltip>
+                <TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs"><p>No articles found. This could be due to API limitations or no recent news matching the criteria.</p></TooltipContent>
+            </Tooltip></TooltipProvider>
         )}
       </CardHeader>
       <CardContent>
@@ -62,9 +71,14 @@ export default function NewsFeedWidget({
                     {article.title}
                   </h4>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                    <span className="truncate max-w-[60%]" title={article.source.name}>{article.source.name}</span>
-                    {article.publishedAt && isValid(parseISO(article.publishedAt)) && (
-                        <span>{formatDistanceToNowStrict(parseISO(article.publishedAt), { addSuffix: true })}</span>
+                    <span>{article.source.name}</span>
+                    {/* Conditional rendering for the timestamp */}
+                    {isClient && article.publishedAt ? (
+                        <span>{formatPublishedTimeClient(article.publishedAt)}</span>
+                    ) : (
+                        // You can put a placeholder here or render nothing server-side for this specific part
+                        // For a "time ago" string, it's often better to render it only on client
+                        <span> </span> // Or a very generic placeholder like "Recently"
                     )}
                   </div>
                 </a>
@@ -72,12 +86,7 @@ export default function NewsFeedWidget({
             ))}
           </ul>
         )}
-        {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
-            <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
-                Headlines as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
-            </p>
-        )}
-         <div className="mt-1 text-center"> {/* Adjusted margin for NewsAPI link */}
+         <div className="mt-4 text-center">
             <a href="https://newsapi.org" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 News powered by NewsAPI.org
             </a>
