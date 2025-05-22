@@ -366,7 +366,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
 
           <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} />
           {/* <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News"/> Defer for simpler MVP */}
-          <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} />
+         {/*  <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} /> */}
           <FredReleasesWidget initialReleases={fredReleases} itemCount={5} />
           <EarningsCalendarWidget initialEvents={earningsEvents} horizon="3month" itemCount={5} />
           {/* <InsiderTransactionsWidget initialTransactions={insiderTransactionsData} itemCount={5} /> Defer for simpler MVP */}
