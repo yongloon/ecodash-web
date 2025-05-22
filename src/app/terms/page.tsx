@@ -1,74 +1,79 @@
-// File: src/app/terms/page.tsx
-// NEW FILE
+// src/app/terms/page.tsx
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // If you want a back button
 
 export default function TermsPage() {
+  const appName = "EcoDash";
+  const contactEmail = "support@example.com"; // REPLACE with your actual support email
+  const lastUpdated = "July 27, 2024"; // REPLACE with the current date
+
   return (
-    <div className="container mx-auto max-w-3xl py-8 md:py-12 px-4">
-      <header className="py-4 sm:py-6 border-b mb-8">
-        <div className="container mx-auto px-0 flex justify-between items-center">
-            <Link href="/" className="text-xl sm:text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
-                EcoDash
-            </Link>
-            <Link href="/dashboard">
-                <Button variant="outline" size="sm">← Back to Dashboard</Button>
-            </Link>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <Link href="/" className="text-xl sm:text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
+            {appName}
+          </Link>
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm">← Back to Dashboard</Button>
+          </Link>
         </div>
       </header>
-      <article className="prose dark:prose-invert max-w-none"> {/* Added prose for styling */}
-        <h1>Terms of Service (Beta Program)</h1>
-        <p>Last Updated: {new Date().toLocaleDateString()}</p>
-        <p>Welcome to the EcoDash Beta Program ("Service"). These Terms of Service ("Terms") govern your access to and use of our beta software, website, and related services. By accessing or using the Service, you agree to be bound by these Terms.</p>
 
-        <h2>1. Beta Service Disclaimer</h2>
-        <p><strong>"AS IS" Basis:</strong> You acknowledge and agree that the Service is a beta version and is provided on an "as is" and "as available" basis. It is currently under development and may contain bugs, errors, omissions, and inaccuracies. The Service may be incomplete and may not function as expected or be entirely stable.</p>
-        <p><strong>No Guarantees:</strong> We make no warranties, express or implied, regarding the reliability, availability, timeliness, security, accuracy, or performance of the Service. Features may be added, modified, or removed without prior notice. Your use of the Service is solely at your own risk.</p>
+      <main className="container mx-auto max-w-3xl py-8 md:py-12 px-4">
+        <h1 className="text-3xl md:text-4xl font-bold mb-6 text-center">Terms of Service</h1>
+        <p className="text-sm text-muted-foreground mb-8 text-center">Last Updated: {lastUpdated}</p>
 
-        <h2>2. Eligibility and Access</h2>
-        <p>You must be at least 13 years old to use the Service. If you are using the Service on behalf of an organization, you represent and warrant that you have the authority to bind that organization to these Terms.</p>
+        <section className="space-y-6">
+          <p>Welcome to {appName}! These Terms of Service ("Terms") govern your access to and use of the {appName} website, applications, and services (collectively, the "Service"). Please read these Terms carefully before using the Service.</p>
 
-        <h2>3. User Accounts</h2>
-        <p>To access certain features, you may need to register for an account. You agree to provide accurate, current, and complete information during registration and to update such information to keep it accurate. You are responsible for safeguarding your password and for all activities that occur under your account. You agree to notify us immediately of any unauthorized use of your account.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">1. Acceptance of Terms</h2>
+          <p>By accessing or using the Service, you agree to be bound by these Terms. If you disagree with any part of the terms, then you may not access the Service. This Service is currently in a Beta phase, and as such, features and functionality may change, and unforeseen issues may arise.</p>
 
-        <h2>4. User Conduct</h2>
-        <p>You agree not to use the Service to:</p>
-        <ul>
-            <li>Violate any applicable laws or regulations.</li>
-            <li>Infringe upon the rights of others, including intellectual property rights.</li>
-            <li>Transmit any harmful, offensive, or illegal content.</li>
-            <li>Attempt to gain unauthorized access to our systems or other users' accounts.</li>
-            <li>Disrupt or interfere with the security or performance of the Service.</li>
-        </ul>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">2. Beta Service</h2>
+          <p>You acknowledge that the Service is a beta version and is made available on an "As Is" and "As Available" basis for the purpose of providing {appName} with feedback on the quality and usability of the Service. The Service may contain bugs, errors, and other problems. You assume all risks and all costs associated with your use of the Service.</p>
 
-        <h2>5. Feedback</h2>
-        <p>We welcome and encourage you to provide feedback, comments, suggestions, and bug reports regarding the Service ("Feedback"). By submitting Feedback, you grant EcoDash a perpetual, irrevocable, non-exclusive, worldwide, royalty-free, fully paid-up license to use, reproduce, modify, create derivative works from, distribute, display, and otherwise exploit such Feedback for any purpose, including incorporation into our products and services, without any compensation or attribution to you.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">3. Use of the Service</h2>
+          <p>You agree to use the Service only for lawful purposes and in accordance with these Terms. You are responsible for ensuring that your use of the Service complies with all applicable laws, rules, and regulations.</p>
+          <p>You agree not to use the Service:</p>
+          <ul className="list-disc list-inside space-y-1 pl-4 text-muted-foreground">
+            <li>In any way that violates any applicable national or international law or regulation.</li>
+            <li>To attempt to gain unauthorized access to, interfere with, damage, or disrupt any parts of the Service, the server on which the Service is stored, or any server, computer, or database connected to the Service.</li>
+            <li>To engage in any other conduct that restricts or inhibits anyone's use or enjoyment of the Service, or which, as determined by us, may harm {appName} or users of the Service.</li>
+          </ul>
 
-        <h2>6. Data Disclaimer & No Financial Advice</h2>
-        <p className="font-semibold text-destructive dark:text-red-400">IMPORTANT: All data, charts, analyses, signals, and information provided by EcoDash are for informational and educational purposes ONLY. They should NOT be considered as financial advice, investment recommendations, trading advice, or an endorsement of any particular investment, security, or strategy. EcoDash is NOT a financial advisor, broker, or dealer.</p>
-        <p>The economic and financial data presented may be sourced from third-party providers and may contain delays, inaccuracies, or omissions. We do not guarantee the accuracy, completeness, timeliness, or reliability of any data or information provided by the Service. You should always conduct your own thorough research and consult with a qualified, licensed financial professional before making any investment or financial decisions. Decisions based on information contained within the Service are your sole responsibility, and you agree that EcoDash and its creators are not liable for any losses, damages, or costs arising from your use of or reliance on the information provided.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">4. User Accounts</h2>
+          <p>If you create an account on the Service, you are responsible for maintaining the security of your account and you are fully responsible for all activities that occur under the account. You must immediately notify us of any unauthorized uses of your account or any other breaches of security.</p>
 
-        <h2>7. Subscription and Payments (If Applicable)</h2>
-        <p>If the Service offers paid subscription plans, the terms related to payments, fees, renewals, and cancellations will be governed by our payment processor's terms (Stripe) and specific details provided at the time of subscription. We reserve the right to change our subscription fees and plans with reasonable notice.</p>
+          {(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY) && (
+            <>
+              <h2 className="text-2xl font-semibold pt-4 border-t mt-8">5. Subscriptions and Payments (If Applicable)</h2>
+              <p>If you subscribe to paid features of the Service, you agree to pay all applicable fees. Payments are processed through a third-party payment processor (Stripe). All payment information is handled by the third-party processor, and we do not store your full credit card information.</p>
+              <p>Subscriptions may be managed, and you can cancel your subscription, through your account settings or by contacting us. Cancellations will typically take effect at the end of the current billing period.</p>
+            </>
+          )}
 
-        <h2>8. Intellectual Property</h2>
-        <p>The Service and its original content (excluding user-provided Feedback and third-party data), features, and functionality are and will remain the exclusive property of EcoDash and its licensors. The Service is protected by copyright, trademark, and other laws.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">6. Intellectual Property</h2>
+          <p>The Service and its original content (excluding content provided by users or third-party data sources), features, and functionality are and will remain the exclusive property of {appName} and its licensors. The Service is protected by copyright, trademark, and other laws.</p>
 
-        <h2>9. Termination</h2>
-        <p>We may terminate or suspend your access to the Beta Service immediately, without prior notice or liability, for any reason whatsoever, including, without limitation, if you breach these Terms. Upon termination, your right to use the Service will immediately cease.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">7. Data Disclaimer & No Financial Advice</h2>
+          <p className="font-semibold text-destructive">All data, charts, insights, and information provided by {appName} are for informational and educational purposes only. They should not be construed as financial, investment, trading, or any other form of advice or recommendation.</p>
+          <p>You acknowledge that {appName} is not a financial advisor, broker, or dealer. Any decisions you make based on information from the Service are made at your own risk. {appName} does not guarantee the accuracy, completeness, timeliness, or reliability of any data provided. Always conduct your own research and consult with a qualified financial professional before making any investment decisions.</p>
 
-        <h2>10. Limitation of Liability</h2>
-        <p>To the maximum extent permitted by applicable law, in no event shall EcoDash, its affiliates, directors, employees, or licensors be liable for any indirect, punitive, incidental, special, consequential, or exemplary damages, including without limitation damages for loss of profits, goodwill, use, data, or other intangible losses, arising out of or relating to the use of, or inability to use, the Service, even if we have been advised of the possibility of such damages.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">8. Limitation of Liability</h2>
+          <p>In no event shall {appName}, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; (iii) any content obtained from the Service; and (iv) unauthorized access, use or alteration of your transmissions or content, whether based on warranty, contract, tort (including negligence) or any other legal theory, whether or not we have been informed of the possibility of such damage, and even if a remedy set forth herein is found to have failed of its essential purpose.</p>
+          <p>As this is a Beta Service, {appName} provides the service "as is", "with all faults" and "as available", and the entire risk as to satisfactory quality, performance, accuracy, and effort is with you.</p>
 
-        <h2>11. Governing Law</h2>
-        <p>These Terms shall be governed and construed in accordance with the laws of [Your Jurisdiction - e.g., State of California, USA], without regard to its conflict of law provisions.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">9. Changes to Terms</h2>
+          <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will make reasonable efforts to provide at least 30 days' notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.</p>
 
-        <h2>12. Changes to Terms</h2>
-        <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will make reasonable efforts to provide at least 30 days' notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion. By continuing to access or use our Service after those revisions become effective, you agree to be bound by the revised terms.</p>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">10. Governing Law</h2>
+          <p>These Terms shall be governed and construed in accordance with the laws of [Your Jurisdiction - e.g., State of California, USA], without regard to its conflict of law provisions.</p>
 
-        <h2>13. Contact Us</h2>
-        <p>If you have any questions about these Terms, please contact us via the <Link href="/contact" className="underline">contact page</Link> on our website.</p>
-      </article>
+          <h2 className="text-2xl font-semibold pt-4 border-t mt-8">11. Contact Us</h2>
+          <p>If you have any questions about these Terms, please contact us at <a href={`mailto:${contactEmail}`} className="text-primary hover:underline">{contactEmail}</a>.</p>
+        </section>
+      </main>
     </div>
   );
 }
