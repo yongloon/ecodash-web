@@ -1,17 +1,13 @@
-// File: src/components/dashboard/SidebarNav.tsx
 // src/components/dashboard/SidebarNav.tsx
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
-import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa';
-import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3, MessageSquare } from 'lucide-react'; // Added MessageSquare
+import { FaTachometerAlt } from 'react-icons/fa'; // Removed PricingIcon
+import { /* Zap as ProToolsIcon, */ Settings as AccountIcon /*, Star as FavoriteIcon */, BarChart3 } from 'lucide-react'; // Commented out unused
 import { useSession } from 'next-auth/react';
-import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
-
-const FAVORITES_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['basic', 'pro']; 
-const PRO_TOOLS_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['pro'];
+// import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Not needed for MVP sidebar logic
 
 interface SidebarNavProps {
   isMobileMenuOpen?: boolean;
@@ -22,14 +18,14 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const isLoadingSession = status === "loading";
-  const userSessionData = session?.user as any;
-  const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier;
+  // const userSessionData = session?.user as any; // Not strictly needed for MVP sidebar
+  // const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier; // Not needed
   const isLoggedIn = !!session?.user;
 
-  const hasActivePaidSubscription = isLoggedIn && userTier && userTier !== 'free';
+  // const hasActivePaidSubscription = isLoggedIn && userTier && userTier !== 'free'; // Not needed
 
-  const canSeeFavoritesLink = isLoggedIn && FAVORITES_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
-  const canSeeProToolsLink = isLoggedIn && PRO_TOOLS_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
+  // const canSeeFavoritesLink = isLoggedIn && FAVORITES_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free'); // Removed
+  // const canSeeProToolsLink = isLoggedIn && PRO_TOOLS_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free'); // Removed
 
   const navLinkClasses = (isActive: boolean) => 
     `flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
@@ -46,14 +42,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
 
   return (
     <>
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm md:hidden"
-          onClick={toggleMobileMenu}
-          aria-hidden="true"
-        />
-      )}
-
+      {/* ... (Overlay for mobile - keep as is) ... */}
       <div 
         className={`
           fixed inset-y-0 left-0 z-40 flex flex-col
@@ -94,66 +83,13 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
             );
           })}
 
-          <hr className="my-3 border-border/60" />
+          {/* Separator, Favorites, Pro Tools, Pricing links removed for MVP */}
           
-          {!isLoadingSession && canSeeFavoritesLink && (
-              <Link
-                  href="/favorites"
-                  className={navLinkClasses(pathname === '/favorites')}
-                  title="My Favorites"
-                  onClick={handleLinkClick}
-              >
-                  <FavoriteIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-                  <span>My Favorites</span>
-              </Link>
-          )}
-
-          {!isLoadingSession && canSeeProToolsLink && (
-            <>
-              <div className="px-4 pt-2 pb-1">
-                  <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Pro Tools</p>
-              </div>
-              <Link
-                href="/pro/comparison"
-                className={navLinkClasses(pathname.startsWith('/pro/comparison'))}
-                title="Indicator Comparison"
-                onClick={handleLinkClick}
-              >
-                <ProToolsIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-                <span>Compare</span>
-              </Link>
-            </>
-          )}
-          
-          {!isLoadingSession && (!isLoggedIn || !hasActivePaidSubscription) && (
-            <Link
-              href="/pricing"
-              className={navLinkClasses(pathname === '/pricing')}
-              title="Pricing Plans"
-              onClick={handleLinkClick}
-            >
-              <PricingIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-              <span>Pricing</span>
-            </Link>
-          )}
-
-           {/* Feedback Link */}
-            <hr className="my-3 border-border/60" />
-            <Link
-              href="/contact?subject=EcoDash%20Beta%20Feedback"
-              className={navLinkClasses(pathname === '/contact')}
-              title="Beta Feedback"
-              onClick={handleLinkClick}
-            >
-              <MessageSquare className="h-4 w-4 mr-3 flex-shrink-0" />
-              <span>Provide Feedback</span>
-            </Link>
-
           <div className="flex-grow"></div> 
 
           {!isLoadingSession && isLoggedIn && (
                <Link
-                  href="/account/profile"
+                  href="/account/profile" // Profile page will be simplified
                   className={`${navLinkClasses(pathname === '/account/profile')} mt-2`}
                   title="My Account"
                   onClick={handleLinkClick}

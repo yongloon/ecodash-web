@@ -1,15 +1,14 @@
 // src/app/api/auth/[...nextauth]/route.ts
-import NextAuth, { AuthOptions, User as NextAuthUser } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import NextAuth, { AuthOptions } from "next-auth";
+// import GoogleProvider from "next-auth/providers/google"; // DEFER for MVP if desired
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import prisma from "@/lib/prisma"; // Assuming DB mode for favorites & subscriptions
+import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt";
 
+// MVP: Simplified Plan (everyone is on a single free tier)
 export const APP_PLANS = {
-  FREE: { name: 'Free', tier: 'free' as const, priceId: null },
-  BASIC: { name: 'Basic', tier: 'basic' as const, priceId: process.env.STRIPE_BASIC_PLAN_PRICE_ID },
-  PRO: { name: 'Pro', tier: 'pro' as const, priceId: process.env.STRIPE_PRO_PLAN_PRICE_ID },
+  MVP_FREE: { name: 'MVP Access', tier: 'mvp_free' as const, priceId: null },
 } as const;
 
 export type AppPlanTier = typeof APP_PLANS[keyof typeof APP_PLANS]['tier'];
@@ -17,28 +16,30 @@ export type AppPlanTier = typeof APP_PLANS[keyof typeof APP_PLANS]['tier'];
 const IS_DATABASE_MODE_ACTIVE = !!process.env.DATABASE_URL;
 
 // Demo users for NO DB mode (if DATABASE_URL is not set)
-const demoUsers: Record<string, { id: string; name?: string; email: string; passwordPlainText: string; username?: string; simulatedTier?: AppPlanTier; favoriteIndicatorIds?: string[] }> = {
-  "user@example.com": { id: "demouser-1", name: "Demo User (Free)", email: "user@example.com", passwordPlainText: "password", username: "demouser", simulatedTier: 'free', favoriteIndicatorIds: ['CPI_YOY_PCT'] },
-  "basic@example.com": { id: "demobasic-1", name: "Demo User (Basic)", email: "basic@example.com", passwordPlainText: "password", username: "basicuser", simulatedTier: 'basic', favoriteIndicatorIds: ['SP500', 'UNRATE'] },
-  "admin@example.com": { id: "demoadmin-1", name: "Admin User (Pro)", email: "admin@example.com", passwordPlainText: "adminpass", username: "admin", simulatedTier: 'pro', favoriteIndicatorIds: ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'GDP_GROWTH'] },
+const demoUsers: Record<string, { id: string; name?: string; email: string; passwordPlainText: string; username?: string; }> = {
+  "user@example.com": { id: "demouser-1", name: "Demo User", email: "user@example.com", passwordPlainText: "password", username: "demouser" },
+  // Add more demo users if needed for no-DB testing
 };
 
 if (IS_DATABASE_MODE_ACTIVE) {
-  console.log("[NextAuth] CONFIG: Running in DATABASE Mode.");
+  console.log("[NextAuth] CONFIG: Running in DATABASE Mode for MVP.");
 } else {
-  console.warn("[NextAuth] CONFIG: Running in NO DATABASE Mode. Auth will use demoUsers.");
+  console.warn("[NextAuth] CONFIG: Running in NO DATABASE Mode for MVP. Auth will use demoUsers.");
 }
 
 export const authOptions: AuthOptions = {
   adapter: IS_DATABASE_MODE_ACTIVE ? PrismaAdapter(prisma) : undefined,
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    // GoogleProvider({ // DEFER for MVP if desired, uncomment to keep
+    //   clientId: process.env.GOOGLE_CLIENT_ID!,
+    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    // }),
     CredentialsProvider({
       name: "Credentials",
-      credentials: { /* ... */ },
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
       async authorize(credentials) {
         if (!IS_DATABASE_MODE_ACTIVE) { // NO DB MODE
           if (!credentials?.email || !credentials?.password) return null;
@@ -49,6 +50,7 @@ export const authOptions: AuthOptions = {
           return null;
         }
         // DB MODE
+        if (!prisma) throw new Error("Database service not available for authorization."); // Should not happen if IS_DATABASE_MODE_ACTIVE is true
         if (!credentials?.email || !credentials?.password) throw new Error("Missing credentials");
         const user = await prisma.user.findUnique({ where: { email: credentials.email.toLowerCase() } });
         if (!user || !user.passwordHash) throw new Error("Invalid credentials (user or hash missing)");
@@ -64,56 +66,18 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        if (!IS_DATABASE_MODE_ACTIVE && user.email) {
-            const demoUser = demoUsers[user.email.toLowerCase()];
-            if (demoUser) {
-                token.simulatedTier = demoUser.simulatedTier;
-                token.favoriteIndicatorIds = demoUser.favoriteIndicatorIds || []; // Add demo favorites
-            }
-        }
+        // No tier or favorite logic needed for MVP JWT
       }
       return token;
     },
     async session({ session, token }) {
       if (token?.id && session.user) {
         (session.user as any).id = token.id as string;
-        let currentPlanDetails = APP_PLANS.FREE;
-        let userFavorites: string[] = [];
-
-        if (IS_DATABASE_MODE_ACTIVE) {
-            try {
-                const userFromDb = await prisma.user.findUnique({
-                    where: { id: token.id as string },
-                    select: { 
-                        stripeSubscriptionId: true, 
-                        stripeCurrentPeriodEnd: true,
-                        stripePriceId: true,
-                        stripeCustomerId: true,
-                        favoriteIndicators: { select: { indicatorId: true } } // Fetch favorites
-                    }
-                });
-                if (userFromDb) {
-                    (session.user as any).stripeCustomerId = userFromDb.stripeCustomerId;
-                    userFavorites = userFromDb.favoriteIndicators.map(f => f.indicatorId);
-                    const isActivePaid = !!userFromDb.stripeSubscriptionId && 
-                                     !!userFromDb.stripeCurrentPeriodEnd && 
-                                     new Date(userFromDb.stripeCurrentPeriodEnd) > new Date();
-                    if (isActivePaid && userFromDb.stripePriceId) {
-                        const matchedPlan = Object.values(APP_PLANS).find(p => p.priceId === userFromDb.stripePriceId);
-                        if (matchedPlan) currentPlanDetails = matchedPlan;
-                        else currentPlanDetails = { name: 'Subscribed (Custom)', tier: 'custom_paid', priceId: userFromDb.stripePriceId } as any;
-                    }
-                }
-            } catch (e) { console.error("SessionCb Error fetching user data from DB:", e); }
-        } else if (token.simulatedTier) { // "No DB" mode for demo users
-            const matchedPlan = Object.values(APP_PLANS).find(p => p.tier === token.simulatedTier);
-            if (matchedPlan) currentPlanDetails = matchedPlan;
-            userFavorites = (token.favoriteIndicatorIds as string[] | undefined) || []; // Use demo favorites from token
-        }
-        (session.user as any).activePlanName = currentPlanDetails.name;
-        (session.user as any).activePlanTier = currentPlanDetails.tier;
-        (session.user as any).hasActivePaidSubscription = currentPlanDetails.tier !== 'free';
-        (session.user as any).favoriteIndicatorIds = userFavorites; // Add favorites to session
+        // MVP: All users are on the single free tier
+        (session.user as any).activePlanName = APP_PLANS.MVP_FREE.name;
+        (session.user as any).activePlanTier = APP_PLANS.MVP_FREE.tier;
+        (session.user as any).hasActivePaidSubscription = false; // No paid plans in MVP
+        // (session.user as any).favoriteIndicatorIds = []; // Favorites deferred for MVP
       }
       return session;
     },
