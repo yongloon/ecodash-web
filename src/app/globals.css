@@ -7,29 +7,78 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
-    /* ... other existing Shadcn variables ... */
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%; /* Ring color often matches primary or accent */
+
     --primary: 240 5.9% 10%;
     --primary-foreground: 0 0% 98%;
 
-    /* Custom Chart Colors (Examples) */
-    --chart-green: 130 55% 50%; /* A balanced green */
-    --chart-red: 0 75% 55%;     /* A clear red */
-    --chart-blue: 220 85% 60%;  /* A distinct blue for other lines if needed */
-    --chart-neutral: 240 5% 65%; /* Muted grey for neutral trends */
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --radius: 0.5rem; /* Example radius, adjust as needed */
+
+    /* Custom Chart Colors (Ensure these are simple HSL strings for direct use) */
+    --chart-1: 220 85% 60%; /* Was --chart-blue */
+    --chart-2: 130 55% 50%; /* Was --chart-green */
+    --chart-3: 0 75% 55%;   /* Was --chart-red */
+    --chart-4: 240 5% 65%;  /* Was --chart-neutral */
+    --chart-5: 30 90% 55%;  /* Example orange for a 5th chart color */
   }
 
   .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    /* ... other existing Shadcn dark variables ... */
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%; /* Adjusted from your tailwind config example */
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%; /* Ring color often matches primary-foreground or accent in dark */
+
+
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
 
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
     /* Custom Chart Dark Colors (Examples) */
-    --chart-green: 130 50% 60%;
-    --chart-red: 0 65% 60%;
-    --chart-blue: 220 75% 70%;
-    --chart-neutral: 240 5% 50%;
+    --chart-1: 220 75% 70%;
+    --chart-2: 130 50% 60%;
+    --chart-3: 0 65% 60%;
+    --chart-4: 240 5% 50%;
+    --chart-5: 30 80% 60%;
   }
 }
 
