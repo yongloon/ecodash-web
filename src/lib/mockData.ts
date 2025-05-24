@@ -14,16 +14,15 @@ import {
     fetchPolygonIOData,
     fetchApiNinjasMetalPrice,
     fetchApiNinjasCommodityHistoricalPrice,
-    fetchTiingoEodData, // Added Tiingo fetcher
-} from './api'; // Ensure this path is correct
+    fetchTiingoEodData,
+} from './api'; 
 import {
     calculateYoYPercent,
     calculateMoMPercent,
     calculateQoQPercent,
     calculateMoMChange
-} from './calculations'; // Ensure this path is correct
+} from './calculations'; 
 
-// --- Helper for Default API Fetch Date Range (Consistent) ---
 const getDefaultApiFetchRange = (years: number = 2): { startDate: string; endDate: string } => {
     const today = new Date();
     const pastDate = subYears(today, years);
@@ -33,7 +32,6 @@ const getDefaultApiFetchRange = (years: number = 2): { startDate: string; endDat
     };
 };
 
-// --- Seeded Pseudo Random Function ---
 function seededPseudoRandom(seedStr: string): () => number {
     let seed = 0;
     for (let i = 0; i < seedStr.length; i++) { seed = (seed * 31 + seedStr.charCodeAt(i)) | 0; }
@@ -43,7 +41,6 @@ function seededPseudoRandom(seedStr: string): () => number {
     };
 }
 
-// --- Mock Data Generation ---
 export function generateMockData(
     indicator: IndicatorMetadata,
     dateRange?: { startDate?: string; endDate?: string }
@@ -69,7 +66,7 @@ export function generateMockData(
   switch (indicator.frequency) {
     case 'Quarterly': intervalGenerator = eachQuarterOfInterval; break;
     case 'Monthly': intervalGenerator = eachMonthOfInterval; break;
-    case 'Weekly': intervalGenerator = eachDayOfInterval; break; // Will filter later
+    case 'Weekly': intervalGenerator = eachDayOfInterval; break; 
     case 'Daily': default: intervalGenerator = eachDayOfInterval; break;
   }
 
@@ -102,10 +99,10 @@ export function generateMockData(
   if (indicator.id === 'SP500') { baseValue = 4000 + randomFn() * 1500; volatility = 50 + randomFn() * 70; }
   else if (indicator.id === 'BTC_PRICE_USD') { baseValue = 35000 + randomFn() * 30000; volatility = 1500 + randomFn() * 1500; }
   else if (indicator.id === 'ETH_PRICE_USD') { baseValue = 2000 + randomFn() * 1500; volatility = 150 + randomFn() * 150; }
-  else if (indicator.id === 'GOLD_PRICE') { baseValue = 1900 + randomFn() * 400; volatility = 20 + randomFn() * 20; } // USD per Ounce
+  else if (indicator.id === 'GOLD_PRICE') { baseValue = 1900 + randomFn() * 400; volatility = 20 + randomFn() * 20; } 
   else if (indicator.id === 'SILVER_PRICE') { baseValue = 22 + randomFn() * 8; volatility = 0.5 + randomFn() * 1; }
   else if (indicator.id === 'CRYPTO_FEAR_GREED') { baseValue = 50; volatility = 30; }
-  else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'ISM/MAN_PMI' || indicator.apiIdentifier === 'NAPM') { 
+  else if (indicator.id === 'PMI' || indicator.apiIdentifier === 'ISM/pmi/pm' || indicator.apiIdentifier === 'NAPM') { 
       baseValue = 45 + randomFn() * 15; 
       volatility = 0.8 + randomFn() * 1.2; 
   }
@@ -153,7 +150,6 @@ export function generateMockData(
 }
 
 
-// --- Main Data Fetching Orchestrator ---
 export async function fetchIndicatorData(
     indicator: IndicatorMetadata,
     dateRangeFromPage?: { startDate?: string; endDate?: string }
@@ -234,10 +230,11 @@ export async function fetchIndicatorData(
                 console.warn(`[Orchestrator] Insufficient data for GDP_NOMINAL_PER_CAPITA components. GDP points: ${nominalGdpData.length}, Pop points: ${populationDataFred.length}`);
                 rawFetchedData = [];
             }
-        } catch (error) {
+        } catch (error: any) {
             apiErrorOccurred = true;
             console.error(`[Orchestrator] Error fetching components for GDP_NOMINAL_PER_CAPITA:`, error);
             rawFetchedData = [];
+            throw new Error(`Failed to calculate ${indicator.name}. Reason: ${error.message}`);
         }
     } else {
         try {
@@ -263,6 +260,9 @@ export async function fetchIndicatorData(
             case 'ApiNinjasHistorical':
                 if (indicator.apiIdentifier) {
                   rawFetchedData = await fetchApiNinjasCommodityHistoricalPrice(indicator.apiIdentifier, effectiveDateRangeForApiCall, '1d');
+                  if(rawFetchedData.length === 0 && indicator.apiSource === 'ApiNinjasHistorical'){
+                    console.warn(`[Orchestrator] ApiNinjasHistorical returned 0 points for ${indicator.id}`);
+                  }
                   apiFetchAttempted = true;
                 }
                 break;
@@ -272,7 +272,7 @@ export async function fetchIndicatorData(
             case 'AlternativeMeAPI':
               rawFetchedData = await fetchAlternativeMeFearGreedIndex(effectiveDateRangeForApiCall); apiFetchAttempted = true;
               break;
-            case 'Tiingo': // Added Tiingo case
+            case 'Tiingo':
               if (indicator.apiIdentifier) {
                 rawFetchedData = await fetchTiingoEodData(indicator.apiIdentifier, effectiveDateRangeForApiCall);
                 apiFetchAttempted = true;
@@ -282,21 +282,22 @@ export async function fetchIndicatorData(
               if (indicator.apiIdentifier && ((indicator.apiSource as string).toUpperCase().includes('FRED') || !indicator.apiSource)) {
                    rawFetchedData = await fetchFredSeries(indicator.apiIdentifier, effectiveDateRangeForApiCall); apiFetchAttempted = true;
               } else {
-                  // console.warn(`[Orchestrator] No specific fetch logic for ${indicator.id} (Source: ${indicator.apiSource}). Will attempt mock.`);
+                  console.warn(`[Orchestrator] No specific fetch logic for ${indicator.id} (Source: ${indicator.apiSource}). Will attempt mock.`);
               }
               break;
           }
-        } catch (error) { 
+        } catch (error: any) { 
             apiErrorOccurred = true; 
             console.error(`[Orchestrator] API call error during switch for ${indicator.id} (Source: ${indicator.apiSource}):`, error); 
+            throw new Error(`Failed to fetch data for ${indicator.name} from ${indicator.sourceName}. Reason: ${error.message}`);
         }
     }
 
     let shouldUseFullMock = false;
     if (indicator.apiSource === 'Mock') {
-        shouldUseFullMock = rawFetchedData.length === 0;
+        shouldUseFullMock = false; 
     } else if (apiFetchAttempted && (rawFetchedData.length === 0 || apiErrorOccurred)) {
-        shouldUseFullMock = true;
+        shouldUseFullMock = true; 
     } else if (!apiFetchAttempted && indicator.apiSource !== 'Mock') {
         console.warn(`[Orchestrator] API fetch not attempted for ${indicator.id} and not Mock. Falling back to mock.`);
         shouldUseFullMock = true;
@@ -323,10 +324,10 @@ export async function fetchIndicatorData(
             let tempCalc: TimeSeriesDataPoint[] = [];
             switch (indicator.calculation) {
               case 'YOY_PERCENT':
-                let lookback = 12; // Default for monthly
+                let lookback = 12; 
                 if (indicator.frequency === 'Quarterly') lookback = 4;
                 else if (indicator.frequency === 'Weekly') lookback = 52;
-                else if (indicator.frequency === 'Daily') lookback = 252; // Approx trading days, adjust if using calendar days
+                else if (indicator.frequency === 'Daily') lookback = 252;
                 tempCalc = calculateYoYPercent(processedData, lookback);
                 break;
               case 'MOM_PERCENT':

@@ -7,6 +7,7 @@ export const FEATURE_KEYS = {
   FAVORITES: 'FAVORITES',
   INDICATOR_COMPARISON: 'INDICATOR_COMPARISON',
   DATA_EXPORT: 'DATA_EXPORT', // Ensure this is present
+  CHART_DOWNLOAD: 'CHART_DOWNLOAD', // New
 } as const;
 
 export type FeatureKey = typeof FEATURE_KEYS[keyof typeof FEATURE_KEYS];
@@ -16,7 +17,8 @@ const FEATURE_ACCESS_CONFIG: Record<FeatureKey, AppPlanTier[]> = {
   [FEATURE_KEYS.ADVANCED_STATS_BUTTON]: ['pro'],
   [FEATURE_KEYS.FAVORITES]: ['basic', 'pro'],
   [FEATURE_KEYS.INDICATOR_COMPARISON]: ['pro'],
-  [FEATURE_KEYS.DATA_EXPORT]: ['pro'], // Set access tier, e.g., 'pro' only
+  [FEATURE_KEYS.DATA_EXPORT]: ['pro'],
+  [FEATURE_KEYS.CHART_DOWNLOAD]: ['pro'], // New
 };
 
 export const canUserAccessFeature = (

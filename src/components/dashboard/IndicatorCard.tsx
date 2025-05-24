@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // Corrected: use 'next/navigation' for App Router
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
@@ -17,10 +17,17 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
 import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
-import ChartComponent, { MovingAverageSeries } from './ChartComponent';
+import ChartComponent, { MovingAverageSeries, ChartSeries } from './ChartComponent'; // ChartSeries added for type consistency
 import { format, parseISO, isValid } from 'date-fns';
-import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
+import { canUserAccessFeature, FEATURE_KEYS, FeatureKey } from '@/lib/permissions';
 import toast from 'react-hot-toast';
+
+interface IndicatorCardProps {
+  indicator: IndicatorMetadata;
+  latestValue: TimeSeriesDataPoint | null;
+  historicalData: TimeSeriesDataPoint[];
+  fetchError?: string | null; // New prop for error message
+}
 
 const getMaPeriods = (frequency?: string): number[] => {
     if (frequency === 'Daily' || frequency === 'Weekly') return [20, 50, 100];
@@ -50,11 +57,12 @@ const downloadCSV = (data: TimeSeriesDataPoint[], filename: string) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    toast.success(`Downloaded ${filename}_data.csv`);
   }
 };
 
 
-export default function IndicatorCard({ indicator, latestValue, historicalData }: IndicatorCardProps) {
+export default function IndicatorCard({ indicator, latestValue, historicalData, fetchError }: IndicatorCardProps) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const userSessionData = session?.user as any;
@@ -100,6 +108,10 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
         period,
         data: calculateMovingAverage(validHistoricalData, period),
         color: colors[index % colors.length],
+        dataKey: 'value',
+        name: `MA ${period}`,
+        type: 'line',
+        yAxisId: 'left' // Assume all MAs use the left axis for simplicity here
       };
     }).filter(ma => ma.data.length > 0);
   }, [validHistoricalData, selectedMaPeriods, canAccessMAs]);
@@ -135,7 +147,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
     );
   };
 
-  const promptLoginForFeature = (featureName: string) => {
+  const promptLoginForFeature = (featureName: string): void => {
     toast((t) => (
         <span>
           Please login to use {featureName.toLowerCase()}.
@@ -194,11 +206,22 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
       return;
     }
     downloadCSV(validHistoricalData, indicator.name);
-    // Toast for success can be added here or kept in downloadCSV
-    // toast.success(`Exporting data for ${indicator.name}`); 
   };
 
-  const isDataEffectivelyUnavailable = validHistoricalData.length === 0 && latestValue === null;
+  const isDataEffectivelyUnavailable = !fetchError && validHistoricalData.length === 0 && latestValue === null;
+
+  const chartSeries: ChartSeries[] = useMemo(() => {
+    const baseSeries: ChartSeries = {
+        data: validHistoricalData,
+        dataKey: 'value',
+        name: indicator.name,
+        color: '#4f46e5', // Default color for the main series
+        type: indicator.chartType || 'line',
+        yAxisId: 'left',
+        unit: indicator.unit,
+    };
+    return [baseSeries, ...movingAverageData];
+  }, [validHistoricalData, indicator, movingAverageData]);
 
 
   return (
@@ -215,7 +238,6 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
             </CardDescription>
           </div>
           <div className="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
-            {/* Favorite Button */}
             <TooltipProvider delayDuration={100}> <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
@@ -236,7 +258,6 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                 </TooltipContent>
             </Tooltip> </TooltipProvider>
             
-            {/* Export Button */}
             {validHistoricalData.length > 0 && (
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
@@ -261,7 +282,6 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
               </TooltipProvider>
             )}
 
-            {/* Stats Button */}
             {statistics && statistics.count > 0 && (
                  <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
@@ -278,7 +298,6 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                     </ul>
                  </TooltipContent> </Tooltip> </TooltipProvider>
             )}
-            {/* Info Button */}
             {indicator.description && (
               <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
@@ -293,12 +312,16 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
       </CardHeader>
       <CardContent className="flex-grow flex flex-col px-3 sm:px-4 pt-0 pb-2">
         <div className="flex-grow h-48 md:h-56 lg:h-60 -ml-1 -mr-1 sm:-ml-2 sm:-mr-2">
-           {validHistoricalData && validHistoricalData.length > 0 ? (
+           {fetchError ? (
+            <div className="flex flex-col items-center justify-center h-full text-destructive text-xs p-3 text-center">
+              <FiAlertCircle className="h-6 w-6 mb-2 opacity-70" />
+              <p className="font-semibold">Data Error</p>
+              <p>{fetchError.length > 100 ? fetchError.substring(0, 97) + "..." : fetchError}</p>
+            </div>
+           ) : validHistoricalData && validHistoricalData.length > 0 ? (
              <ChartComponent
-                data={validHistoricalData}
-                dataKey="value"
-                type={indicator.chartType || 'line'}
-                movingAverages={movingAverageData}
+                series={chartSeries}
+                chartId={`indicator-chart-${indicator.id}`}
               />
            ) : (
              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs p-3 text-center">
@@ -357,7 +380,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                       </TooltipContent>
                   </Tooltip> </TooltipProvider>
                 )}
-                 {!isLoggedIn && ( // Prompt to login if not logged in for MAs
+                 {!isLoggedIn && (
                     <TooltipProvider delayDuration={50}> <Tooltip>
                         <TooltipTrigger asChild>
                              <button onClick={(e) => {e.preventDefault(); e.stopPropagation(); promptLoginForFeature("Moving Averages");}} className="flex items-center justify-center h-full ml-0.5 cursor-pointer" aria-label="Login for Moving Averages" >
@@ -392,7 +415,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                 {!isLoggedIn && (
                      <p className="text-xs text-muted-foreground text-center mt-0.5">
                         <Button asChild variant="link" size="xs" className="p-0 h-auto text-xs">
-                            <Link href={`/login?callbackUrl=${encodeURIComponent(router.asPath || '/dashboard')}`}>Login</Link>
+                            <Link href={`/login?callbackUrl=${encodeURIComponent((typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/dashboard'))}`}>Login</Link>
                         </Button> or <Button asChild variant="link" size="xs" className="p-0 h-auto text-xs"><Link href="/pricing">Upgrade</Link></Button> for this feature.
                     </p>
                 )}
