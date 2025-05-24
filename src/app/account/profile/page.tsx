@@ -5,7 +5,7 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import toast from 'react-hot-toast'; // <<< ADD THIS
+import toast from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -22,17 +22,17 @@ const getInitials = (name?: string | null, email?: string | null): string => {
   if (name) {
     const names = name.trim().split(' ').filter(Boolean);
     if (names.length === 0) { /* Fallthrough */ }
-    else if (names.length === 1) return names[0][0]?.toUpperCase() || "?";
-    else return (names[0][0] + (names[names.length - 1][0] || '')).toUpperCase();
+    else if (names.length === 1 && names[0].length > 0) return names[0][0].toUpperCase();
+    else if (names.length > 1 && names[0].length > 0 && names[names.length - 1].length > 0) return (names[0][0] + names[names.length - 1][0]).toUpperCase();
   }
-  if (email) {
-    return email[0]?.toUpperCase() || "?";
+  if (email && email.length > 0) {
+    return email[0].toUpperCase();
   }
   return "U";
 };
 
 export default function ProfilePage() {
-  const { data: session, status, update: updateSession } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   
   const [isPortalLoading, setIsPortalLoading] = useState(false);
@@ -41,8 +41,6 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  // const [passwordChangeMessage, setPasswordChangeMessage] = useState<string | null>(null); // Handled by toast
-  // const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null); // Handled by toast
   const [isPasswordChangeLoading, setIsPasswordChangeLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -52,28 +50,29 @@ export default function ProfilePage() {
   const userHasActiveSubscription = userSessionData?.hasActiveSubscription === true;
   const userStripeCustomerId = userSessionData?.stripeCustomerId;
   const activePlanName = userSessionData?.activePlanName;
-  const [showPasswordChangeForm, setShowPasswordChangeForm] = useState(false);
+  
+  // Determine if user signed up via credentials based on provider in session
+  const showPasswordChangeForm = userSessionData?.provider === 'credentials';
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace('/login?callbackUrl=/account/profile');
     }
-    if (session) {
-        setShowPasswordChangeForm(true); 
-    }
-  }, [status, router, session]);
+  }, [status, router]);
 
   const handleManageSubscription = async () => {
     setIsPortalLoading(true);
     setPortalError(null);
+    toast.dismiss(); // Clear previous toasts
     try {
       const response = await fetch('/api/stripe/create-portal-link', { method: 'POST' });
       const data = await response.json();
       if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
-        setPortalError(data.error || 'Could not open subscription management.');
-        toast.error(data.error || 'Could not open subscription management.');
+        const errorMsg = data.error || 'Could not open subscription management.';
+        setPortalError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
       const msg = 'Failed to open subscription management. Please try again.';
@@ -86,8 +85,7 @@ export default function ProfilePage() {
 
   const handleChangePassword = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // setPasswordChangeError(null); // Handled by toast
-    // setPasswordChangeMessage(null); // Handled by toast
+    toast.dismiss(); 
 
     if (newPassword !== confirmNewPassword) {
       toast.error("New passwords do not match.");
@@ -176,7 +174,6 @@ export default function ProfilePage() {
             <section>
               <form onSubmit={handleChangePassword} className="space-y-4">
                   <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Change Password</h3>
-                  {/* Error/Success messages handled by toast */}
                   <div className="space-y-1.5">
                       <Label htmlFor="currentPassword_profile">Current Password</Label>
                       <div className="relative">
@@ -212,7 +209,7 @@ export default function ProfilePage() {
             </section>
           )}
           {!showPasswordChangeForm && user?.email && (
-            <section className="border-t pt-6">
+            <section>
                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">Password</h3>
                  <p className="text-sm text-muted-foreground">
                     You are signed in with an external provider (e.g., Google). To manage your password, please visit your provider's account settings.

@@ -1,6 +1,6 @@
 // File: src/app/(dashboard)/page.tsx
 // src/app/(dashboard)/page.tsx
-import React from 'react';
+import React, { Suspense } from 'react'; // Import Suspense
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
@@ -35,7 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gem, Star, TrendingUp, Zap, Shield, Activity, Scale } from 'lucide-react';
 import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
-
+import OverviewSkeleton from '@/components/dashboard/OverviewSkeleton'; // <<< ADD THIS
 
 export const revalidate = 300; 
 
@@ -104,7 +104,10 @@ const fetchDataForRiskAndSummaryLists = async (
   return Promise.all(
       indicatorsWithOriginalId
       .filter(item => {
-          if (!item.indicator) { return false; }
+          if (!item.indicator) { 
+            // console.warn(`[fetchDataForRiskAndSummaryLists] Indicator metadata not found for ID: ${item.originalId}`);
+            return false; 
+          }
           return true;
       })
       .map(async ({ indicator }) => { 
@@ -181,7 +184,8 @@ const fetchDataForRiskAndSummaryLists = async (
   );
 };
 
-export default async function OverviewPage({ searchParams }: { searchParams?: { country?: string; startDate?: string; endDate?: string; }; }) {
+
+async function DashboardContent({ searchParams }: { searchParams?: { country?: string; startDate?: string; endDate?: string; }; }) {
   const session = await getServerSession(authOptions);
   const userSessionData = session?.user as any;
   const userTier: AppPlanTier = userSessionData?.activePlanTier || 'free';
@@ -354,7 +358,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
               }) : <p className="text-sm text-muted-foreground p-2.5">Snapshot data unavailable.</p>}
             </CardContent>
           </Card>
-          <NewsFeedWidget initialNews={newsApiArticles} /> 
+          <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} />
           <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News" dataTimestamp={dataFetchTimestamp} />
           <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} dataTimestamp={dataFetchTimestamp} />
           <FredReleasesWidget initialReleases={fredReleases} itemCount={5} dataTimestamp={dataFetchTimestamp} />
@@ -364,4 +368,12 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
       </div>
     </div>
   );
+}
+
+export default async function OverviewPage({ searchParams }: { searchParams?: { country?: string; startDate?: string; endDate?: string; }; }) {
+    return (
+        <Suspense fallback={<OverviewSkeleton />}>
+            <DashboardContent searchParams={searchParams} />
+        </Suspense>
+    );
 }
