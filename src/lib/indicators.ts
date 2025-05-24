@@ -195,20 +195,22 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'USD_EUR', name: 'USD/EUR Exchange Rate', categoryKey: 'viii', description: 'Value of 1 U.S. Dollar in Euros.', unit: 'EUR per USD', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DEXUSEU', chartType: 'line', calculation: 'NONE' },
   { id: 'VIX', name: 'Volatility Index (VIX)', categoryKey: 'viii', description: 'Market expectation of near-term S&P 500 volatility.', unit: 'Index', frequency: 'Daily', sourceName: 'CBOE via FRED', apiSource: 'FRED', apiIdentifier: 'VIXCLS', chartType: 'line', calculation: 'NONE' },
   { id: 'CORP_BOND_SPREAD_BAA', name: 'Corporate Bond Spread (Baa)', categoryKey: 'viii', description: 'Difference between Moody\'s Baa Corp Bond Yield and 10-Yr Treasury.', unit: '%', frequency: 'Daily', sourceName: 'Moody\'s/Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'BAA10Y', chartType: 'line', calculation: 'NONE' },
-  {
+   {
     id: 'BTC_PRICE_USD', name: 'Bitcoin Price (USD)', categoryKey: 'viii',
-    description: 'Daily closing price of Bitcoin in US Dollars from Coinbase.',
+    description: 'Daily price of Bitcoin in US Dollars.',
     unit: 'USD', frequency: 'Daily',
-    sourceName: 'Coinbase via FRED',
-    apiSource: 'FRED', apiIdentifier: 'CBBTCUSD',
+    sourceName: 'CoinGecko',
+    apiSource: 'CoinGeckoAPI', // <<< MUST BE THIS
+    apiIdentifier: 'bitcoin',   // <<< MUST BE THIS
     chartType: 'line', calculation: 'NONE',
   },
   {
     id: 'ETH_PRICE_USD', name: 'Ethereum Price (USD)', categoryKey: 'viii',
-    description: 'Daily closing price of Ethereum in US Dollars from Coinbase.',
+    description: 'Daily price of Ethereum in US Dollars.',
     unit: 'USD', frequency: 'Daily',
-    sourceName: 'Coinbase via FRED',
-    apiSource: 'FRED', apiIdentifier: 'CBETHUSD',
+    sourceName: 'CoinGecko',
+    apiSource: 'CoinGeckoAPI', // <<< MUST BE THIS
+    apiIdentifier: 'ethereum',  // <<< MUST BE THIS
     chartType: 'line', calculation: 'NONE',
   },
   {
