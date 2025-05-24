@@ -1,7 +1,7 @@
 // File: src/components/dashboard/InsiderTransactionsWidget.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Import useState and useEffect
+import React, { useState, useEffect } from 'react';
 import { InsiderTransaction } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRightLeft, Info } from 'lucide-react';
@@ -15,10 +15,11 @@ interface InsiderTransactionsWidgetProps {
     dataTimestamp?: string;
 }
 
-const formatTransactionType = (code: string, type: string): string => {
-    if (code === 'P' || type.toLowerCase().includes('purchase')) return "Purchase";
-    if (code === 'S' || type.toLowerCase().includes('sale')) return "Sale";
-    return type;
+const formatTransactionType = (code: string, type: string | null | undefined): string => { // Added null/undefined check for type
+    const lowerType = typeof type === 'string' ? type.toLowerCase() : ''; // Ensure type is a string before toLowerCase
+    if (code === 'P' || lowerType.includes('purchase')) return "Purchase";
+    if (code === 'S' || lowerType.includes('sale')) return "Sale";
+    return type || 'N/A'; // Return original type or 'N/A' if null/undefined
 };
 
 const getTransactionColor = (code: string): string => {
@@ -34,9 +35,9 @@ export default function InsiderTransactionsWidget({
     dataTimestamp
 }: InsiderTransactionsWidgetProps) {
     const transactionsToDisplay = initialTransactions.slice(0, itemCount);
-    const [isClientMounted, setIsClientMounted] = useState(false); // <<< ADDED STATE
+    const [isClientMounted, setIsClientMounted] = useState(false);
 
-    useEffect(() => { // <<< ADDED EFFECT
+    useEffect(() => {
         setIsClientMounted(true);
     }, []);
 
@@ -69,15 +70,15 @@ export default function InsiderTransactionsWidget({
                                     </span>
                                 </div>
                                 <div className="text-muted-foreground mb-0.5">
-                                    <span title={tx.reportingName}>{tx.reportingName.length > 25 ? tx.reportingName.substring(0,22) + "..." : tx.reportingName}</span>
+                                    <span title={tx.reportingName}>{tx.reportingName && tx.reportingName.length > 25 ? tx.reportingName.substring(0,22) + "..." : tx.reportingName || 'Unknown Insider'}</span>
                                     {tx.reportingTitle && tx.reportingTitle !== "N/A" && ` (${tx.reportingTitle.substring(0,20)})`}
                                 </div>
                                 <div className="flex justify-between items-center text-muted-foreground/80">
-                                    <span>Shares: {parseFloat(tx.shares).toLocaleString()}</span>
+                                    <span>Shares: {tx.shares ? parseFloat(tx.shares).toLocaleString() : 'N/A'}</span>
                                     {tx.pricePerShare && parseFloat(tx.pricePerShare) > 0 && <span>@ ${parseFloat(tx.pricePerShare).toFixed(2)}</span>}
                                 </div>
                                 <div className="text-xs text-muted-foreground/70 mt-0.5">
-                                    Transaction: {isValid(parseISO(tx.transactionDate)) ? format(parseISO(tx.transactionDate), 'MMM d, yyyy') : tx.transactionDate}
+                                    Transaction: {tx.transactionDate && isValid(parseISO(tx.transactionDate)) ? format(parseISO(tx.transactionDate), 'MMM d, yyyy') : tx.transactionDate || 'N/A'}
                                 </div>
                             </li>
                         ))}
@@ -85,8 +86,7 @@ export default function InsiderTransactionsWidget({
                 )}
                 {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
                     <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
-                        Insider data as of {/* <<< MODIFIED LINE */}
-                        {isClientMounted ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
+                        Insider data as of {isClientMounted ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
                     </p>
                 )}
                 <div className="mt-1 text-center">

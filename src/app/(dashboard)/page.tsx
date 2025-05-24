@@ -1,6 +1,6 @@
 // File: src/app/(dashboard)/page.tsx
 // src/app/(dashboard)/page.tsx
-import React, { Suspense } from 'react'; // Import Suspense
+import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
@@ -8,13 +8,13 @@ import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata, indicatorCate
 import { fetchIndicatorData } from '@/lib/mockData';
 import {
   fetchNewsHeadlines, 
-  fetchEconomicCalendar, 
+  // fetchEconomicCalendar, // Still commented out as per previous request
   fetchAlphaVantageEarningsCalendar,
   fetchFredReleaseCalendar, 
   fetchAlphaVantageNewsSentiment,     
   fetchAlphaVantageInsiderTransactions, 
   NewsArticle, 
-  EconomicEvent,
+  // EconomicEvent, 
   EarningsEventAV,
   FredReleaseDate,
   NewsSentimentArticle,            
@@ -25,7 +25,7 @@ import {
 import SummaryCard from '@/components/dashboard/SummaryCard';
 import NewsFeedWidget from '@/components/dashboard/NewsFeedWidget'; 
 import AlphaNewsSentimentWidget from '@/components/dashboard/AlphaNewsSentimentWidget'; 
-import EconomicCalendarWidget from '@/components/dashboard/EconomicCalendarWidget';
+// import EconomicCalendarWidget from '@/components/dashboard/EconomicCalendarWidget';
 import EarningsCalendarWidget from '@/components/dashboard/EarningsCalendarWidget';
 import FredReleasesWidget from '@/components/dashboard/FredReleasesWidget';
 import InsiderTransactionsWidget from '@/components/dashboard/InsiderTransactionsWidget';
@@ -35,7 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gem, Star, TrendingUp, Zap, Shield, Activity, Scale } from 'lucide-react';
 import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 import { subDays, format, parseISO, isValid, differenceInDays } from 'date-fns';
-import OverviewSkeleton from '@/components/dashboard/OverviewSkeleton'; // <<< ADD THIS
+import OverviewSkeleton from '@/components/dashboard/OverviewSkeleton';
 
 export const revalidate = 300; 
 
@@ -105,7 +105,6 @@ const fetchDataForRiskAndSummaryLists = async (
       indicatorsWithOriginalId
       .filter(item => {
           if (!item.indicator) { 
-            // console.warn(`[fetchDataForRiskAndSummaryLists] Indicator metadata not found for ID: ${item.originalId}`);
             return false; 
           }
           return true;
@@ -199,31 +198,58 @@ async function DashboardContent({ searchParams }: { searchParams?: { country?: s
   
   const dataFetchTimestamp = new Date().toISOString();
 
+  // Helper to wrap promises and log their individual outcomes
+  const handlePromise = async <T>(promise: Promise<T>, name: string): Promise<T | []> => { // Return T or empty array on error
+    try {
+      const result = await promise;
+      console.log(`[DashboardContent] Successfully fetched ${name}. Item count: ${Array.isArray(result) ? result.length : 'N/A (not an array)'}`);
+      if (name === "FRED Releases" || name === "Earnings Events") { // More detailed log for specific items
+        console.log(`[DashboardContent] ${name} Data:`, JSON.stringify(result, null, 2).substring(0, 1000)); // Log first 1000 chars
+      }
+      return result;
+    } catch (error: any) {
+      console.error(`[DashboardContent] Error fetching ${name}:`, error.message);
+      return []; // Return an empty array on error so Promise.all doesn't fail entirely
+    }
+  };
+
   const newsApiHeadlinesPromise = fetchNewsHeadlines('business', 'us', 5);
   const alphaNewsPromise = fetchAlphaVantageNewsSentiment(undefined, "economy,financial_markets,earnings", 3); 
-  const economicEventsPromise = fetchEconomicCalendar(30);
   const fredReleasesPromise = fetchFredReleaseCalendar(30);
   const earningsEventsPromise = fetchAlphaVantageEarningsCalendar('3month', undefined); 
   const insiderTradesPromise = fetchAlphaVantageInsiderTransactions(DEFAULT_INSIDER_TICKER_FOR_OVERVIEW, 5); 
 
+  // --- Using the handlePromise wrapper ---
   const [
     summaryData, marketSnapshotData, favoritesInitialData, riskSpectrumFetchedData,
-    newsApiArticles, alphaNewsArticles, economicEvents, fredReleases, earningsEvents, insiderTransactionsData
+    newsApiArticles, alphaNewsArticles, 
+    fredReleases, // Will be FredReleaseDate[] or []
+    earningsEvents, // Will be EarningsEventAV[] or []
+    insiderTransactionsData
   ] = await Promise.all([
-    fetchDataForRiskAndSummaryLists(headlineIndicatorIds, country, dateRange),
-    fetchDataForRiskAndSummaryLists(marketSnapshotIndicatorIds, country, dateRange, true),
-    (isLoggedIn && (userTier === 'basic' || userTier === 'pro') && favoriteIndicatorIdsFromSession.length > 0)
-        ? fetchDataForRiskAndSummaryLists(favoriteIndicatorIdsFromSession.slice(0, MAX_FAVORITES_ON_OVERVIEW), country, dateRange)
-        : Promise.resolve([]),
-    fetchDataForRiskAndSummaryLists(allRiskSpectrumIndicatorIds, country, dateRange),
-    newsApiHeadlinesPromise, alphaNewsPromise, economicEventsPromise, fredReleasesPromise, earningsEventsPromise, insiderTradesPromise,
+    handlePromise(fetchDataForRiskAndSummaryLists(headlineIndicatorIds, country, dateRange), "Summary Data"),
+    handlePromise(fetchDataForRiskAndSummaryLists(marketSnapshotIndicatorIds, country, dateRange, true), "Market Snapshot Data"),
+    handlePromise(
+        (isLoggedIn && (userTier === 'basic' || userTier === 'pro') && favoriteIndicatorIdsFromSession.length > 0)
+            ? fetchDataForRiskAndSummaryLists(favoriteIndicatorIdsFromSession.slice(0, MAX_FAVORITES_ON_OVERVIEW), country, dateRange)
+            : Promise.resolve([]), 
+        "Favorites Initial Data"
+    ),
+    handlePromise(fetchDataForRiskAndSummaryLists(allRiskSpectrumIndicatorIds, country, dateRange), "Risk Spectrum Data"),
+    handlePromise(newsApiHeadlinesPromise, "News API Headlines"), 
+    handlePromise(alphaNewsPromise, "AlphaNews Sentiment"), 
+    handlePromise(fredReleasesPromise, "FRED Releases"), // Wrapped
+    handlePromise(earningsEventsPromise, "Earnings Events"), // Wrapped
+    handlePromise(insiderTradesPromise, "Insider Transactions"),
   ]);
+  // const economicEvents: any[] = []; // Keep this if you re-enable the economic calendar
 
-  const favoritesSnippetData = favoritesInitialData;
+
+  const favoritesSnippetData = Array.isArray(favoritesInitialData) ? favoritesInitialData : []; // Ensure it's an array
   const processedRiskSpectrumDisplayData = riskSpectrumSetup.map(categoryConfig => {
     const indicatorsDisplayData: KeyIndicatorDisplayInfo[] = categoryConfig.keyIndicatorsConfig
       .map(cfg => {
-        const fetchedIndData = riskSpectrumFetchedData.find(d => d.indicator.id === cfg.id);
+        const fetchedIndData = (Array.isArray(riskSpectrumFetchedData) ? riskSpectrumFetchedData : []).find(d => d.indicator.id === cfg.id);
         const indicatorMeta = getIndicatorById(cfg.id);
         if (!indicatorMeta) return null;
         const categoryInfo = getCategoryBySlug(indicatorMeta.categoryKey);
@@ -271,14 +297,14 @@ async function DashboardContent({ searchParams }: { searchParams?: { country?: s
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3 mt-6 flex items-center"><TrendingUp className="h-5 w-5 mr-2 text-indigo-500"/> Key Indicators</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-              {summaryData.length > 0 ? (
+              {Array.isArray(summaryData) && summaryData.length > 0 ? (
                   summaryData
                       .filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id))
                       .slice(0, 9) 
                       .map(({ indicator, latestValue, previousValue, sparklineData }) => (
                   <SummaryCard key={indicator.id} indicator={indicator} latestValue={latestValue} previousValue={previousValue} sparklineData={sparklineData}/> ))
               ) : ( <p className="col-span-full text-center text-muted-foreground py-8">No key indicators to display.</p> )}
-              {summaryData.length > 0 && summaryData.filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id)).slice(0,9).length === 0 && (
+              {Array.isArray(summaryData) && summaryData.length > 0 && summaryData.filter(data => data.latestValue !== null || (country !== 'US' && !data.indicator.id.startsWith("US")) || ['BTC_PRICE_USD', 'CRYPTO_FEAR_GREED', 'SP500'].includes(data.indicator.id)).slice(0,9).length === 0 && (
                   <p className="col-span-full text-center text-muted-foreground py-8">Key indicators are currently unavailable for the selected criteria.</p> )}
             </div>
           </section>
@@ -300,7 +326,7 @@ async function DashboardContent({ searchParams }: { searchParams?: { country?: s
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-lg font-semibold flex items-center"><Zap className="h-5 w-5 mr-2 text-blue-500"/>Market Snapshot</CardTitle></CardHeader>
             <CardContent className="space-y-1">
-              {marketSnapshotData.length > 0 && marketSnapshotData.some(d => d.latestValue) ? marketSnapshotData.filter(d => d.latestValue).map(({indicator, latestValue, previousValue, change7D, trendIconName: initialTrendIconName, trendColor: initialTrendColor}) => {
+              {Array.isArray(marketSnapshotData) && marketSnapshotData.length > 0 && marketSnapshotData.some(d => d.latestValue) ? marketSnapshotData.filter(d => d.latestValue).map(({indicator, latestValue, previousValue, change7D, trendIconName: initialTrendIconName, trendColor: initialTrendColor}) => {
                   let trendIconNameToUse = initialTrendIconName;
                   let trendColorForSnapshot = initialTrendColor || 'text-muted-foreground';
                   let displayChangeValue = previousValue && latestValue?.value != null && previousValue?.value != null && previousValue.value !== 0 ? (((latestValue.value - previousValue.value) / Math.abs(previousValue.value)) * 100) : ( latestValue?.value != null && previousValue?.value === 0 && latestValue.value !==0 ? Infinity : null);
@@ -358,12 +384,12 @@ async function DashboardContent({ searchParams }: { searchParams?: { country?: s
               }) : <p className="text-sm text-muted-foreground p-2.5">Snapshot data unavailable.</p>}
             </CardContent>
           </Card>
-          <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} />
-          <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News" dataTimestamp={dataFetchTimestamp} />
-          <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} dataTimestamp={dataFetchTimestamp} />
-          <FredReleasesWidget initialReleases={fredReleases} itemCount={5} dataTimestamp={dataFetchTimestamp} />
-          <EarningsCalendarWidget initialEvents={earningsEvents} horizon="3month" itemCount={5} dataTimestamp={dataFetchTimestamp} />
-          <InsiderTransactionsWidget initialTransactions={insiderTransactionsData} itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <NewsFeedWidget initialNews={Array.isArray(newsApiArticles) ? newsApiArticles : []} itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <AlphaNewsSentimentWidget initialArticles={Array.isArray(alphaNewsArticles) ? alphaNewsArticles : []} itemCount={3} title="Market Sentiment News" dataTimestamp={dataFetchTimestamp} />
+          {/* <EconomicCalendarWidget initialEvents={Array.isArray(economicEvents) ? economicEvents : []} daysAhead={30} itemCount={4} dataTimestamp={dataFetchTimestamp} /> */}
+          <FredReleasesWidget initialReleases={Array.isArray(fredReleases) ? fredReleases : []} itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <EarningsCalendarWidget initialEvents={Array.isArray(earningsEvents) ? earningsEvents : []} horizon="3month" itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <InsiderTransactionsWidget initialTransactions={Array.isArray(insiderTransactionsData) ? insiderTransactionsData : []} itemCount={5} dataTimestamp={dataFetchTimestamp} />
         </aside>
       </div>
     </div>

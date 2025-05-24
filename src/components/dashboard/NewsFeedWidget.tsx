@@ -1,4 +1,4 @@
-// File: src/components/dashboard/NewsFeedWidget.tsx
+// src/components/dashboard/NewsFeedWidget.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 interface NewsFeedWidgetProps {
   initialNews?: NewsArticle[];
   itemCount?: number;
-  // dataTimestamp?: string; // If you add this later for overall widget update time
+  dataTimestamp?: string; // Added prop for overall widget data timestamp
 }
 
 const formatPublishedTimeClient = (publishedAt: string | null | undefined): string => {
@@ -21,18 +21,18 @@ const formatPublishedTimeClient = (publishedAt: string | null | undefined): stri
     if (!isValid(date)) return 'Invalid date';
     return formatDistanceToNowStrict(date, { addSuffix: true });
   } catch (e) {
-    console.error("Error formatting date:", e);
-    return 'Error in date';
+    // console.error("Error formatting date:", e); // Can be noisy
+    return 'Invalid date';
   }
 };
 
 export default function NewsFeedWidget({
     initialNews = [],
     itemCount = 5,
-    // dataTimestamp // If you add this later
+    dataTimestamp 
 }: NewsFeedWidgetProps) {
   const articlesToDisplay = initialNews.slice(0, itemCount);
-  const [isClient, setIsClient] = useState(false); // This handles hydration for article.publishedAt
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -84,13 +84,12 @@ export default function NewsFeedWidget({
             ))}
           </ul>
         )}
-         {/* If you add dataTimestamp prop for the widget itself: */}
-         {/* {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+        {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
             <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
                 News feed as of {isClient ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
             </p>
-         )} */}
-         <div className="mt-4 text-center">
+        )}
+         <div className="mt-1 text-center">
             <a href="https://newsapi.org" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 News powered by NewsAPI.org
             </a>

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from '@/components/ui/button';
 import { FaInfoCircle } from 'react-icons/fa';
 import { FiBarChart2, FiAlertCircle } from 'react-icons/fi';
-import { Lock, Star, BarChartHorizontalBig } from 'lucide-react';
+import { Lock, Star, BarChartHorizontalBig, Download, Loader2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
@@ -19,17 +19,40 @@ import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
 import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
 import ChartComponent, { MovingAverageSeries } from './ChartComponent';
 import { format, parseISO, isValid } from 'date-fns';
-import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions'; // <<< UPDATED IMPORT
-import toast from 'react-hot-toast'; // For potential upgrade prompts
+import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
+import toast from 'react-hot-toast';
 
 const getMaPeriods = (frequency?: string): number[] => {
     if (frequency === 'Daily' || frequency === 'Weekly') return [20, 50, 100];
     if (frequency === 'Monthly') return [3, 6, 12];
     if (frequency === 'Quarterly') return [2, 4];
-    return [30];
+    return [30]; // Default for unspecified or other frequencies
 };
 
-// FEATURE_ACCESS is now in permissions.ts
+const downloadCSV = (data: TimeSeriesDataPoint[], filename: string) => {
+  if (!data || data.length === 0) {
+    toast.error("No data available to download.");
+    return;
+  }
+  const header = "date,value\n";
+  const csvContent = data
+    .map(row => `${row.date},${row.value === null || row.value === undefined ? '' : row.value}`)
+    .join("\n");
+  
+  const blob = new Blob([header + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${filename.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_data.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+};
+
 
 export default function IndicatorCard({ indicator, latestValue, historicalData }: IndicatorCardProps) {
   const router = useRouter();
@@ -41,12 +64,13 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
   const canAccessMAs = canUserAccessFeature(userTier, FEATURE_KEYS.MOVING_AVERAGES);
   const canAccessAdvancedStats = canUserAccessFeature(userTier, FEATURE_KEYS.ADVANCED_STATS_BUTTON);
   const canUseFavorites = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
+  const canExportData = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.DATA_EXPORT);
 
   const { addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites();
   const currentIsFavorited = useMemo(() => isFavorited(indicator.id), [isFavorited, indicator.id]);
 
   const displayValue = useMemo(() => latestValue?.value !== null && latestValue?.value !== undefined
-    ? `${latestValue.value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${indicator.unit}`
+    ? `${latestValue.value.toLocaleString(undefined, { maximumFractionDigits: indicator.unit === '%' || indicator.unit?.includes('Index') ? 1 : 2 })} ${indicator.unit}`
     : 'N/A', [latestValue, indicator.unit]);
 
   const displayDate = useMemo(() => {
@@ -80,8 +104,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
     }).filter(ma => ma.data.length > 0);
   }, [validHistoricalData, selectedMaPeriods, canAccessMAs]);
 
-  const promptUpgrade = (featureName: string) => {
-    // Using toast to suggest upgrade, can be made more interactive later
+  const promptUpgrade = (featureName: string, requiredTierText: string = "a higher tier") => {
     toast.custom((t) => (
         <div
           className={`${
@@ -98,7 +121,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                   Upgrade Required
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {featureName} requires a Basic or Pro plan.
+                  {featureName} requires {requiredTierText}.
                 </p>
               </div>
             </div>
@@ -112,29 +135,34 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
     );
   };
 
+  const promptLoginForFeature = (featureName: string) => {
+    toast((t) => (
+        <span>
+          Please login to use {featureName.toLowerCase()}.
+          <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => {router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search)); toast.dismiss(t.id);}}>Login</Button>
+        </span>
+    ));
+  };
+
   const handleMaToggle = (period: number) => {
+    if (!isLoggedIn) {
+        promptLoginForFeature("Moving Averages"); return;
+    }
     if (!canAccessMAs) {
-        promptUpgrade("Moving Averages");
+        promptUpgrade("Moving Averages", "Basic or Pro");
         return;
     }
     setSelectedMaPeriods(prev =>
-/*************  ✨ Windsurf Command ⭐  *************/
-/**
- * Toggles the favorite status of an indicator for the current user.
- * 
- * - If the user is not logged in, prompts them to log in first.
- * - If the user's plan does not support favoriting, prompts them to upgrade.
- * - If the favorite operation is currently loading, exits early.
- * - Otherwise, adds or removes the indicator from the user's favorites based on the current status.
- */
-
-/*******  38d9ba28-c637-4081-b331-2c0345b8849d  *******/      prev.includes(period) ? prev.filter(p => p !== period) : [...prev, period]
+      prev.includes(period) ? prev.filter(p => p !== period) : [...prev, period]
     );
   };
 
   const handleAdvancedStatsClick = () => {
+    if (!isLoggedIn) {
+        promptLoginForFeature("Advanced Statistics"); return;
+    }
     if (!canAccessAdvancedStats) {
-        promptUpgrade("Advanced Statistics");
+        promptUpgrade("Advanced Statistics", "Pro");
         return;
     }
     toast.success("Pro Feature: Advanced Statistics (Placeholder)");
@@ -142,16 +170,10 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
 
   const handleFavoriteToggle = async () => {
     if (!isLoggedIn) {
-        toast((t) => (
-            <span>
-              Please login to save favorites.
-              <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => {router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search)); toast.dismiss(t.id);}}>Login</Button>
-            </span>
-        ));
-        return;
+        promptLoginForFeature("Favorites"); return;
     }
     if (!canUseFavorites) {
-        promptUpgrade("Favoriting indicators");
+        promptUpgrade("Favoriting indicators", "Basic or Pro");
         return;
     }
     if (isLoadingFavorites) return;
@@ -162,12 +184,26 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
       await addFavorite(indicator.id);
     }
   };
+  
+  const handleDataExport = () => {
+    if (!isLoggedIn) {
+        promptLoginForFeature("Data Export"); return;
+    }
+    if (!canExportData) {
+      promptUpgrade("Data Export", "Pro");
+      return;
+    }
+    downloadCSV(validHistoricalData, indicator.name);
+    // Toast for success can be added here or kept in downloadCSV
+    // toast.success(`Exporting data for ${indicator.name}`); 
+  };
 
-  const isDataEffectivelyUnavailable = historicalData.length === 0 && latestValue === null;
+  const isDataEffectivelyUnavailable = validHistoricalData.length === 0 && latestValue === null;
+
 
   return (
     <Card id={`indicator-${indicator.id}`} className="flex flex-col h-full border bg-card text-card-foreground shadow-sm hover:shadow-lg transition-shadow duration-200 relative overflow-hidden group">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 px-4 pt-4 sm:px-5 sm:pt-5">
         <div className="flex justify-between items-start gap-2">
           <div className='flex-1 min-w-0'>
             <CardTitle className="text-base md:text-lg font-semibold leading-tight tracking-tight truncate" title={indicator.name}>
@@ -178,24 +214,54 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
               <span className="text-xs ml-1 text-muted-foreground">{displayDate}</span>
             </CardDescription>
           </div>
-          <div className="flex items-center space-x-1 flex-shrink-0">
-            {isLoggedIn && (
-                <TooltipProvider delayDuration={100}> <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost" size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-amber-500 disabled:opacity-50"
-                            onClick={handleFavoriteToggle} disabled={isLoadingFavorites || !canUseFavorites}
-                            aria-label={currentIsFavorited ? "Remove from favorites" : "Add to favorites"}
-                        > {currentIsFavorited ? <Star className="h-4 w-4 fill-amber-400 text-amber-500" /> : <Star className="h-4 w-4" />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                        <p>{currentIsFavorited ? "Unfavorite" : "Favorite"}</p>
-                        {!canUseFavorites && <p className="text-xs text-amber-600 mt-1">Upgrade to use favorites.</p>}
-                    </TooltipContent>
-                </Tooltip> </TooltipProvider>
+          <div className="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
+            {/* Favorite Button */}
+            <TooltipProvider delayDuration={100}> <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-amber-500 disabled:opacity-50 relative"
+                        onClick={handleFavoriteToggle} 
+                        disabled={isLoadingFavorites || (isLoggedIn && !canUseFavorites)}
+                        aria-label={currentIsFavorited ? "Remove from favorites" : "Add to favorites"}
+                    > 
+                      {isLoadingFavorites ? <Loader2 className="h-4 w-4 animate-spin" /> : (currentIsFavorited ? <Star className="h-4 w-4 fill-amber-400 text-amber-500" /> : <Star className="h-4 w-4" />)}
+                      {isLoggedIn && !canUseFavorites && !isLoadingFavorites && <Lock className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600 bg-card rounded-full p-0.5" />}
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                    <p>{currentIsFavorited ? "Unfavorite" : "Favorite"}</p>
+                    {isLoggedIn && !canUseFavorites && <p className="text-xs text-amber-600 mt-1">Upgrade to use favorites.</p>}
+                    {!isLoggedIn && <p className="text-xs text-muted-foreground mt-1">Login to use favorites.</p>}
+                </TooltipContent>
+            </Tooltip> </TooltipProvider>
+            
+            {/* Export Button */}
+            {validHistoricalData.length > 0 && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost" size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-primary disabled:opacity-50 relative"
+                      onClick={handleDataExport}
+                      disabled={isLoggedIn && !canExportData}
+                      aria-label="Export Data as CSV"
+                    >
+                      <Download className="h-4 w-4" />
+                      {isLoggedIn && !canExportData && <Lock className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600 bg-card rounded-full p-0.5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>Export Data (CSV)</p>
+                    {isLoggedIn && !canExportData && <p className="text-xs text-amber-600 mt-1">Upgrade to Pro to export.</p>}
+                    {!isLoggedIn && <p className="text-xs text-muted-foreground mt-1">Login to export data.</p>}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
+
+            {/* Stats Button */}
             {statistics && statistics.count > 0 && (
                  <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
@@ -212,6 +278,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                     </ul>
                  </TooltipContent> </Tooltip> </TooltipProvider>
             )}
+            {/* Info Button */}
             {indicator.description && (
               <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
@@ -266,18 +333,18 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                   id={`ma-${indicator.id}-${period}`}
                   checked={selectedMaPeriods.includes(period) && canAccessMAs}
                   onCheckedChange={() => handleMaToggle(period)}
-                  disabled={!canAccessMAs}
+                  disabled={isLoggedIn && !canAccessMAs}
                   className="h-4 w-7 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
                 />
-                <Label htmlFor={`ma-${indicator.id}-${period}`} className={`text-xs ${!canAccessMAs ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                <Label htmlFor={`ma-${indicator.id}-${period}`} className={`text-xs ${(!isLoggedIn || !canAccessMAs) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                   {period}{indicator.frequency?.charAt(0).toUpperCase() || 'P'}
                 </Label>
-                {!canAccessMAs && (
+                {isLoggedIn && !canAccessMAs && (
                   <TooltipProvider delayDuration={50}> <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                            onClick={(e) => {e.preventDefault(); e.stopPropagation(); promptUpgrade("Moving Averages");}}
-                            className="flex items-center justify-center h-full ml-0.5"
+                            onClick={(e) => {e.preventDefault(); e.stopPropagation(); promptUpgrade("Moving Averages", "Basic or Pro");}}
+                            className="flex items-center justify-center h-full ml-0.5 cursor-pointer"
                             aria-label="Upgrade for Moving Averages"
                         > <Lock className="h-3 w-3 text-amber-500 group-hover:text-amber-400 transition-colors" />
                         </button>
@@ -290,26 +357,43 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                       </TooltipContent>
                   </Tooltip> </TooltipProvider>
                 )}
+                 {!isLoggedIn && ( // Prompt to login if not logged in for MAs
+                    <TooltipProvider delayDuration={50}> <Tooltip>
+                        <TooltipTrigger asChild>
+                             <button onClick={(e) => {e.preventDefault(); e.stopPropagation(); promptLoginForFeature("Moving Averages");}} className="flex items-center justify-center h-full ml-0.5 cursor-pointer" aria-label="Login for Moving Averages" >
+                                <Lock className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top"><p className="text-xs">Login to use Moving Averages.</p></TooltipContent>
+                    </Tooltip> </TooltipProvider>
+                )}
               </div>
             ))}
           </div>
         )}
-
-        { ( // Always show button, but disable if no access
+        {(
             <div className="w-full pt-1.5 border-t mt-1.5">
                 <Button
                     variant="outline" size="xs" className="w-full text-xs h-7"
-                    onClick={handleAdvancedStatsClick} disabled={!canAccessAdvancedStats}
+                    onClick={handleAdvancedStatsClick} 
+                    disabled={isLoggedIn && !canAccessAdvancedStats}
                 >
                     <BarChartHorizontalBig className="mr-1.5 h-3.5 w-3.5" />
                     Advanced Stats
-                    {!canAccessAdvancedStats && <Lock className="ml-1.5 h-3 w-3 text-amber-500" />}
+                    {isLoggedIn && !canAccessAdvancedStats && <Lock className="ml-1.5 h-3 w-3 text-amber-500" />}
                 </Button>
-                {!canAccessAdvancedStats && (
+                {isLoggedIn && !canAccessAdvancedStats && (
                     <p className="text-xs text-muted-foreground text-center mt-0.5">
                         <Button asChild variant="link" size="xs" className="p-0 h-auto text-xs">
                             <Link href="/pricing">Upgrade to Pro</Link>
                         </Button> for Advanced Statistics.
+                    </p>
+                )}
+                {!isLoggedIn && (
+                     <p className="text-xs text-muted-foreground text-center mt-0.5">
+                        <Button asChild variant="link" size="xs" className="p-0 h-auto text-xs">
+                            <Link href={`/login?callbackUrl=${encodeURIComponent(router.asPath || '/dashboard')}`}>Login</Link>
+                        </Button> or <Button asChild variant="link" size="xs" className="p-0 h-auto text-xs"><Link href="/pricing">Upgrade</Link></Button> for this feature.
                     </p>
                 )}
             </div>
