@@ -1,19 +1,19 @@
-// src/components/dashboard/NewsFeedWidget.tsx
+// File: src/components/dashboard/NewsFeedWidget.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Import useState and useEffect
+import React, { useState, useEffect } from 'react';
 import { NewsArticle } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Newspaper, Info } from 'lucide-react';
-import { formatDistanceToNowStrict, parseISO, isValid } from 'date-fns'; // Import parseISO and isValid
+import { formatDistanceToNowStrict, parseISO, isValid } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NewsFeedWidgetProps {
   initialNews?: NewsArticle[];
   itemCount?: number;
+  // dataTimestamp?: string; // If you add this later for overall widget update time
 }
 
-// Helper function to format time, to be used client-side
 const formatPublishedTimeClient = (publishedAt: string | null | undefined): string => {
   if (!publishedAt) return '';
   try {
@@ -28,13 +28,14 @@ const formatPublishedTimeClient = (publishedAt: string | null | undefined): stri
 
 export default function NewsFeedWidget({
     initialNews = [],
-    itemCount = 5
+    itemCount = 5,
+    // dataTimestamp // If you add this later
 }: NewsFeedWidgetProps) {
   const articlesToDisplay = initialNews.slice(0, itemCount);
-  const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(false); // This handles hydration for article.publishedAt
 
   useEffect(() => {
-    setIsClient(true); // This will set to true only on the client-side after mount
+    setIsClient(true);
   }, []);
 
   return (
@@ -72,13 +73,10 @@ export default function NewsFeedWidget({
                   </h4>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
                     <span>{article.source.name}</span>
-                    {/* Conditional rendering for the timestamp */}
                     {isClient && article.publishedAt ? (
                         <span>{formatPublishedTimeClient(article.publishedAt)}</span>
                     ) : (
-                        // You can put a placeholder here or render nothing server-side for this specific part
-                        // For a "time ago" string, it's often better to render it only on client
-                        <span> </span> // Or a very generic placeholder like "Recently"
+                        <span> </span> 
                     )}
                   </div>
                 </a>
@@ -86,6 +84,12 @@ export default function NewsFeedWidget({
             ))}
           </ul>
         )}
+         {/* If you add dataTimestamp prop for the widget itself: */}
+         {/* {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
+            <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
+                News feed as of {isClient ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
+            </p>
+         )} */}
          <div className="mt-4 text-center">
             <a href="https://newsapi.org" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">
                 News powered by NewsAPI.org

@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import SidebarNav from '@/components/dashboard/SidebarNav';
 import Header from '@/components/dashboard/Header';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link'; // Added for footer
+import Link from 'next/link';
 
 export default function DashboardLayout({
   children,

@@ -193,7 +193,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
 
   const allRiskSpectrumIndicatorIds = Array.from(new Set( riskSpectrumSetup.flatMap(cat => cat.keyIndicatorsConfig.map(ind => ind.id)) ));
   
-  const dataFetchTimestamp = new Date().toISOString(); // For "Last Updated" display
+  const dataFetchTimestamp = new Date().toISOString();
 
   const newsApiHeadlinesPromise = fetchNewsHeadlines('business', 'us', 5);
   const alphaNewsPromise = fetchAlphaVantageNewsSentiment(undefined, "economy,financial_markets,earnings", 3); 
@@ -354,7 +354,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: { 
               }) : <p className="text-sm text-muted-foreground p-2.5">Snapshot data unavailable.</p>}
             </CardContent>
           </Card>
-          <NewsFeedWidget initialNews={newsApiArticles} itemCount={5} dataTimestamp={dataFetchTimestamp} />
+          <NewsFeedWidget initialNews={newsApiArticles} /> 
           <AlphaNewsSentimentWidget initialArticles={alphaNewsArticles} itemCount={3} title="Market Sentiment News" dataTimestamp={dataFetchTimestamp} />
           <EconomicCalendarWidget initialEvents={economicEvents} daysAhead={30} itemCount={4} dataTimestamp={dataFetchTimestamp} />
           <FredReleasesWidget initialReleases={fredReleases} itemCount={5} dataTimestamp={dataFetchTimestamp} />

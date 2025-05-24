@@ -1,18 +1,17 @@
 // File: src/components/dashboard/FredReleasesWidget.tsx
-// (Adding dataTimestamp prop)
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { FredReleaseDate } from '@/lib/api'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarCheck, Info } from 'lucide-react';
-import { format, parseISO, isToday, isTomorrow, isValid, startOfToday, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
+import { format, parseISO, isToday, isTomorrow, isValid, startOfToday, formatDistanceToNowStrict } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FredReleasesWidgetProps {
     initialReleases?: FredReleaseDate[];
     itemCount?: number;
-    dataTimestamp?: string; // For "Last Updated" display
+    dataTimestamp?: string;
 }
 
 export default function FredReleasesWidget({
@@ -21,6 +20,11 @@ export default function FredReleasesWidget({
     dataTimestamp
 }: FredReleasesWidgetProps) {
   const today = startOfToday();
+  const [isClientMounted, setIsClientMounted] = useState(false); // <<< ADDED STATE
+
+  useEffect(() => { // <<< ADDED EFFECT
+      setIsClientMounted(true);
+  }, []);
 
   const futureAndTodayReleases = initialReleases
     .filter(release => {
@@ -82,7 +86,8 @@ export default function FredReleasesWidget({
         )}
         {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
             <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
-                Release schedule as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+                Release schedule as of {/* <<< MODIFIED LINE */}
+                {isClientMounted ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
             </p>
         )}
          <div className="mt-1 text-center">

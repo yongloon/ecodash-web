@@ -1,10 +1,10 @@
-// src/components/dashboard/AssetRiskCategoryCard.tsx
+// File: src/components/dashboard/AssetRiskCategoryCard.tsx
 "use client";
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from 'next/link';
-import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa'; // Keep these imports here
+import { FaArrowUp, FaArrowDown, FaMinus } from 'react-icons/fa';
 
 export interface KeyIndicatorDisplayInfo {
   id: string;
@@ -12,7 +12,7 @@ export interface KeyIndicatorDisplayInfo {
   unit: string;
   link: string;
   currentValueDisplay: string;
-  trendIconName?: 'up' | 'down' | 'neutral'; // <<< CHANGED prop type
+  trendIconName?: 'up' | 'down' | 'neutral'; // Corrected prop name
   trendColor?: string;
   explanation: string;
 }
@@ -23,7 +23,6 @@ interface AssetRiskCategoryCardProps {
   indicatorsDisplayData: KeyIndicatorDisplayInfo[];
 }
 
-// Helper to get the icon component based on name
 const getTrendIcon = (iconName?: 'up' | 'down' | 'neutral'): React.ElementType | null => {
   if (iconName === 'up') return FaArrowUp;
   if (iconName === 'down') return FaArrowDown;
@@ -40,7 +39,7 @@ export default function AssetRiskCategoryCard({ title, description, indicatorsDi
       </CardHeader>
       <CardContent className="space-y-3 pt-2 pb-4">
         {indicatorsDisplayData.length > 0 ? indicatorsDisplayData.map(item => {
-          const TrendIconComponent = getTrendIcon(item.trendIconName); // <<< GET ICON COMPONENT HERE
+          const TrendIconComponent = getTrendIcon(item.trendIconName); // Using corrected prop name
           return (
             <div key={item.id} className="pb-2.5 border-b border-border/30 last:border-b-0 last:pb-0">
               <div className="flex justify-between items-center mb-0.5">
@@ -48,7 +47,6 @@ export default function AssetRiskCategoryCard({ title, description, indicatorsDi
                   {item.name}
                 </Link>
                 <div className={`flex items-center text-sm font-semibold ${item.trendColor || 'text-foreground'}`}>
-                  {/* Render the component if it exists */}
                   {TrendIconComponent && <TrendIconComponent className="h-3.5 w-3.5 mr-1 flex-shrink-0" />}
                   <span>{item.currentValueDisplay}</span>
                 </div>

@@ -1,19 +1,18 @@
 // File: src/components/dashboard/AlphaNewsSentimentWidget.tsx
-// (Adding dataTimestamp prop similar to NewsFeedWidget)
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { NewsSentimentArticle } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { NewspaperIcon, MessageSquareText, TrendingUp, TrendingDown, MinusCircle, Info } from 'lucide-react';
-import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns'; // Added isValid, formatDistanceToNowStrict
+import { MessageSquareText, TrendingUp, TrendingDown, MinusCircle, Info } from 'lucide-react';
+import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AlphaNewsSentimentWidgetProps {
     initialArticles?: NewsSentimentArticle[];
     itemCount?: number;
     title?: string;
-    dataTimestamp?: string; // For "Last Updated" display
+    dataTimestamp?: string;
 }
 
 const getSentimentIconAndColor = (label: string): { icon: React.ElementType, color: string } => {
@@ -45,6 +44,11 @@ export default function AlphaNewsSentimentWidget({
     dataTimestamp
 }: AlphaNewsSentimentWidgetProps) {
     const articlesToDisplay = initialArticles.slice(0, itemCount);
+    const [isClientMounted, setIsClientMounted] = useState(false); // <<< ADDED STATE
+
+    useEffect(() => { // <<< ADDED EFFECT
+        setIsClientMounted(true);
+    }, []);
 
     return (
         <Card>
@@ -93,7 +97,8 @@ export default function AlphaNewsSentimentWidget({
                 )}
                 {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
                     <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
-                        Sentiment data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+                        Sentiment data as of {/* <<< MODIFIED LINE */}
+                        {isClientMounted ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
                     </p>
                 )}
                 <div className="mt-1 text-center">

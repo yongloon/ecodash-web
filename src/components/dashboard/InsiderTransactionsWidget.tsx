@@ -1,19 +1,18 @@
 // File: src/components/dashboard/InsiderTransactionsWidget.tsx
-// (Adding dataTimestamp prop)
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { InsiderTransaction } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UsersRound, DollarSign, ArrowRightLeft, Info } from 'lucide-react';
-import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
+import { ArrowRightLeft, Info } from 'lucide-react';
+import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface InsiderTransactionsWidgetProps {
     initialTransactions?: InsiderTransaction[];
     itemCount?: number;
     title?: string;
-    dataTimestamp?: string; // For "Last Updated" display
+    dataTimestamp?: string;
 }
 
 const formatTransactionType = (code: string, type: string): string => {
@@ -35,6 +34,11 @@ export default function InsiderTransactionsWidget({
     dataTimestamp
 }: InsiderTransactionsWidgetProps) {
     const transactionsToDisplay = initialTransactions.slice(0, itemCount);
+    const [isClientMounted, setIsClientMounted] = useState(false); // <<< ADDED STATE
+
+    useEffect(() => { // <<< ADDED EFFECT
+        setIsClientMounted(true);
+    }, []);
 
     return (
         <Card>
@@ -81,7 +85,8 @@ export default function InsiderTransactionsWidget({
                 )}
                 {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
                     <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
-                        Insider data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+                        Insider data as of {/* <<< MODIFIED LINE */}
+                        {isClientMounted ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
                     </p>
                 )}
                 <div className="mt-1 text-center">

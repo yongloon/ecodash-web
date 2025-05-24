@@ -1,19 +1,18 @@
 // File: src/components/dashboard/EconomicCalendarWidget.tsx
-// (Adding dataTimestamp prop)
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { EconomicEvent } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Info } from 'lucide-react';
-import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns'; // Added formatDistanceToNowStrict
+import { format, parseISO, isValid, formatDistanceToNowStrict } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface EconomicCalendarWidgetProps {
     initialEvents?: EconomicEvent[];
     daysAhead?: number;
     itemCount?: number;
-    dataTimestamp?: string; // For "Last Updated" display
+    dataTimestamp?: string;
 }
 
 export default function EconomicCalendarWidget({
@@ -25,6 +24,12 @@ export default function EconomicCalendarWidget({
   const eventsToDisplay = initialEvents
     .filter(event => event.country === 'US' && (event.impact === 'high' || event.impact === 'medium'))
     .slice(0, itemCount);
+
+  const [isClientMounted, setIsClientMounted] = useState(false); // <<< ADDED STATE
+
+  useEffect(() => { // <<< ADDED EFFECT
+      setIsClientMounted(true);
+  }, []);
 
   const getImpactColor = (impact: string | null | undefined) => {
     if (impact === 'high') return 'text-red-500 dark:text-red-400';
@@ -81,7 +86,8 @@ export default function EconomicCalendarWidget({
         )}
         {dataTimestamp && isValid(parseISO(dataTimestamp)) && (
             <p className="mt-3 pt-3 border-t border-border/30 text-center text-xs text-muted-foreground/80">
-                Calendar data as of {formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true })}
+                Calendar data as of {/* <<< MODIFIED LINE */}
+                {isClientMounted ? formatDistanceToNowStrict(parseISO(dataTimestamp), { addSuffix: true }) : "a moment ago"}
             </p>
         )}
          <div className="mt-1 text-center">

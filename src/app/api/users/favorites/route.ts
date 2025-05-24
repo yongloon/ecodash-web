@@ -2,27 +2,24 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import prisma from '@/lib/prisma'; // Now PrismaClient | null
+import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
 const favoritePostSchema = z.object({
   indicatorId: z.string().min(1, "Indicator ID cannot be empty"),
 });
 
-// GET: Fetch user's favorite indicator IDs
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
   if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
 
-  // --- PRISMA CHECK ---
   if (!prisma) {
     console.warn("[API GET /users/favorites] No Database Mode: Returning demo favorites or empty.");
     const demoFavorites = (session.user as any).favoriteIndicatorIds || [];
     return NextResponse.json(demoFavorites, { status: 200 });
   }
-  // --- END PRISMA CHECK ---
 
   try {
     const favorites = await prisma.favoriteIndicator.findMany({
@@ -37,19 +34,16 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Add an indicator to favorites
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
   if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
 
-  // --- PRISMA CHECK ---
   if (!prisma) {
     console.warn("[API POST /users/favorites] No Database Mode: Cannot add favorite.");
-    return NextResponse.json({ error: 'Favorites unavailable in demo mode.' }, { status: 403 });
+    return NextResponse.json({ error: 'Favorites unavailable. Database not configured.' }, { status: 503 });
   }
-  // --- END PRISMA CHECK ---
 
   try {
     const body = await request.json();
@@ -69,19 +63,16 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE: Remove an indicator from favorites
 export async function DELETE(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const userId = (session.user as any).id;
   if (!userId) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
 
-  // --- PRISMA CHECK ---
   if (!prisma) {
     console.warn("[API DELETE /users/favorites] No Database Mode: Cannot remove favorite.");
-    return NextResponse.json({ error: 'Favorites unavailable in demo mode.' }, { status: 403 });
+    return NextResponse.json({ error: 'Favorites unavailable. Database not configured.' }, { status: 503 });
   }
-  // --- END PRISMA CHECK ---
 
   const { searchParams } = new URL(request.url);
   const indicatorId = searchParams.get('indicatorId');
