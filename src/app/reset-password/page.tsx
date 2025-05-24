@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import toast from 'react-hot-toast'; // <<< ADD THIS
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
@@ -14,41 +15,40 @@ export default function ResetPasswordPage() {
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // const [message, setMessage] = useState<string | null>(null); // Handled by toast
+  // const [error, setError] = useState<string | null>(null); // Handled by toast
   const [isLoading, setIsLoading] = useState(false);
-  const [isValidToken, setIsValidToken] = useState<boolean | null>(null); // null: checking, true: valid, false: invalid
+  const [isValidTokenState, setIsValidTokenState] = useState<boolean | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-  // Optional: Validate token on load (can also be done purely on submit)
+
   useEffect(() => {
     if (!token) {
-      setError("No reset token provided or token is invalid.");
-      setIsValidToken(false);
+      toast.error("No reset token provided or token is invalid.");
+      setIsValidTokenState(false);
       return;
     }
-    // You could add an API route to verify token validity without resetting
-    // For now, we'll just assume it's potentially valid until submission.
-    setIsValidToken(true); // Assume valid for now, server will confirm
+    setIsValidTokenState(true);
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      setError("Invalid or missing reset token.");
+      toast.error("Invalid or missing reset token.");
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      toast.error("Passwords do not match.");
       return;
     }
     if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+      toast.error("Password must be at least 6 characters long.");
       return;
     }
 
     setIsLoading(true);
-    setMessage(null);
-    setError(null);
+    // setMessage(null); // Handled by toast
+    // setError(null); // Handled by toast
 
     try {
       const response = await fetch('/api/auth/confirm-password-reset', {
@@ -58,25 +58,25 @@ export default function ResetPasswordPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || "Failed to reset password.");
+        toast.error(data.error || "Failed to reset password.");
       } else {
-        setMessage(data.message || "Password has been reset successfully. You can now login.");
-        // Optionally redirect to login after a delay
+        toast.success(data.message || "Password has been reset successfully. You can now login.");
+        setShowSuccessMessage(true); // To show the "Back to Login" button after success
         setTimeout(() => router.push('/login'), 3000);
       }
     } catch (err) {
-      setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred during password reset.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isValidToken === false) { // If token was determined invalid on load
+  if (isValidTokenState === false) {
     return (
          <div className="flex items-center justify-center min-h-screen bg-background p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader><CardTitle>Invalid Link</CardTitle></CardHeader>
-                <CardContent><p className="text-destructive">{error || "This password reset link is invalid or has expired."}</p></CardContent>
+                <CardContent><p className="text-destructive">This password reset link is invalid or has expired.</p></CardContent>
                 <CardFooter>
                     <Link href="/forgot-password">
                         <Button variant="link">Request a new link</Button>
@@ -96,8 +96,7 @@ export default function ResetPasswordPage() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {message && <p className="text-sm text-green-600">{message}</p>}
+            {/* Error/Success messages handled by toast */}
             <div className="space-y-2">
               <label htmlFor="new_password_reset" className="text-sm font-medium">New Password</label>
               <Input
@@ -106,7 +105,7 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading || !!message} // Disable if success message shown
+                disabled={isLoading || showSuccessMessage}
               />
             </div>
             <div className="space-y-2">
@@ -117,17 +116,17 @@ export default function ResetPasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                disabled={isLoading || !!message}
+                disabled={isLoading || showSuccessMessage}
               />
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading || !!message}>
+            <Button type="submit" className="w-full" disabled={isLoading || showSuccessMessage}>
               {isLoading ? 'Resetting...' : 'Reset Password'}
             </Button>
           </CardFooter>
         </form>
-         {message && (
+         {showSuccessMessage && (
             <div className="p-4 text-center">
                 <Link href="/login">
                     <Button variant="outline">Back to Login</Button>

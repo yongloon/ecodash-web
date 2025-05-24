@@ -1,12 +1,13 @@
 // File: src/components/ContactForm.tsx
 "use client";
 
-import React, { useState, useTransition, FormEvent, useRef, useEffect } from 'react'; // Added useRef, useEffect
+import React, { useTransition, FormEvent, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { submitContactFormAction } from '@/app/actions'; // Adjust path if you put actions.ts elsewhere (e.g., '@/lib/actions')
-import { useFormState } from 'react-dom'; // Recommended for handling form state with server actions
+import { submitContactFormAction } from '@/app/actions';
+import { useFormState } from 'react-dom';
+import toast from 'react-hot-toast'; // <<< ADD THIS
 
 const initialState = {
   success: null as boolean | null,
@@ -15,17 +16,21 @@ const initialState = {
 };
 
 export default function ContactForm() {
-  // Using useFormState for better state management with server actions
   const [formState, formAction] = useFormState(submitContactFormAction, initialState);
   const [isPending, startTransition] = useTransition();
-  const formRef = useRef<HTMLFormElement>(null); // Ref to reset the form
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // Effect to reset the form if submission was successful
   useEffect(() => {
     if (formState.success === true && formRef.current) {
+      toast.success(formState.message || "Message sent successfully!");
       formRef.current.reset();
+    } else if (formState.success === false && formState.error) {
+      toast.error(formState.error);
     }
-  }, [formState.success]);
+    // Reset message/error from formState so toasts don't reappear on unrelated re-renders
+    // This is tricky with useFormState as it holds the state.
+    // A more complex solution might involve a local state reset after toast.
+  }, [formState]);
 
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -33,24 +38,19 @@ export default function ContactForm() {
     const formData = new FormData(event.currentTarget);
     
     startTransition(() => {
-        formAction(formData); // Directly call the action wrapped by useFormState
+        formAction(formData);
     });
   };
 
   return (
-    // Pass formAction to the <form> element's action prop when using useFormState directly
-    // Or handle with onSubmit and startTransition as shown
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-6"> 
-      {formState.message && (
-        <p className={`text-sm p-3 rounded-md ${formState.success ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700' : 'bg-destructive/10 text-destructive border-destructive/20'}`}>
+      {/* We'll rely on toasts now, so can remove direct message rendering here if desired */}
+      {/* Or keep them as a fallback / more persistent message */}
+      {/* {formState.message && !formState.success && (
+        <p className="text-sm p-3 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
           {formState.message}
         </p>
-      )}
-      {formState.error && (
-        <p className="text-sm p-3 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
-          {formState.error}
-        </p>
-      )}
+      )} */}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">

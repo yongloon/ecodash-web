@@ -5,22 +5,22 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import toast from 'react-hot-toast'; // <<< ADD THIS
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator"; // npx shadcn-ui@latest add separator
+import { Separator } from "@/components/ui/separator";
 import { 
     LogOut, Settings, CreditCard, ShieldCheck, AlertTriangle, User as UserIcon, 
     KeyRound, Eye, EyeOff, Loader2, ExternalLinkIcon 
 } from 'lucide-react';
 
-// Helper to get initials - more robust
 const getInitials = (name?: string | null, email?: string | null): string => {
   if (name) {
-    const names = name.trim().split(' ').filter(Boolean); // Filter out empty strings from multiple spaces
+    const names = name.trim().split(' ').filter(Boolean);
     if (names.length === 0) { /* Fallthrough */ }
     else if (names.length === 1) return names[0][0]?.toUpperCase() || "?";
     else return (names[0][0] + (names[names.length - 1][0] || '')).toUpperCase();
@@ -28,7 +28,7 @@ const getInitials = (name?: string | null, email?: string | null): string => {
   if (email) {
     return email[0]?.toUpperCase() || "?";
   }
-  return "U"; // Default User
+  return "U";
 };
 
 export default function ProfilePage() {
@@ -41,8 +41,8 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [passwordChangeMessage, setPasswordChangeMessage] = useState<string | null>(null);
-  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
+  // const [passwordChangeMessage, setPasswordChangeMessage] = useState<string | null>(null); // Handled by toast
+  // const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null); // Handled by toast
   const [isPasswordChangeLoading, setIsPasswordChangeLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -52,12 +52,6 @@ export default function ProfilePage() {
   const userHasActiveSubscription = userSessionData?.hasActiveSubscription === true;
   const userStripeCustomerId = userSessionData?.stripeCustomerId;
   const activePlanName = userSessionData?.activePlanName;
-
-  // Determine if user likely has a password set locally (i.e., signed up with credentials)
-  // This is a heuristic. In a more robust system, you'd store the provider type ('credentials', 'google')
-  // with the user record or have it in the session.
-  // For now, we check if the user object in the session has an email that's NOT a typical OAuth provider format.
-  // Or, more simply, assume they can change if they are logged in. The API will reject if no passwordHash.
   const [showPasswordChangeForm, setShowPasswordChangeForm] = useState(false);
 
   useEffect(() => {
@@ -65,12 +59,7 @@ export default function ProfilePage() {
       router.replace('/login?callbackUrl=/account/profile');
     }
     if (session) {
-        // A simple check: if the session user ID doesn't look like a typical OAuth ID (which are often long strings/numbers)
-        // This is VERY crude. A better way is to check the provider used during login,
-        // which NextAuth makes available in the `account` object in the `jwt` or `signIn` callbacks.
-        // For this example, we'll enable it if they are logged in, and the API will handle if it's an OAuth user.
-        // A more direct check would be `userSessionData.provider !== 'google'` if you add provider to session.
-        setShowPasswordChangeForm(true); // Assume they can try, API will verify
+        setShowPasswordChangeForm(true); 
     }
   }, [status, router, session]);
 
@@ -84,9 +73,12 @@ export default function ProfilePage() {
         window.location.href = data.url;
       } else {
         setPortalError(data.error || 'Could not open subscription management.');
+        toast.error(data.error || 'Could not open subscription management.');
       }
     } catch (error) {
-      setPortalError('Failed to open subscription management. Please try again.');
+      const msg = 'Failed to open subscription management. Please try again.';
+      setPortalError(msg);
+      toast.error(msg);
     } finally {
       setIsPortalLoading(false);
     }
@@ -94,15 +86,15 @@ export default function ProfilePage() {
 
   const handleChangePassword = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setPasswordChangeError(null);
-    setPasswordChangeMessage(null);
+    // setPasswordChangeError(null); // Handled by toast
+    // setPasswordChangeMessage(null); // Handled by toast
 
     if (newPassword !== confirmNewPassword) {
-      setPasswordChangeError("New passwords do not match.");
+      toast.error("New passwords do not match.");
       return;
     }
-    if (newPassword.length < 6) { // Consistent with registration if you have that rule
-      setPasswordChangeError("New password must be at least 6 characters long.");
+    if (newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters long.");
       return;
     }
 
@@ -115,17 +107,15 @@ export default function ProfilePage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setPasswordChangeError(data.error || "Failed to change password.");
+        toast.error(data.error || "Failed to change password.");
       } else {
-        setPasswordChangeMessage(data.message || "Password updated successfully! You may need to log in again with your new password if your session is invalidated.");
+        toast.success(data.message || "Password updated successfully!");
         setCurrentPassword('');
         setNewPassword('');
         setConfirmNewPassword('');
-        // Consider forcing a re-login for better security after password change
-        // signOut({ callbackUrl: '/login?status=passwordChanged' });
       }
     } catch (error) {
-      setPasswordChangeError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred changing password.");
     } finally {
       setIsPasswordChangeLoading(false);
     }
@@ -139,12 +129,7 @@ export default function ProfilePage() {
     );
   }
 
-   // --- CORRECTED SECTION ---
   if (!session?.user) {
-    // This case handles when status is "unauthenticated" (after loading) 
-    // or if session.user is somehow null even if authenticated (unlikely with NextAuth default flow)
-    // The useEffect above should have already redirected if status was "unauthenticated".
-    // This is a fallback / explicit state handling.
     return (
         <div className="flex items-center justify-center min-h-screen bg-background p-4">
              <Card className="w-full max-w-sm p-6 text-center">
@@ -162,7 +147,6 @@ export default function ProfilePage() {
         </div>
     );
   }
-  // --- END CORRECTED SECTION ---
 
   const { user } = session;
 
@@ -179,8 +163,6 @@ export default function ProfilePage() {
         </CardHeader>
 
         <CardContent className="space-y-8 p-6 sm:p-8">
-          
-          {/* General Account Section */}
           <section className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Account</h3>
             <Link href="/dashboard" className="w-full block">
@@ -189,17 +171,12 @@ export default function ProfilePage() {
                 </Button>
             </Link>
           </section>
-
           <Separator />
-
-          {/* Change Password Section */}
-          {showPasswordChangeForm && ( // Conditionally render based on likelihood of having a password
+          {showPasswordChangeForm && (
             <section>
               <form onSubmit={handleChangePassword} className="space-y-4">
                   <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">Change Password</h3>
-                  {passwordChangeMessage && <p className="text-sm p-3 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">{passwordChangeMessage}</p>}
-                  {passwordChangeError && <p className="text-sm p-3 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-500 border border-red-200 dark:border-red-700">{passwordChangeError}</p>}
-                  
+                  {/* Error/Success messages handled by toast */}
                   <div className="space-y-1.5">
                       <Label htmlFor="currentPassword_profile">Current Password</Label>
                       <div className="relative">
@@ -234,7 +211,7 @@ export default function ProfilePage() {
               </form>
             </section>
           )}
-          {!showPasswordChangeForm && user?.email && ( // If form is hidden, and user has an email (likely OAuth user)
+          {!showPasswordChangeForm && user?.email && (
             <section className="border-t pt-6">
                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">Password</h3>
                  <p className="text-sm text-muted-foreground">
@@ -242,11 +219,7 @@ export default function ProfilePage() {
                  </p>
             </section>
           )}
-
-
           <Separator />
-
-          {/* Subscription Management Section */}
           <section className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Subscription</h3>
             {portalError && (
@@ -288,7 +261,6 @@ export default function ProfilePage() {
                 </div>
             )}
           </section>
-
         </CardContent>
         <CardFooter className="border-t p-6 sm:p-8 bg-muted/20">
           <Button variant="ghost" onClick={() => signOut({ callbackUrl: '/login' })} className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 justify-start">

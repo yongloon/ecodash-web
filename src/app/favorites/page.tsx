@@ -10,13 +10,9 @@ import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata } from '@/lib/
 import { fetchIndicatorData } from '@/lib/mockData';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-// --- ADD Star TO THIS IMPORT ---
 import { StarOff, AlertTriangle, Loader2, Star } from 'lucide-react'; 
-// --- ---
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
-
-// Define which tiers can use favorites (should match IndicatorCard and Sidebar)
-const FAVORITES_ACCESS_TIERS: AppPlanTier[] = ['basic', 'pro'];
+import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions'; // <<< UPDATED IMPORT
 
 type ResolvedIndicatorType = { 
     indicator: IndicatorMetadata; 
@@ -36,9 +32,10 @@ export default function FavoritesPage() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   const userTier: AppPlanTier | undefined = (session?.user as any)?.activePlanTier;
-  const canAccessFavoritesFeature = useMemo(() => {
+  
+  const canAccessFavoritesPage = useMemo(() => {
       if (sessionStatus !== 'authenticated') return false;
-      return FAVORITES_ACCESS_TIERS.includes(userTier || 'free');
+      return canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
   }, [sessionStatus, userTier]);
 
   useEffect(() => {
@@ -47,7 +44,7 @@ export default function FavoritesPage() {
       return;
     }
 
-    if (sessionStatus === 'authenticated' && canAccessFavoritesFeature && favoriteIds.length > 0) {
+    if (sessionStatus === 'authenticated' && canAccessFavoritesPage && favoriteIds.length > 0) {
       setIsLoadingPageData(true);
       setPageError(null);
       const dateRange = { 
@@ -74,11 +71,11 @@ export default function FavoritesPage() {
           }
       };
       fetchData();
-    } else if (sessionStatus === 'authenticated' && favoriteIds.length === 0 && !isLoadingFavorites) { // ensure favoriteIds are loaded
+    } else if (sessionStatus === 'authenticated' && favoriteIds.length === 0 && !isLoadingFavorites) {
         setResolvedIndicatorData([]);
         setIsLoadingPageData(false);
     }
-  }, [favoriteIds, sessionStatus, router, canAccessFavoritesFeature, searchParams, isLoadingFavorites]);
+  }, [favoriteIds, sessionStatus, router, canAccessFavoritesPage, searchParams, isLoadingFavorites]);
 
 
   if (sessionStatus === "loading" || (sessionStatus === "authenticated" && isLoadingFavorites)) {
@@ -113,7 +110,7 @@ export default function FavoritesPage() {
     );
   }
   
-  if (sessionStatus === "authenticated" && !canAccessFavoritesFeature) {
+  if (sessionStatus === "authenticated" && !canAccessFavoritesPage) {
     return (
         <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
             <StarOff className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -132,16 +129,14 @@ export default function FavoritesPage() {
     <div className="container mx-auto py-6 sm:py-8"> 
       <div className="flex justify-between items-center mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center">
-            {/* This is where Star is used */}
             <Star className="h-6 w-6 mr-3 text-amber-400 fill-amber-400"/> 
             My Favorite Indicators
         </h1>
-        {/* Optional: Add DateRangePicker here if you want to filter favorites by date */}
       </div>
       
       {isLoadingPageData && favoriteIds.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-              {[...Array(Math.min(favoriteIds.length, 6))].map((_, i) => ( // Show up to 6 skeletons
+              {[...Array(Math.min(favoriteIds.length, 6))].map((_, i) => (
                   <div key={`skel-${i}`} className="rounded-lg border bg-card p-6 shadow-sm animate-pulse h-[280px] md:h-[320px]">
                       <div className="h-5 bg-muted rounded w-3/4 mb-2"></div>
                       <div className="h-4 bg-muted rounded w-1/2 mb-4"></div>
@@ -163,7 +158,7 @@ export default function FavoritesPage() {
             />
           ))}
         </div>
-      ) : !isLoadingPageData && favoriteIds.length === 0 && sessionStatus === 'authenticated' && canAccessFavoritesFeature ? (
+      ) : !isLoadingPageData && favoriteIds.length === 0 && sessionStatus === 'authenticated' && canAccessFavoritesPage ? (
         <div className="text-center py-10 border border-dashed rounded-lg bg-card">
           <StarOff className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">No Favorites Yet</h2>

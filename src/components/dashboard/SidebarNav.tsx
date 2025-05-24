@@ -1,4 +1,3 @@
-// File: src/components/dashboard/SidebarNav.tsx
 // src/components/dashboard/SidebarNav.tsx
 "use client";
 
@@ -6,12 +5,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
 import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa';
-import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3, MessageSquare } from 'lucide-react'; // Added MessageSquare
+import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3, MessageSquareIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
-
-const FAVORITES_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['basic', 'pro']; 
-const PRO_TOOLS_SIDEBAR_ACCESS_TIERS: AppPlanTier[] = ['pro'];
+import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions'; // <<< UPDATED IMPORT
 
 interface SidebarNavProps {
   isMobileMenuOpen?: boolean;
@@ -28,8 +25,8 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
 
   const hasActivePaidSubscription = isLoggedIn && userTier && userTier !== 'free';
 
-  const canSeeFavoritesLink = isLoggedIn && FAVORITES_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
-  const canSeeProToolsLink = isLoggedIn && PRO_TOOLS_SIDEBAR_ACCESS_TIERS.includes(userTier || 'free');
+  const canSeeFavoritesLink = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
+  const canSeeProToolsLink = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.INDICATOR_COMPARISON); // Or a more general "PRO_TOOLS" key if you prefer
 
   const navLinkClasses = (isActive: boolean) => 
     `flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
@@ -137,7 +134,6 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
             </Link>
           )}
 
-           {/* Feedback Link */}
             <hr className="my-3 border-border/60" />
             <Link
               href="/contact?subject=EcoDash%20Beta%20Feedback"
@@ -145,7 +141,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
               title="Beta Feedback"
               onClick={handleLinkClick}
             >
-              <MessageSquare className="h-4 w-4 mr-3 flex-shrink-0" />
+              <MessageSquareIcon className="h-4 w-4 mr-3 flex-shrink-0" /> {/* Updated Icon */}
               <span>Provide Feedback</span>
             </Link>
 

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch"; // Correct import
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from '@/components/ui/button';
 import { FaInfoCircle } from 'react-icons/fa';
@@ -19,12 +19,8 @@ import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
 import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
 import ChartComponent, { MovingAverageSeries } from './ChartComponent';
 import { format, parseISO, isValid } from 'date-fns';
-
-interface IndicatorCardProps {
-  indicator: IndicatorMetadata;
-  latestValue: TimeSeriesDataPoint | null;
-  historicalData: TimeSeriesDataPoint[];
-}
+import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions'; // <<< UPDATED IMPORT
+import toast from 'react-hot-toast'; // For potential upgrade prompts
 
 const getMaPeriods = (frequency?: string): number[] => {
     if (frequency === 'Daily' || frequency === 'Weekly') return [20, 50, 100];
@@ -33,17 +29,7 @@ const getMaPeriods = (frequency?: string): number[] => {
     return [30];
 };
 
-const FEATURE_ACCESS: Record<string, AppPlanTier[]> = {
-    MOVING_AVERAGES: ['basic', 'pro'],
-    ADVANCED_STATS_BUTTON: ['pro'],
-    FAVORITES: ['basic', 'pro'],
-};
-
-const canUserAccessFeature = (userTier: AppPlanTier | undefined, featureKey: string): boolean => {
-    const effectiveTier = userTier || 'free';
-    return FEATURE_ACCESS[featureKey]?.includes(effectiveTier) || false;
-};
-
+// FEATURE_ACCESS is now in permissions.ts
 
 export default function IndicatorCard({ indicator, latestValue, historicalData }: IndicatorCardProps) {
   const router = useRouter();
@@ -52,11 +38,11 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
   const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier;
   const isLoggedIn = !!userSessionData && sessionStatus === 'authenticated';
 
-  const canAccessMAs = canUserAccessFeature(userTier, 'MOVING_AVERAGES');
-  const canAccessAdvancedStats = canUserAccessFeature(userTier, 'ADVANCED_STATS_BUTTON');
-  const canUseFavorites = isLoggedIn && canUserAccessFeature(userTier, 'FAVORITES');
+  const canAccessMAs = canUserAccessFeature(userTier, FEATURE_KEYS.MOVING_AVERAGES);
+  const canAccessAdvancedStats = canUserAccessFeature(userTier, FEATURE_KEYS.ADVANCED_STATS_BUTTON);
+  const canUseFavorites = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
 
-  const { addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites(); // Removed favoriteIds, not directly used
+  const { addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites();
   const currentIsFavorited = useMemo(() => isFavorited(indicator.id), [isFavorited, indicator.id]);
 
   const displayValue = useMemo(() => latestValue?.value !== null && latestValue?.value !== undefined
@@ -95,9 +81,35 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
   }, [validHistoricalData, selectedMaPeriods, canAccessMAs]);
 
   const promptUpgrade = (featureName: string) => {
-    if (confirm(`${featureName} requires a higher tier subscription. Would you like to view plans?`)) {
-        router.push('/pricing');
-    }
+    // Using toast to suggest upgrade, can be made more interactive later
+    toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-border ring-opacity-5 p-4`}
+        >
+          <div className="flex-1 w-0">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <Lock className="h-5 w-5 text-amber-500" />
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Upgrade Required
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {featureName} requires a Basic or Pro plan.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col border-l border-border/50 ml-4 pl-4 space-y-2">
+             <Button size="sm" onClick={() => { router.push('/pricing'); toast.dismiss(t.id); }}>View Plans</Button>
+             <Button size="sm" variant="outline" onClick={() => toast.dismiss(t.id)}>Dismiss</Button>
+          </div>
+        </div>
+      ), { duration: 6000 }
+    );
   };
 
   const handleMaToggle = (period: number) => {
@@ -106,7 +118,17 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
         return;
     }
     setSelectedMaPeriods(prev =>
-      prev.includes(period) ? prev.filter(p => p !== period) : [...prev, period]
+/*************  ✨ Windsurf Command ⭐  *************/
+/**
+ * Toggles the favorite status of an indicator for the current user.
+ * 
+ * - If the user is not logged in, prompts them to log in first.
+ * - If the user's plan does not support favoriting, prompts them to upgrade.
+ * - If the favorite operation is currently loading, exits early.
+ * - Otherwise, adds or removes the indicator from the user's favorites based on the current status.
+ */
+
+/*******  38d9ba28-c637-4081-b331-2c0345b8849d  *******/      prev.includes(period) ? prev.filter(p => p !== period) : [...prev, period]
     );
   };
 
@@ -115,14 +137,17 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
         promptUpgrade("Advanced Statistics");
         return;
     }
-    alert("Showing Advanced Statistics! (Pro Feature Placeholder) - Would navigate or show modal.");
+    toast.success("Pro Feature: Advanced Statistics (Placeholder)");
   };
 
   const handleFavoriteToggle = async () => {
     if (!isLoggedIn) {
-        if (confirm("Please login to save favorites. Go to login page?")) {
-            router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search));
-        }
+        toast((t) => (
+            <span>
+              Please login to save favorites.
+              <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => {router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search)); toast.dismiss(t.id);}}>Login</Button>
+            </span>
+        ));
         return;
     }
     if (!canUseFavorites) {
@@ -154,7 +179,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
             </CardDescription>
           </div>
           <div className="flex items-center space-x-1 flex-shrink-0">
-            {isLoggedIn && FEATURE_ACCESS.FAVORITES && (
+            {isLoggedIn && (
                 <TooltipProvider delayDuration={100}> <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
@@ -232,7 +257,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
             {indicator.frequency && <span className="flex-shrink-0 ml-2">({indicator.frequency})</span>}
         </div>
 
-        {FEATURE_ACCESS.MOVING_AVERAGES && availableMaPeriods.length > 0 && validHistoricalData.length >= Math.min(...availableMaPeriods, Infinity) && (
+        {availableMaPeriods.length > 0 && validHistoricalData.length >= Math.min(...availableMaPeriods, Infinity) && (
           <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 pt-1.5 border-t w-full mt-1.5">
             <Label className="text-xs font-medium text-muted-foreground shrink-0 mr-1">MAs:</Label>
             {availableMaPeriods.map(period => (
@@ -243,7 +268,6 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
                   onCheckedChange={() => handleMaToggle(period)}
                   disabled={!canAccessMAs}
                   className="h-4 w-7 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
-                  // thumbClassName prop removed here
                 />
                 <Label htmlFor={`ma-${indicator.id}-${period}`} className={`text-xs ${!canAccessMAs ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                   {period}{indicator.frequency?.charAt(0).toUpperCase() || 'P'}
@@ -271,7 +295,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData }
           </div>
         )}
 
-        {FEATURE_ACCESS.ADVANCED_STATS_BUTTON && (
+        { ( // Always show button, but disable if no access
             <div className="w-full pt-1.5 border-t mt-1.5">
                 <Button
                     variant="outline" size="xs" className="w-full text-xs h-7"
