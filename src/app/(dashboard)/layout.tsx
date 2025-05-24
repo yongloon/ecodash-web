@@ -1,5 +1,4 @@
 // File: src/app/(dashboard)/layout.tsx
-// src/app/(dashboard)/layout.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -7,6 +6,7 @@ import SidebarNav from '@/components/dashboard/SidebarNav';
 import Header from '@/components/dashboard/Header';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { FaTwitter, FaLinkedin, FaGithub } from 'react-icons/fa';
 
 export default function DashboardLayout({
   children,
@@ -28,7 +28,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="flex h-screen bg-muted/30 dark:bg-background font-sans text-foreground">
+    <div className="flex h-screen bg-muted dark:bg-background font-sans text-foreground"> {/* CHANGED bg-muted/30 to bg-muted */}
       <SidebarNav isMobileMenuOpen={isMobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
       
       <div className="flex-1 flex flex-col overflow-hidden"> 
@@ -42,9 +42,24 @@ export default function DashboardLayout({
           {children}
         </main>
         <footer className="text-center text-xs text-muted-foreground p-3 border-t bg-card flex-shrink-0">
-          © {new Date().getFullYear()} EcoDash. All data for informational purposes only. Not financial advice.
-          <Link href="/terms" className="ml-2 hover:underline">Terms</Link> |
-          <Link href="/privacy" className="ml-1 hover:underline">Privacy</Link>
+          <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div>
+              © {new Date().getFullYear()} EcoDash. All data for informational purposes only. Not financial advice.
+              <Link href="/terms" className="ml-2 hover:underline">Terms</Link> |
+              <Link href="/privacy" className="ml-1 hover:underline">Privacy</Link>
+            </div>
+            <div className="flex items-center space-x-3 mt-2 sm:mt-0">
+              <a href="https://twitter.com/yourprofile" target="_blank" rel="noopener noreferrer" aria-label="EcoDash on Twitter" className="hover:text-primary transition-colors">
+                <FaTwitter className="h-4 w-4" />
+              </a>
+              <a href="https://linkedin.com/company/yourcompany" target="_blank" rel="noopener noreferrer" aria-label="EcoDash on LinkedIn" className="hover:text-primary transition-colors">
+                <FaLinkedin className="h-4 w-4" />
+              </a>
+              <a href="https://github.com/yourrepo" target="_blank" rel="noopener noreferrer" aria-label="EcoDash on GitHub" className="hover:text-primary transition-colors">
+                <FaGithub className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
         </footer>
       </div>
     </div>

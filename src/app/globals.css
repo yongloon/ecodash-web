@@ -5,31 +5,91 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 100%;       /* Opaque white */
     --foreground: 240 10% 3.9%;
-    /* ... other existing Shadcn variables ... */
+
+    --card: 0 0% 100%;             /* Opaque white */
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;          /* Opaque white */
+    --popover-foreground: 240 10% 3.9%;
+
     --primary: 240 5.9% 10%;
     --primary-foreground: 0 0% 98%;
 
-    /* Custom Chart Colors (Examples) */
-    --chart-green: 130 55% 50%; /* A balanced green */
-    --chart-red: 0 75% 55%;     /* A clear red */
-    --chart-blue: 220 85% 60%;  /* A distinct blue for other lines if needed */
-    --chart-neutral: 240 5% 65%; /* Muted grey for neutral trends */
+    --secondary: 240 4.8% 95.9%;  /* Light grey, opaque */
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;      /* Light grey, opaque */
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;     /* Light grey, opaque */
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+
+    --radius: 0.5rem;
+
+    /* Custom Chart Colors (Examples) - ensure these are opaque if needed */
+    --chart-green: 130 55% 50%; 
+    --chart-red: 0 75% 55%;     
+    --chart-blue: 220 85% 60%; 
+    --chart-neutral: 240 5% 65%;
+    
+    /* Recharts specific chart colors, if you use them directly */
+    --chart-1: 220 85% 60%; /* Example: Blue */
+    --chart-2: 0 75% 55%;   /* Example: Red */
+    --chart-3: 130 55% 50%; /* Example: Green */
+    --chart-4: 40 95% 60%;  /* Example: Orange */
+    --chart-5: 280 75% 60%; /* Example: Purple */
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 240 10% 3.9%;    /* Opaque dark */
     --foreground: 0 0% 98%;
-    /* ... other existing Shadcn dark variables ... */
+
+    --card: 240 10% 3.9%;          /* Opaque dark */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;       /* Opaque dark */
+    --popover-foreground: 0 0% 98%;
+
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
 
-    /* Custom Chart Dark Colors (Examples) */
+    --secondary: 240 3.7% 15.9%; /* Darker grey, opaque */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;     /* Darker grey, opaque */
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;    /* Darker grey, opaque */
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 0 0% 98%;
+
+    /* Custom Chart Dark Colors (Examples) - ensure opaque if needed */
     --chart-green: 130 50% 60%;
     --chart-red: 0 65% 60%;
     --chart-blue: 220 75% 70%;
     --chart-neutral: 240 5% 50%;
+
+    /* Recharts specific chart colors for dark mode */
+    --chart-1: 220 75% 70%; 
+    --chart-2: 0 65% 60%;   
+    --chart-3: 130 50% 60%; 
+    --chart-4: 35 85% 65%;  
+    --chart-5: 280 65% 70%; 
   }
 }
 
@@ -42,8 +102,8 @@
 
 /* Ensure Recharts text inherits color for theming */
 .recharts-text {
-  fill: hsl(var(--muted-foreground)); /* Use a theme variable */
+  fill: hsl(var(--muted-foreground)); 
 }
 .recharts-cartesian-axis-tick-value {
-   font-size: 0.7rem; /* Smaller axis tick labels */
+   font-size: 0.7rem; 
 }

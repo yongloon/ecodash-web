@@ -1,6 +1,6 @@
 // src/app/terms/page.tsx
 import Link from 'next/link';
-import { Button } from '@/components/ui/button'; // If you want a back button
+import { Button } from '@/components/ui/button';
 
 export default function TermsPage() {
   const appName = "EcoDash";
@@ -9,7 +9,7 @@ export default function TermsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background backdrop-blur-sm"> {/* CHANGED HERE */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <Link href="/" className="text-xl sm:text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
             {appName}

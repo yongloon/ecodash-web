@@ -6,14 +6,11 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, ShieldQuestion, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
-// --- CORRECTED IMPORT FOR APP_PLANS ---
-import { authOptions, APP_PLANS, AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Make sure this path is correct
+import { authOptions, APP_PLANS, AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 
-// Define pagePlans using the imported APP_PLANS for consistency
-// This ensures that if APP_PLANS is undefined due to an import error, it's caught here.
 const pagePlans = [
   {
-    ...APP_PLANS.FREE, // Spread properties from the central definition
+    ...APP_PLANS.FREE,
     priceMonthly: '$0',
     description: 'Get started with essential economic indicators.',
     features: [
@@ -27,7 +24,7 @@ const pagePlans = [
   },
   {
     ...APP_PLANS.BASIC,
-    priceId: APP_PLANS.BASIC.priceId || 'price_basic_placeholder_id', // Fallback if env var for priceId is missing
+    priceId: APP_PLANS.BASIC.priceId || 'price_basic_placeholder_id',
     priceMonthly: '$10',
     description: 'More indicators and standard analysis tools.',
     features: [
@@ -42,7 +39,7 @@ const pagePlans = [
   },
   {
     ...APP_PLANS.PRO,
-    priceId: APP_PLANS.PRO.priceId || 'price_pro_placeholder_id', // Fallback
+    priceId: APP_PLANS.PRO.priceId || 'price_pro_placeholder_id',
     priceMonthly: '$25',
     description: 'Full access to all data and advanced analytical tools.',
     features: [
@@ -62,17 +59,8 @@ const pagePlans = [
 
 export default async function PricingPage() {
   if (!APP_PLANS || !APP_PLANS.FREE || !APP_PLANS.BASIC || !APP_PLANS.PRO) {
-    // This check helps catch if APP_PLANS wasn't imported correctly
     console.error("[PricingPage] CRITICAL ERROR: APP_PLANS not defined or incomplete. Check export/import from authOptions.");
     return <div className="container mx-auto p-8 text-center text-destructive">Error: Pricing plans could not be loaded. Please contact support.</div>;
-  }
-
-  console.log("[PricingPage] Effective pagePlans for rendering:", JSON.stringify(pagePlans.map(p => ({name: p.name, tier: p.tier, priceId: p.priceId})), null, 2));
-  if (!process.env.STRIPE_BASIC_PLAN_PRICE_ID) {
-    console.warn("[PricingPage] STRIPE_BASIC_PLAN_PRICE_ID environment variable is not set. Using placeholder for Basic plan SubscriptionButton.");
-  }
-  if (!process.env.STRIPE_PRO_PLAN_PRICE_ID) {
-    console.warn("[PricingPage] STRIPE_PRO_PLAN_PRICE_ID environment variable is not set. Using placeholder for Pro plan SubscriptionButton.");
   }
 
   const session = await getServerSession(authOptions);
@@ -81,7 +69,7 @@ export default async function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background backdrop-blur-sm"> {/* CHANGED HERE */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <Link href="/" className="text-xl sm:text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
             EcoDash

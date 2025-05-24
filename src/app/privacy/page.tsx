@@ -9,7 +9,7 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+      <header className="py-4 sm:py-6 border-b sticky top-0 z-40 bg-background backdrop-blur-sm"> {/* CHANGED HERE */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <Link href="/" className="text-xl sm:text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
             {appName}
@@ -43,12 +43,6 @@ export default function PrivacyPolicyPage() {
           <p className="font-semibold mt-2">Usage Data:</p>
           <p>We may also collect information on how the Service is accessed and used ("Usage Data"). This Usage Data may include information such as your computer's Internet Protocol address (e.g., IP address), browser type, browser version, the pages of our Service that you visit, the time and date of your visit, the time spent on those pages, unique device identifiers, and other diagnostic data.</p>
           
-          {/* If using Google Analytics or similar */}
-          {/* 
-          <p className="font-semibold mt-2">Tracking & Cookies Data:</p>
-          <p>We use cookies and similar tracking technologies to track the activity on our Service and hold certain information. You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent. However, if you do not accept cookies, you may not be able to use some portions of our Service.</p>
-          */}
-
           <h2 className="text-2xl font-semibold pt-4 border-t mt-8">2. Use of Data</h2>
           <p>{appName} uses the collected data for various purposes:</p>
           <ul className="list-disc list-inside space-y-1 pl-4 text-muted-foreground">
