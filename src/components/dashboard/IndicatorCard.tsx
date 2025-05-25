@@ -3,37 +3,39 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Corrected: use 'next/navigation' for App Router
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from '@/components/ui/button';
-import { FaInfoCircle } from 'react-icons/fa';
-import { FiBarChart2, FiAlertCircle } from 'react-icons/fi';
-import { Lock, Star, BarChartHorizontalBig, Download, Loader2 } from 'lucide-react';
+import { FiBarChart2, FiAlertCircle, FiInfo } from 'react-icons/fi'; // Changed FaInfoCircle to FiInfo
+import { Lock, Star, BarChartHorizontalBig, Download, Loader2, BellPlus } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { IndicatorMetadata, TimeSeriesDataPoint } from '@/lib/indicators';
 import { calculateSeriesStatistics, SeriesStatistics, calculateMovingAverage } from '@/lib/calculations';
-import ChartComponent, { MovingAverageSeries, ChartSeries } from './ChartComponent'; // ChartSeries added for type consistency
+import ChartComponent, { ChartSeries } from './ChartComponent';
 import { format, parseISO, isValid } from 'date-fns';
 import { canUserAccessFeature, FEATURE_KEYS, FeatureKey } from '@/lib/permissions';
 import toast from 'react-hot-toast';
+
+import AlertModal from './AlertModal'; // Assuming AlertModal is in the same directory
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 
 interface IndicatorCardProps {
   indicator: IndicatorMetadata;
   latestValue: TimeSeriesDataPoint | null;
   historicalData: TimeSeriesDataPoint[];
-  fetchError?: string | null; // New prop for error message
+  fetchError?: string | null;
 }
 
 const getMaPeriods = (frequency?: string): number[] => {
     if (frequency === 'Daily' || frequency === 'Weekly') return [20, 50, 100];
     if (frequency === 'Monthly') return [3, 6, 12];
     if (frequency === 'Quarterly') return [2, 4];
-    return [30]; // Default for unspecified or other frequencies
+    return [30];
 };
 
 const downloadCSV = (data: TimeSeriesDataPoint[], filename: string) => {
@@ -73,6 +75,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
   const canAccessAdvancedStats = canUserAccessFeature(userTier, FEATURE_KEYS.ADVANCED_STATS_BUTTON);
   const canUseFavorites = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
   const canExportData = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.DATA_EXPORT);
+  const canCreateAlerts = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.ALERTS_BASIC_SETUP);
 
   const { addFavorite, removeFavorite, isFavorited, isLoadingFavorites } = useFavorites();
   const currentIsFavorited = useMemo(() => isFavorited(indicator.id), [isFavorited, indicator.id]);
@@ -100,21 +103,22 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
 
   const [selectedMaPeriods, setSelectedMaPeriods] = useState<number[]>([]);
 
-  const movingAverageData: MovingAverageSeries[] = useMemo(() => {
+  const movingAverageDataForChart: ChartSeries[] = useMemo(() => {
     if (!canAccessMAs || selectedMaPeriods.length === 0) return [];
     return selectedMaPeriods.map((period, index) => {
       const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
       return {
-        period,
+        // period, // period is part of the name and dataKey
         data: calculateMovingAverage(validHistoricalData, period),
         color: colors[index % colors.length],
-        dataKey: 'value',
+        dataKey: `${indicator.id}_ma_${period}`,
         name: `MA ${period}`,
-        type: 'line',
-        yAxisId: 'left' // Assume all MAs use the left axis for simplicity here
+        type: 'line' as const,
+        unit: indicator.unit,
+        yAxisId: 'left'
       };
     }).filter(ma => ma.data.length > 0);
-  }, [validHistoricalData, selectedMaPeriods, canAccessMAs]);
+  }, [validHistoricalData, selectedMaPeriods, canAccessMAs, indicator.id, indicator.unit]);
 
   const promptUpgrade = (featureName: string, requiredTierText: string = "a higher tier") => {
     toast.custom((t) => (
@@ -209,19 +213,23 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
   };
 
   const isDataEffectivelyUnavailable = !fetchError && validHistoricalData.length === 0 && latestValue === null;
+  
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const handleAlertCreated = () => { /* Potentially refresh a list of active alerts if displayed elsewhere */ };
 
   const chartSeries: ChartSeries[] = useMemo(() => {
     const baseSeries: ChartSeries = {
         data: validHistoricalData,
-        dataKey: 'value',
+        dataKey: `${indicator.id}_value`, 
         name: indicator.name,
-        color: '#4f46e5', // Default color for the main series
+        color: '#4f46e5', 
         type: indicator.chartType || 'line',
         yAxisId: 'left',
         unit: indicator.unit,
     };
-    return [baseSeries, ...movingAverageData];
-  }, [validHistoricalData, indicator, movingAverageData]);
+    return [baseSeries, ...movingAverageDataForChart];
+  }, [validHistoricalData, indicator, movingAverageDataForChart]);
 
 
   return (
@@ -257,6 +265,30 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
                     {!isLoggedIn && <p className="text-xs text-muted-foreground mt-1">Login to use favorites.</p>}
                 </TooltipContent>
             </Tooltip> </TooltipProvider>
+            
+            {latestValue?.value !== null && latestValue?.value !== undefined && (
+                <TooltipProvider delayDuration={100}> <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-sky-500 disabled:opacity-50 relative"
+                            onClick={() => {
+                                if (!isLoggedIn) { promptLoginForFeature("Alerts"); return; }
+                                if (!canCreateAlerts) { promptUpgrade("Setting alerts", "Basic or Pro"); return;}
+                                setIsAlertModalOpen(true);
+                            }}
+                            disabled={isLoggedIn && !canCreateAlerts}
+                            aria-label="Set alert"
+                        >
+                            <BellPlus className="h-4 w-4" />
+                            {isLoggedIn && !canCreateAlerts && <Lock className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 text-amber-600 bg-card rounded-full p-0.5" />}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>Set Alert</p>
+                        {isLoggedIn && !canCreateAlerts && <p className="text-xs text-amber-600 mt-1">Upgrade to set alerts.</p>}
+                        {!isLoggedIn && <p className="text-xs text-muted-foreground mt-1">Login to set alerts.</p>}</TooltipContent>
+            </Tooltip> </TooltipProvider>
+            )}
             
             {validHistoricalData.length > 0 && (
               <TooltipProvider delayDuration={100}>
@@ -298,15 +330,26 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
                     </ul>
                  </TooltipContent> </Tooltip> </TooltipProvider>
             )}
-            {indicator.description && (
-              <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
-                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
-                    <FaInfoCircle className="h-4 w-4" />
-                 </Button>
-              </TooltipTrigger> <TooltipContent className="max-w-xs text-xs bg-popover text-popover-foreground border-border shadow-lg rounded-md p-2">
-                <p>{indicator.description}</p>
-              </TooltipContent> </Tooltip> </TooltipProvider>
-            )}
+            <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                        <FiInfo className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>View Details</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{indicator.name}</DialogTitle>
+                  <DialogDescription className="text-sm pt-2 text-foreground/80 whitespace-pre-line">{indicator.description || "No description available."} {indicator.notes && <><br/><br/><span className="font-semibold">Notes:</span> {indicator.notes}</>}</DialogDescription>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </CardHeader>
@@ -318,7 +361,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
               <p className="font-semibold">Data Error</p>
               <p>{fetchError.length > 100 ? fetchError.substring(0, 97) + "..." : fetchError}</p>
             </div>
-           ) : validHistoricalData && validHistoricalData.length > 0 ? (
+           ) : validHistoricalData && validHistoricalData.length > 0 && chartSeries.length > 0 && chartSeries[0].data.length > 0 ? ( // Check if base series has data
              <ChartComponent
                 series={chartSeries}
                 chartId={`indicator-chart-${indicator.id}`}
@@ -422,6 +465,15 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
             </div>
         )}
       </CardFooter>
+      {isAlertModalOpen && (
+        <AlertModal
+            isOpen={isAlertModalOpen}
+            onOpenChange={setIsAlertModalOpen}
+            indicator={indicator}
+            currentValue={latestValue?.value ?? null}
+            onAlertCreated={handleAlertCreated}
+        />
+      )}
     </Card>
   );
 }

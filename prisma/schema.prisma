@@ -90,3 +90,20 @@ model FavoriteIndicator {
   @@unique([userId, indicatorId]) // A user can only favorite an indicator once
   @@index([userId]) // Good for querying a user's favorites
 }
+
+model UserAlert {
+  id          String   @id @default(cuid())
+  userId      String
+  indicatorId String
+  targetValue Float
+  condition   String // "ABOVE" or "BELOW"
+  triggeredAt DateTime? // When the alert was last triggered
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, indicatorId, targetValue, condition]) // Prevent duplicate identical alerts
+  @@index([userId])
+}
