@@ -2,13 +2,14 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation'; // Corrected import for App Router
 import { indicatorCategories, IndicatorCategoryKey } from '@/lib/indicators';
 import { FaTachometerAlt, FaDollarSign as PricingIcon } from 'react-icons/fa';
-import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3, MessageSquareIcon } from 'lucide-react';
+import { Zap as ProToolsIcon, Settings as AccountIcon, Star as FavoriteIcon, BarChart3, MessageSquareIcon, BellIcon } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
-import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions'; // <<< UPDATED IMPORT
+import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
+// import { useTranslations } from 'next-intl'; // Uncomment if you start using translations here
 
 interface SidebarNavProps {
   isMobileMenuOpen?: boolean;
@@ -16,17 +17,19 @@ interface SidebarNavProps {
 }
 
 export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: SidebarNavProps) {
-  const pathname = usePathname();
+  const pathname = usePathname(); // Gets the path *without* the locale prefix
   const { data: session, status } = useSession();
   const isLoadingSession = status === "loading";
   const userSessionData = session?.user as any;
   const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier;
   const isLoggedIn = !!session?.user;
+  // const t = useTranslations('SidebarNav'); // Example if you had a SidebarNav namespace
 
   const hasActivePaidSubscription = isLoggedIn && userTier && userTier !== 'free';
 
   const canSeeFavoritesLink = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
-  const canSeeProToolsLink = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.INDICATOR_COMPARISON); // Or a more general "PRO_TOOLS" key if you prefer
+  const canSeeProToolsLink = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.INDICATOR_COMPARISON);
+  const canSeeAlertsLink = isLoggedIn && canUserAccessFeature(userTier, FEATURE_KEYS.ALERTS_BASIC_SETUP);
 
   const navLinkClasses = (isActive: boolean) => 
     `flex items-center px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ${
@@ -41,6 +44,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
     }
   };
 
+  // Note: Links here don't include locale prefix. next-intl's Link or middleware handles it.
   return (
     <>
       {isMobileMenuOpen && (
@@ -66,6 +70,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
         <div className="flex items-center justify-center h-16 border-b border-border/60 px-4 flex-shrink-0">
           <Link href="/" className="flex items-center gap-2 group" onClick={handleLinkClick}>
              <BarChart3 className="h-7 w-7 text-primary group-hover:opacity-80 transition-opacity" />
+             {/* <span className="text-lg font-semibold">EcoDash</span> */}
           </Link>
         </div>
         <nav className="mt-4 px-2 pb-4 space-y-1 flex-grow flex flex-col">
@@ -77,11 +82,13 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
           {Object.keys(indicatorCategories).map((key) => {
             const category = indicatorCategories[key as IndicatorCategoryKey];
             const IconComponent = category.icon;
+            // Compare pathname against the non-localized slug. Middleware handles locale.
+            const isActive = pathname === `/category/${category.slug}` || pathname.startsWith(`/category/${category.slug}/`);
             return (
               <Link
                 key={category.slug}
                 href={`/category/${category.slug}`}
-                className={navLinkClasses(pathname === `/category/${category.slug}`)}
+                className={navLinkClasses(isActive)}
                 title={category.name}
                 onClick={handleLinkClick}
               >
@@ -122,6 +129,18 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
             </>
           )}
           
+          {!isLoadingSession && canSeeAlertsLink && (
+               <Link
+                  href="/account/alerts" // Path to the new alerts management page
+                  className={navLinkClasses(pathname === '/account/alerts')}
+                  title="Manage Alerts"
+                  onClick={handleLinkClick}
+              >
+                  <BellIcon className="h-4 w-4 mr-3 flex-shrink-0" />
+                  <span>Manage Alerts</span>
+              </Link>
+          )}
+
           {!isLoadingSession && (!isLoggedIn || !hasActivePaidSubscription) && (
             <Link
               href="/pricing"
@@ -141,7 +160,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
               title="Beta Feedback"
               onClick={handleLinkClick}
             >
-              <MessageSquareIcon className="h-4 w-4 mr-3 flex-shrink-0" /> {/* Updated Icon */}
+              <MessageSquareIcon className="h-4 w-4 mr-3 flex-shrink-0" />
               <span>Provide Feedback</span>
             </Link>
 
@@ -150,7 +169,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
           {!isLoadingSession && isLoggedIn && (
                <Link
                   href="/account/profile"
-                  className={`${navLinkClasses(pathname === '/account/profile')} mt-2`}
+                  className={`${navLinkClasses(pathname.startsWith('/account/profile') || pathname === '/account')} mt-2`} // Added startsWith for sub-routes
                   title="My Account"
                   onClick={handleLinkClick}
               >

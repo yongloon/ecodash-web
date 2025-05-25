@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from '@/components/ui/button';
-import { FiBarChart2, FiAlertCircle, FiInfo } from 'react-icons/fi'; // Changed FaInfoCircle to FiInfo
+import { FiBarChart2, FiAlertCircle, FiInfo } from 'react-icons/fi';
 import { Lock, Star, BarChartHorizontalBig, Download, Loader2, BellPlus } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -21,7 +21,7 @@ import { format, parseISO, isValid } from 'date-fns';
 import { canUserAccessFeature, FEATURE_KEYS, FeatureKey } from '@/lib/permissions';
 import toast from 'react-hot-toast';
 
-import AlertModal from './AlertModal'; // Assuming AlertModal is in the same directory
+import AlertModal from './AlertModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 
 interface IndicatorCardProps {
@@ -108,7 +108,6 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
     return selectedMaPeriods.map((period, index) => {
       const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
       return {
-        // period, // period is part of the name and dataKey
         data: calculateMovingAverage(validHistoricalData, period),
         color: colors[index % colors.length],
         dataKey: `${indicator.id}_ma_${period}`,
@@ -152,10 +151,13 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
   };
 
   const promptLoginForFeature = (featureName: string): void => {
+    // Get current path for callbackUrl. Note: usePathname() from next/navigation doesn't work in non-page/layout components directly.
+    // For components like this, window.location is a simpler client-side way if needed, or pass path as prop.
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/dashboard';
     toast((t) => (
         <span>
           Please login to use {featureName.toLowerCase()}.
-          <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => {router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search)); toast.dismiss(t.id);}}>Login</Button>
+          <Button variant="link" size="sm" className="ml-2 p-0 h-auto" onClick={() => {router.push(`/login?callbackUrl=${encodeURIComponent(currentPath)}`); toast.dismiss(t.id);}}>Login</Button>
         </span>
     ));
   };
@@ -216,7 +218,11 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
   
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const handleAlertCreated = () => { /* Potentially refresh a list of active alerts if displayed elsewhere */ };
+  const handleAlertCreated = () => { 
+    toast.success(`Alert set for ${indicator.name}. You can manage it in My Account > Manage Alerts.`);
+    // Potentially refresh a list of active alerts if displayed elsewhere on this page.
+    // For now, a simple success message is good.
+  };
 
   const chartSeries: ChartSeries[] = useMemo(() => {
     const baseSeries: ChartSeries = {
@@ -246,6 +252,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
             </CardDescription>
           </div>
           <div className="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
+            {/* Favorite Button */}
             <TooltipProvider delayDuration={100}> <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
@@ -266,6 +273,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
                 </TooltipContent>
             </Tooltip> </TooltipProvider>
             
+            {/* Alert Button */}
             {latestValue?.value !== null && latestValue?.value !== undefined && (
                 <TooltipProvider delayDuration={100}> <Tooltip>
                     <TooltipTrigger asChild>
@@ -290,6 +298,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
             </Tooltip> </TooltipProvider>
             )}
             
+            {/* Export Button */}
             {validHistoricalData.length > 0 && (
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
@@ -314,12 +323,13 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
               </TooltipProvider>
             )}
 
+            {/* Stats Button */}
             {statistics && statistics.count > 0 && (
                  <TooltipProvider delayDuration={100}> <Tooltip> <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
                         <FiBarChart2 className="h-4 w-4" />
                     </Button>
-                 </TooltipTrigger> <TooltipContent className="max-w-xs text-xs bg-popover text-popover-foreground border-border shadow-lg rounded-md p-2">
+                 </TooltipTrigger> <TooltipContent className="max-w-xs text-xs bg-popover text-popover-foreground border-border shadow-lg rounded-md p-2" side="top">
                     <p className="font-semibold mb-1">Data Statistics ({statistics.count} points):</p>
                     <ul className="list-none space-y-0.5">
                         <li>Mean: <span className="font-medium">{statistics.mean?.toLocaleString() ?? 'N/A'}</span></li>
@@ -330,6 +340,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
                     </ul>
                  </TooltipContent> </Tooltip> </TooltipProvider>
             )}
+            {/* Info Button/Modal */}
             <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
@@ -361,7 +372,7 @@ export default function IndicatorCard({ indicator, latestValue, historicalData, 
               <p className="font-semibold">Data Error</p>
               <p>{fetchError.length > 100 ? fetchError.substring(0, 97) + "..." : fetchError}</p>
             </div>
-           ) : validHistoricalData && validHistoricalData.length > 0 && chartSeries.length > 0 && chartSeries[0].data.length > 0 ? ( // Check if base series has data
+           ) : validHistoricalData && validHistoricalData.length > 0 && chartSeries.length > 0 && chartSeries[0].data.length > 0 ? (
              <ChartComponent
                 series={chartSeries}
                 chartId={`indicator-chart-${indicator.id}`}
