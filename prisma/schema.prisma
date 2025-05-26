@@ -1,11 +1,39 @@
 // prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql" // Or your chosen provider: "mysql", "sqlite", "sqlserver", "mongodb"
+  url      = env("DATABASE_URL")
+}
+
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  name                  String?
+  username              String?                @unique
+  email                 String?                @unique
+  emailVerified         DateTime?
+  image                 String?
+  passwordHash          String?
+  accounts              Account[]
+  sessions              Session[]
+  favoriteIndicators    FavoriteIndicator[]
+  stripeCustomerId      String?                @unique @map("stripe_customer_id")
+  stripeSubscriptionId  String?                @unique @map("stripe_subscription_id")
+  stripePriceId         String?                @map("stripe_price_id")
+  stripeCurrentPeriodEnd DateTime?             @map("stripe_current_period_end")
+  alerts                UserAlert[]
+  role                  UserRole               @default(USER) // <<< ADDED THIS
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Account {
@@ -35,29 +63,6 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  username      String?   @unique
-  email         String?   @unique
-  emailVerified DateTime?
-  passwordHash  String?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  favoriteIndicators FavoriteIndicator[] // If you implement favorites later
-  // annotations UserAnnotation[]      // If you implement annotations later
-
-  // --- STRIPE RELATED FIELDS ---
-  stripeCustomerId       String?   @unique // Stripe Customer ID
-  stripeSubscriptionId   String?   @unique // Active Stripe Subscription ID
-  stripePriceId          String?            // ID of the price for the active subscription
-  stripeCurrentPeriodEnd DateTime?          // When the current subscription period ends
-  // --- END STRIPE RELATED FIELDS ---
-
-  // PasswordResetToken PasswordResetToken[] // If you implement password reset
-}
-
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -68,27 +73,26 @@ model VerificationToken {
 
 model PasswordResetToken {
   id        String   @id @default(cuid())
-  token     String   @unique // Store the HASHED token
-  email     String   // To quickly find tokens by email for cleanup
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String   // Storing email here for faster lookup if needed, though userId is primary key
+  token     String   @unique
   expiresAt DateTime
-  createdAt DateTime @default(now())
 
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
-  @@index([email])
+  @@index([email]) // If you plan to query by email often for tokens
 }
 
 model FavoriteIndicator {
   id          String   @id @default(cuid())
   userId      String
-  indicatorId String   // The ID string from your src/lib/indicators.ts (e.g., "GDP_REAL")
+  indicatorId String
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, indicatorId]) // A user can only favorite an indicator once
-  @@index([userId]) // Good for querying a user's favorites
+  @@unique([userId, indicatorId]) // Ensures a user can't favorite the same indicator multiple times
+  @@index([userId])
 }
 
 model UserAlert {
@@ -96,14 +100,14 @@ model UserAlert {
   userId      String
   indicatorId String
   targetValue Float
-  condition   String // "ABOVE" or "BELOW"
-  triggeredAt DateTime? // When the alert was last triggered
+  condition   String 
+  triggeredAt DateTime?
   isEnabled   Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, indicatorId, targetValue, condition]) // Prevent duplicate identical alerts
+  @@unique([userId, indicatorId, targetValue, condition]) 
   @@index([userId])
 }

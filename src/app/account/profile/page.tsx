@@ -7,16 +7,24 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
+// UI Components - CHECK THESE
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+
+// Icons from lucide-react - CHECK THESE
 import { 
-    LogOut, Settings, CreditCard, ShieldCheck, AlertTriangle, User as UserIcon, 
-    KeyRound, Eye, EyeOff, Loader2, ExternalLinkIcon 
+    LogOut, Settings, CreditCard, ShieldCheck, AlertTriangle, User as UserIcon, BellIcon, Star,
+    KeyRound, Eye, EyeOff, Loader2, ExternalLinkIcon, Shield
 } from 'lucide-react';
+
+// Types - CHECK THIS
+import { UserRole, AppPlanTier } from '@/app/api/auth/[...nextauth]/route'; // Assuming UserRole is exported here
+import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
+
 
 const getInitials = (name?: string | null, email?: string | null): string => {
   if (name) {
@@ -50,9 +58,13 @@ export default function ProfilePage() {
   const userHasActiveSubscription = userSessionData?.hasActiveSubscription === true;
   const userStripeCustomerId = userSessionData?.stripeCustomerId;
   const activePlanName = userSessionData?.activePlanName;
+  const userRole: UserRole | undefined = userSessionData?.role;
+  const userTier: AppPlanTier | undefined = userSessionData?.activePlanTier; // For checking favorites access
   
-  // Determine if user signed up via credentials based on provider in session
   const showPasswordChangeForm = userSessionData?.provider === 'credentials';
+  const canAccessFavorites = canUserAccessFeature(userTier, FEATURE_KEYS.FAVORITES);
+  const canAccessAlerts = canUserAccessFeature(userTier, FEATURE_KEYS.ALERTS_BASIC_SETUP);
+
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -63,7 +75,7 @@ export default function ProfilePage() {
   const handleManageSubscription = async () => {
     setIsPortalLoading(true);
     setPortalError(null);
-    toast.dismiss(); // Clear previous toasts
+    toast.dismiss(); 
     try {
       const response = await fetch('/api/stripe/create-portal-link', { method: 'POST' });
       const data = await response.json();
@@ -168,6 +180,20 @@ export default function ProfilePage() {
                     <Settings className="mr-2 h-4 w-4 text-muted-foreground" /> Back to Dashboard
                 </Button>
             </Link>
+            {canAccessFavorites && (
+                <Link href="/favorites" className="w-full block">
+                    <Button variant="outline" className="w-full justify-start text-foreground hover:bg-muted/50">
+                        <Star className="mr-2 h-4 w-4 text-muted-foreground" /> Manage My Favorites
+                    </Button>
+                </Link>
+            )}
+            {canAccessAlerts && (
+                <Link href="/account/alerts" className="w-full block">
+                    <Button variant="outline" className="w-full justify-start text-foreground hover:bg-muted/50">
+                        <BellIcon className="mr-2 h-4 w-4 text-muted-foreground" /> Manage My Alerts
+                    </Button>
+                </Link>
+            )}
           </section>
           <Separator />
           {showPasswordChangeForm && (
@@ -258,6 +284,21 @@ export default function ProfilePage() {
                 </div>
             )}
           </section>
+
+          {/* Admin Panel Link - Only for ADMIN users */}
+          {userRole === 'ADMIN' && (
+            <>
+              <Separator />
+              <section className="space-y-3">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Admin Area</h3>
+                <Link href="/admin" className="w-full block">
+                    <Button variant="destructive" className="w-full justify-start text-destructive-foreground hover:bg-destructive/90">
+                        <Shield className="mr-2 h-4 w-4" /> Go to Admin Panel
+                    </Button>
+                </Link>
+              </section>
+            </>
+          )}
         </CardContent>
         <CardFooter className="border-t p-6 sm:p-8 bg-muted/20">
           <Button variant="ghost" onClick={() => signOut({ callbackUrl: '/login' })} className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 justify-start">
