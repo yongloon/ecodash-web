@@ -10,7 +10,7 @@ import { getIndicatorById, TimeSeriesDataPoint, IndicatorMetadata } from '@/lib/
 import { fetchIndicatorData } from '@/lib/mockData';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { StarOff, AlertTriangle, Loader2, Star } from 'lucide-react'; 
+import { StarOff, AlertTriangle, Loader2, Star, ArrowLeft } from 'lucide-react'; 
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
 import toast from 'react-hot-toast';
@@ -19,7 +19,7 @@ type ResolvedIndicatorType = {
     indicator: IndicatorMetadata; 
     latestValue: TimeSeriesDataPoint | null; 
     historicalData: TimeSeriesDataPoint[];
-    error?: string | null; // Added to carry fetch errors per indicator
+    error?: string | null;
 };
 
 export default function FavoritesPage() {
@@ -27,11 +27,11 @@ export default function FavoritesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { favoriteIds, isLoadingFavorites, favoritesError: SWRFavoritesError } = useFavorites(); // Renamed to avoid conflict
+  const { favoriteIds, isLoadingFavorites, favoritesError: SWRFavoritesError } = useFavorites();
   
   const [resolvedIndicatorData, setResolvedIndicatorData] = useState<ResolvedIndicatorType[]>([]);
   const [isLoadingPageData, setIsLoadingPageData] = useState(false);
-  const [pageError, setPageError] = useState<string | null>(null); // For general page errors
+  const [pageError, setPageError] = useState<string | null>(null);
 
   const userTier: AppPlanTier | undefined = (session?.user as any)?.activePlanTier;
   
@@ -59,17 +59,15 @@ export default function FavoritesPage() {
             const dataPromises = favoriteIds
                 .map(id => {
                     const indicatorMeta = getIndicatorById(id);
-                    // DEBUG LOGGING FOR BTC METADATA
                     if (indicatorMeta && indicatorMeta.id === 'BTC_PRICE_USD') {
-                        console.log("[FavoritesPage] BTC Metadata from getIndicatorById:", JSON.stringify(indicatorMeta, null, 2));
+                        // console.log("[FavoritesPage] BTC Metadata from getIndicatorById:", JSON.stringify(indicatorMeta, null, 2));
                     }
                     return indicatorMeta;
                 })
                 .filter((indicator): indicator is IndicatorMetadata => !!indicator)
                 .map(async (indicator) => {
-                    // DEBUG LOGGING BEFORE FETCHING
                     if (indicator.id === 'BTC_PRICE_USD') {
-                        console.log(`[FavoritesPage] Attempting to fetch BTC with apiSource: ${indicator.apiSource}, apiIdentifier: ${indicator.apiIdentifier}`);
+                        // console.log(`[FavoritesPage] Attempting to fetch BTC with apiSource: ${indicator.apiSource}, apiIdentifier: ${indicator.apiIdentifier}`);
                     }
                     try {
                         const historicalData = await fetchIndicatorData(indicator, dateRange); 
@@ -82,7 +80,7 @@ export default function FavoritesPage() {
                 });
             const results = await Promise.all(dataPromises);
             setResolvedIndicatorData(results);
-          } catch (err: any) { // This catch is for Promise.all or other general errors in fetchData
+          } catch (err: any) {
             console.error("Error in fetchData for favorites list (Promise.all or setup):", err);
             setPageError(err.message || "Failed to load indicator data for your favorites.");
             toast.error(err.message || "Error loading some favorite indicator data.");
@@ -95,63 +93,76 @@ export default function FavoritesPage() {
         setResolvedIndicatorData([]);
         setIsLoadingPageData(false);
     }
-  }, [favoriteIds, sessionStatus, router, canAccessFavoritesPage, searchParams, isLoadingFavorites]); // Added isLoadingFavorites
+  }, [favoriteIds, sessionStatus, router, canAccessFavoritesPage, searchParams, isLoadingFavorites]);
 
 
-  if (sessionStatus === "loading" || (sessionStatus === "authenticated" && isLoadingFavorites)) {
+  if (sessionStatus === "loading" || (sessionStatus === 'authenticated' && isLoadingFavorites && !SWRFavoritesError)) { // Added !SWRFavoritesError
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height)-var(--footer-height))] flex flex-col items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
             <p className="text-muted-foreground">Loading your favorites...</p>
         </div>
     );
   }
 
-  if (SWRFavoritesError) { // Use the renamed SWR error
+  if (SWRFavoritesError) {
     const errInfo = (SWRFavoritesError as any)?.info;
     const displayError = errInfo?.error || errInfo?.message || SWRFavoritesError.message || "An unexpected error occurred.";
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height)-var(--footer-height))] flex flex-col items-center justify-center">
             <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
             <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Favorites List</h1>
             <p className="text-muted-foreground mb-4">{displayError}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+            <div className="flex gap-2">
+                <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+                <Link href="/dashboard"><Button variant="outline" className="mt-4">Back to Dashboard</Button></Link>
+            </div>
         </div>
     );
   }
-   if (pageError && !isLoadingPageData) { // Show general page error if data loading is complete
+   if (pageError && !isLoadingPageData) { 
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height)-var(--footer-height))] flex flex-col items-center justify-center">
             <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
             <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Indicator Data</h1>
             <p className="text-muted-foreground mb-4">{pageError}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+            <div className="flex gap-2">
+                <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+                <Link href="/dashboard"><Button variant="outline" className="mt-4">Back to Dashboard</Button></Link>
+            </div>
         </div>
     );
   }
   
   if (sessionStatus === "authenticated" && !canAccessFavoritesPage) {
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 text-center min-h-[calc(100vh-var(--header-height)-var(--footer-height))] flex flex-col items-center justify-center">
             <StarOff className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h1 className="text-2xl font-bold mb-2">Favorites Not Available</h1>
             <p className="text-muted-foreground mb-6 max-w-md">
                 Managing and viewing a list of favorite indicators is a feature available on our Basic and Pro plans.
             </p>
-            <Link href="/pricing">
-                <Button size="lg">Upgrade Your Plan</Button>
-            </Link>
+            <div className="flex gap-2">
+                <Link href="/pricing"><Button size="lg">Upgrade Your Plan</Button></Link>
+                <Link href="/dashboard"><Button size="lg" variant="outline">Back to Dashboard</Button></Link>
+            </div>
         </div>
     );
   }
 
   return (
     <div className="container mx-auto py-6 sm:py-8"> 
-      <div className="flex justify-between items-center mb-6 sm:mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-3">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center">
             <Star className="h-6 w-6 mr-3 text-amber-400 fill-amber-400"/> 
             My Favorite Indicators
         </h1>
+        <Link href="/dashboard">
+            <Button variant="outline" size="sm">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Dashboard
+            </Button>
+        </Link>
       </div>
       
       {isLoadingPageData && favoriteIds.length > 0 && (
@@ -175,12 +186,12 @@ export default function FavoritesPage() {
               indicator={indicator}
               latestValue={latestValue}
               historicalData={historicalData}
-              fetchError={error} // Pass the specific error for this card
+              fetchError={error}
             />
           ))}
         </div>
       ) : !isLoadingPageData && favoriteIds.length === 0 && sessionStatus === 'authenticated' && canAccessFavoritesPage ? (
-        <div className="text-center py-10 border border-dashed rounded-lg bg-card">
+        <div className="text-center py-10 border border-dashed rounded-lg bg-card min-h-[300px] flex flex-col justify-center items-center">
           <StarOff className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">No Favorites Yet</h2>
           <p className="text-muted-foreground mb-4">
@@ -191,11 +202,11 @@ export default function FavoritesPage() {
           </Link>
         </div>
       ) : null}
-      {!isLoadingPageData && SWRFavoritesError && (
-        // This is a fallback if SWR error occurs but pageError wasn't set by fetchData (less likely now)
-        <div className="text-center text-destructive py-10">
-            <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-            <p>Could not load your list of favorites.</p>
+      {!isLoadingPageData && SWRFavoritesError && resolvedIndicatorData.length === 0 && (
+        <div className="text-center text-destructive py-10 border border-dashed border-destructive/50 rounded-lg bg-destructive/10 min-h-[300px] flex flex-col justify-center items-center">
+            <AlertTriangle className="mx-auto h-12 w-12 mb-4" />
+            <h2 className="text-xl font-semibold">Error Loading Favorites</h2>
+            <p className="text-sm">Could not load your list of favorites at this time.</p>
         </div>
       )}
     </div>

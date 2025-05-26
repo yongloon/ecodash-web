@@ -15,9 +15,9 @@ import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
 import ChartComponent, { ChartSeries } from '@/components/dashboard/ChartComponent';
 import { indicators as allIndicators, IndicatorMetadata, TimeSeriesDataPoint, getCategoryBySlug } from '@/lib/indicators';
 import { fetchIndicatorData } from '@/lib/mockData';
-import { Loader2, AlertTriangle, XCircle } from "lucide-react";
+import { Loader2, AlertTriangle, XCircle, ArrowLeft, BarChart3 } from "lucide-react"; // Added ArrowLeft, BarChart3
 import toast from 'react-hot-toast';
-import { DateRangePicker } from '@/components/dashboard/DateRangePicker'; // For global date range
+import { DateRangePicker } from '@/components/dashboard/DateRangePicker';
 
 const MAX_COMPARISON_INDICATORS = 4;
 const DEFAULT_SERIES_COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F", "#FFBB28"];
@@ -42,7 +42,12 @@ export default function IndicatorComparisonPage() {
   const [chartError, setChartError] = useState<string | null>(null);
   const [normalizeData, setNormalizeData] = useState(false);
 
-  // Update URL when selectedIndicatorIds change
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login?callbackUrl=/pro/comparison");
+    }
+  }, [status, router]);
+
   useEffect(() => {
     const current = new URLSearchParams(Array.from(searchParams.entries()));
     if (selectedIndicatorIds.length > 0) {
@@ -50,11 +55,13 @@ export default function IndicatorComparisonPage() {
     } else {
       current.delete('indicators');
     }
-    router.replace(`${pathname}?${current.toString()}`, { scroll: false });
+    // Only push if the search string actually changes to avoid redundant pushes
+    if (current.toString() !== searchParams.toString()) {
+        router.replace(`${pathname}?${current.toString()}`, { scroll: false });
+    }
   }, [selectedIndicatorIds, pathname, router, searchParams]);
 
 
-  // Effect to fetch data when selectedIndicatorIds change or date range changes or normalization changes
   useEffect(() => {
     if (selectedIndicatorIds.length === 0) {
       setSeriesData([]);
@@ -75,7 +82,15 @@ export default function IndicatorComparisonPage() {
           const indicatorMeta = allIndicators.find(ind => ind.id === id);
           if (!indicatorMeta) return null;
 
-          const rawData = await fetchIndicatorData(indicatorMeta, dateRange);
+          let rawData: TimeSeriesDataPoint[] = [];
+          let fetchErr: string | null = null;
+          try {
+            rawData = await fetchIndicatorData(indicatorMeta, dateRange);
+          } catch (err: any) {
+            console.error(`[ComparisonPage] Error fetching data for ${id}:`, err.message);
+            fetchErr = err.message || `Failed to load data for ${indicatorMeta.name}.`;
+            // Continue, so other successful fetches can still be processed
+          }
           
           let displayData = rawData;
           if (normalizeData && rawData.length > 0) {
@@ -86,47 +101,44 @@ export default function IndicatorComparisonPage() {
                 ...dp,
                 value: dp.value !== null ? (dp.value / firstValue) * 100 : null,
               }));
-            } else if (firstValue === 0) { // Handle case where first value is 0
-                displayData = rawData.map(dp => ({ ...dp, value: dp.value === 0 ? 100 : (dp.value !== null ? (dp.value / 0.000001) * 100 : null) })); // Avoid division by zero, treat 0 as 100
+            } else if (firstValue === 0) { 
+                displayData = rawData.map(dp => ({ ...dp, value: dp.value === 0 ? 100 : (dp.value !== null ? (dp.value / 0.000001) * 100 : null) }));
             }
           }
           
           return {
             data: displayData,
-            dataKey: 'value',
+            dataKey: `series_${id.replace(/[^a-zA-Z0-9_]/g, '_')}`, // Sanitize dataKey
             name: indicatorMeta.name,
             color: DEFAULT_SERIES_COLORS[index % DEFAULT_SERIES_COLORS.length],
             type: indicatorMeta.chartType || 'line',
-            yAxisId: index % 2 === 0 ? 'left' : 'right',
+            yAxisId: index % 2 === 0 ? 'left' : 'right', 
             unit: normalizeData ? ' (Rebased)' : indicatorMeta.unit,
+            fetchError: fetchErr, // Store individual fetch error
           };
         });
 
-        const results = (await Promise.all(fetchedSeriesPromises)).filter(s => s !== null) as ChartSeries[];
+        const results = (await Promise.all(fetchedSeriesPromises)).filter(s => s !== null) as (ChartSeries & { fetchError?: string | null })[];
         
-        let hasData = false;
-        results.forEach(s => {
-            if(s.data.some(dp => dp.value !== null)) {
-                hasData = true;
-            }
-        });
+        const successfulSeries = results.filter(s => !s.fetchError && s.data.length > 0);
+        const erroredSeries = results.filter(s => s.fetchError);
 
-        if (!hasData && results.length > 0) {
-            toast.error("No data available for any selected indicators for the current period.", { duration: 4000 });
-            setSeriesData([]); // Clear data if all selected are empty
-        } else if (results.some(s => s.data.length === 0) && results.length > 0) {
-             toast.error("Some selected indicators have no data for the current period.", { duration: 4000 });
-             setSeriesData(results.filter(s => s.data.length > 0)); // Only show series with data
+        if (erroredSeries.length > 0) {
+            const errorMessages = erroredSeries.map(s => `${s.name}: ${s.fetchError}`).join('\n');
+            toast.error(`Could not load data for:\n${errorMessages.substring(0, 200)}${errorMessages.length > 200 ? '...' : ''}`, { duration: 6000 });
         }
-         else {
-            setSeriesData(results);
+        
+        if (successfulSeries.length === 0 && selectedIndicatorIds.length > 0) {
+            setChartError(erroredSeries.length > 0 ? "Failed to load data for all selected indicators." : "No data available for the selected indicators or date range.");
+            setSeriesData([]);
+        } else {
+            setSeriesData(successfulSeries);
         }
 
-      } catch (error: any) {
-        console.error("Error fetching data for comparison:", error);
-        const displayError = error.message?.includes("Failed to fetch data for") ? error.message : "Failed to load data for one or more indicators.";
-        setChartError(displayError);
-        toast.error(displayError);
+      } catch (error: any) { // Catch for Promise.all or other general errors
+        console.error("Error fetching data for comparison (general):", error);
+        setChartError(error.message || "An unexpected error occurred while loading comparison data.");
+        toast.error(error.message || "Error loading comparison data.");
       } finally {
         setIsLoadingData(false);
       }
@@ -143,7 +155,7 @@ export default function IndicatorComparisonPage() {
       
       if (newSelected.length > MAX_COMPARISON_INDICATORS) {
         toast.error(`You can select up to ${MAX_COMPARISON_INDICATORS} indicators.`);
-        return prev; // Return original if limit exceeded
+        return prev;
       }
       return newSelected;
     });
@@ -152,7 +164,7 @@ export default function IndicatorComparisonPage() {
 
   if (status === "loading") {
     return (
-      <div className="container mx-auto p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
+      <div className="container mx-auto p-8 text-center min-h-[calc(100vh-var(--header-height)-var(--footer-height))] flex flex-col items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Verifying access...</p>
       </div>
@@ -164,14 +176,16 @@ export default function IndicatorComparisonPage() {
 
   if (!canAccessComparison) {
     return (
-      <div className="container mx-auto p-8 text-center min-h-[calc(100vh-var(--header-height))] flex flex-col items-center justify-center">
+      <div className="container mx-auto p-8 text-center min-h-[calc(100vh-var(--header-height)-var(--footer-height))] flex flex-col items-center justify-center">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h1 className="text-2xl font-bold mb-4">Pro Feature: Indicator Comparison</h1>
         <p className="text-muted-foreground mb-6 max-w-md">
           This tool requires a Pro subscription. Upgrade to compare multiple indicators side-by-side.
         </p>
-        <Link href="/pricing"><Button size="lg">Upgrade to Pro</Button></Link>
-        <Link href="/dashboard" className="mt-4"><Button variant="outline">Back to Dashboard</Button></Link>
+        <div className="flex gap-2">
+          <Link href="/pricing"><Button size="lg">Upgrade to Pro</Button></Link>
+          <Link href="/dashboard"><Button size="lg" variant="outline">Back to Dashboard</Button></Link>
+        </div>
       </div>
     );
   }
@@ -179,11 +193,19 @@ export default function IndicatorComparisonPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-          Indicator Comparison Tool
-        </h1>
-        <div className="flex items-center space-x-4">
-             <DateRangePicker /> {/* Global Date Range Picker */}
+        <div className="flex items-center gap-3">
+            <Link href="/dashboard">
+                <Button variant="outline" size="icon" className="h-9 w-9 flex-shrink-0">
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="sr-only">Back to Dashboard</span>
+                </Button>
+            </Link>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+            Indicator Comparison Tool
+            </h1>
+        </div>
+        <div className="flex items-center space-x-4 self-start sm:self-center">
+             <DateRangePicker />
             <div className="flex items-center space-x-2">
                 <Switch
                     id="normalize-data"
@@ -196,13 +218,13 @@ export default function IndicatorComparisonPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="md:col-span-1">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <Card className="lg:col-span-3">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Select Indicators</CardTitle>
             <CardDescription className="text-xs">Choose up to {MAX_COMPARISON_INDICATORS}.</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[calc(100vh-250px)] overflow-y-auto space-y-1.5 pr-2">
+          <CardContent className="max-h-[calc(100vh-300px)] lg:max-h-[calc(100vh-200px)] overflow-y-auto space-y-1.5 pr-2">
             {allIndicators.map(indicator => (
               <div key={indicator.id} className="flex items-center space-x-2 p-1.5 rounded-md hover:bg-muted/50 has-[button:disabled]:opacity-60 has-[button:disabled]:cursor-not-allowed">
                 <Checkbox
@@ -219,12 +241,12 @@ export default function IndicatorComparisonPage() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3 min-h-[450px] sm:min-h-[500px] flex flex-col">
+        <Card className="lg:col-span-9 min-h-[450px] sm:min-h-[500px] flex flex-col">
           <CardHeader>
             <CardTitle className="text-lg">Comparison Chart</CardTitle>
-             {selectedIndicatorIds.length > 0 && (
+             {selectedIndicatorIds.length > 0 && seriesData.length > 0 && (
                  <CardDescription className="text-xs">
-                    Comparing: {selectedIndicatorIds.map(id => allIndicators.find(i=>i.id===id)?.name || id).join(' vs. ')}
+                    Comparing: {seriesData.map(s => s.name).join(' vs. ')}
                 </CardDescription>
              )}
           </CardHeader>
@@ -236,14 +258,14 @@ export default function IndicatorComparisonPage() {
             )}
             {chartError && !isLoadingData && (
               <div className="text-center text-destructive py-10 h-full flex flex-col justify-center items-center">
-                <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-                <p className="font-semibold">Error Loading Chart</p>
-                <p className="text-xs max-w-md">{chartError}</p>
-                 <Button variant="outline" size="sm" onClick={() => setSelectedIndicatorIds([])} className="mt-3">Clear Selections & Retry</Button>
+                <AlertTriangle className="mx-auto h-10 w-10 mb-3" />
+                <p className="font-semibold text-base">Error Loading Chart</p>
+                <p className="text-xs max-w-md mb-3">{chartError}</p>
+                 <Button variant="outline" size="sm" onClick={() => setSelectedIndicatorIds([])}>Clear Selections & Retry</Button>
               </div>
             )}
             {!isLoadingData && !chartError && seriesData.length > 0 && seriesData.some(s=> s.data.length > 0) && (
-              <div className="w-full h-[380px] sm:h-[480px]">
+              <div className="w-full h-[calc(100%-2rem)] min-h-[350px] sm:min-h-[450px]"> {/* Ensure chart has space */}
                 <ChartComponent
                   series={seriesData}
                   showRecessionPeriods={true}
@@ -252,9 +274,20 @@ export default function IndicatorComparisonPage() {
                 />
               </div>
             )}
-            {!isLoadingData && !chartError && (selectedIndicatorIds.length === 0 || (seriesData.length > 0 && !seriesData.some(s => s.data.length > 0))) && (
+            {!isLoadingData && selectedIndicatorIds.length === 0 && (
+              <div className="text-center text-muted-foreground py-10 h-full flex flex-col justify-center items-center">
+                <BarChart3 className="mx-auto h-12 w-12 text-muted-foreground/70 mb-4" />
+                <p className="font-medium">Indicator Comparison</p>
+                <p className="text-sm">Select up to {MAX_COMPARISON_INDICATORS} indicators from the left panel to compare them.</p>
+              </div>
+            )}
+             {!isLoadingData && !chartError && selectedIndicatorIds.length > 0 && seriesData.length === 0 && (
                 <div className="text-center text-muted-foreground py-10 h-full flex flex-col justify-center items-center">
-                    <p>{selectedIndicatorIds.length === 0 ? `Select up to ${MAX_COMPARISON_INDICATORS} indicators to compare.` : "No data to display for the selected indicators or date range."}</p>
+                    <AlertTriangle className="mx-auto h-10 w-10 mb-3 text-amber-500" />
+                    <p className="font-medium">No Data to Display</p>
+                    <p className="text-sm max-w-md">
+                        No data could be loaded for the currently selected indicators and date range. Please try different indicators or adjust the date range.
+                    </p>
                 </div>
             )}
           </CardContent>
