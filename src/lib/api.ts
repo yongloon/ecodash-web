@@ -119,79 +119,58 @@ export async function fetchFredSeries(
 
 // --- FRED API Fetcher (Releases Calendar) ---
 export interface FredReleaseDate { release_id: number; release_name: string; date: string; }
-export interface FredReleasesDatesResponse { 
-    release_dates: FredReleaseDate[]; 
-    count?: number; 
-    offset?: number; 
-    limit?: number; 
-    error_code?: number;
-    error_message?: string;
-}
+export interface FredReleasesDatesResponse { release_dates: FredReleaseDate[]; count?: number; offset?: number; limit?: number; }
 
-export async function fetchFredReleaseCalendar( 
-    _daysAheadForDisplay: number = 90, // Not directly used in API query, but for semantic clarity
-    includeReleaseDatesWithNoData: boolean = false 
+export async function fetchFredReleaseCalendar(
+  _daysAheadForDisplay: number = 30, // This param is for context now, API fetches a fixed window
+  includeReleaseDatesWithNoData: boolean = false
 ): Promise<FredReleaseDate[]> {
-  const apiKey = getApiKey('FRED');
-  if (!apiKey) {
-    console.error("[API FRED Releases] API Key is missing.");
-    throw new Error(`[FRED API Key Missing] Cannot fetch release calendar.`);
-  }
-  
-  const params = new URLSearchParams({
-    api_key: apiKey,
-    file_type: 'json',
-    include_release_dates_with_no_data: String(includeReleaseDatesWithNoData),
-    limit: '500', 
-    sort_order: 'asc',
-    // Optional: To get more future-dated *schedules*, we might need to specify a future `release_date_start`
-    // However, the FRED API doc for /releases/dates does not list `release_date_start` as a param.
-    // It lists `realtime_start` and `realtime_end` which are for when the schedule *itself* was valid.
-    // We will rely on fetching a large limit and client-side filtering for future dates.
-  });
+  const apiKey = process.env.FRED_API_KEY;
+  if (!apiKey) { console.error("[API FRED Releases] Key missing."); return []; }
 
+  const today = new Date();
+  // Fetch a window: 7 days in the past (for any just-missed updates) to 60 days in the future.
+  const queryStartDate = format(subDays(today, 7), 'yyyy-MM-dd');
+  const queryEndDate = format(addDays(today, 60), 'yyyy-MM-dd');
+
+  const params = new URLSearchParams({
+    api_key: apiKey, file_type: 'json',
+    realtime_start: queryStartDate,
+    realtime_end: queryEndDate,
+    include_release_dates_with_no_data: String(includeReleaseDatesWithNoData),
+    limit: '200', // Fetch a decent number of releases within the window
+    sort_order: 'asc', // Get them sorted by release date
+  });
   const url = `${FRED_API_RELEASES_URL}/releases/dates?${params.toString()}`;
-  
-  // console.log(`[API FRED Releases] Fetching URL: ${url}`);
 
   try {
-    const response = await fetch(url, { next: { revalidate: 43200 } }); 
-    
-    const responseText = await response.text();
-
+    const response = await fetch(url, { next: { revalidate: 43200 } }); // Revalidate every 12 hours
     if (!response.ok) {
-      console.error(`[API FRED Releases] Error: ${response.status} - Body: ${responseText.substring(0,500)}`);
-      throw new Error(`[FRED Releases API Error] (${response.status}). Details: ${responseText.substring(0,100)}`);
+      const errorText = await response.text();
+      console.error(`[API FRED Releases] Error: ${response.status} - Body: ${errorText.substring(0,500)}`);
+      throw new Error(`FRED Releases API Error (${response.status}).`);
+    }
+    const data: FredReleasesDatesResponse = await response.json();
+    if (!data?.release_dates?.length) {
+        return [];
     }
 
-    const data: FredReleasesDatesResponse = JSON.parse(responseText);
-
-    if (data.error_message || data.error_code) {
-        console.error(`[API FRED Releases] API returned an error: ${data.error_message} (Code: ${data.error_code})`);
-        throw new Error(`[FRED Releases API Error] ${data.error_message || `Code ${data.error_code}`}`);
-    }
-
-    if (!data?.release_dates || !Array.isArray(data.release_dates) || data.release_dates.length === 0) { 
-        // console.warn(`[API FRED Releases] No 'release_dates' array found or it's empty. Data:`, JSON.stringify(data).substring(0,300));
-        return []; 
-    }
-    
+    // Deduplicate and ensure validity
     const uniqueReleasesMap = new Map<string, FredReleaseDate>();
     data.release_dates.forEach(current => {
       if (current.date && current.release_name && current.release_id != null && isValid(parseISO(current.date))) {
-        uniqueReleasesMap.set(`${current.date}-${current.release_id}`, current);
+        uniqueReleasesMap.set(`${current.release_id}-${current.date}`, current); // Use ID and date for uniqueness
       }
     });
-
-    const sortedReleases = Array.from(uniqueReleasesMap.values())
+    // The API already sorts by date if sort_order=asc is used. If not, sort here.
+    // Sorting again won't hurt if API guarantees it, but good for safety.
+    const allUniqueSortedReleases = Array.from(uniqueReleasesMap.values())
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    return sortedReleases;
 
-  } catch (error: any) { 
-    if (error.message.startsWith('[FRED')) throw error;
-    console.error(`[API FRED Releases] Network/Parse Error:`, error); 
-    throw new Error(`[FRED Releases Network/Parse Error] Original: ${error.message?.substring(0,100)}`);
+    return allUniqueSortedReleases;
+  } catch (error) {
+    console.error(`[API FRED Releases] Error:`, error);
+    return [];
   }
 }
 
