@@ -93,6 +93,19 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'PRODUCTIVITY', name: 'Productivity (Output Per Hour)', categoryKey: 'ii', description: 'Output per hour in the nonfarm business sector.', unit: 'Index 2012=100', frequency: 'Quarterly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'OPHNFB', chartType: 'line', calculation: 'NONE' },
 
   // == Category III: Inflation & Prices ==
+  {
+    id: 'NATURAL_GAS',
+    name: 'Natural Gas Price (Henry Hub)',
+    categoryKey: 'iii',
+    description: 'Henry Hub Natural Gas Spot Price.',
+    unit: 'USD per Million BTU',
+    frequency: 'Daily', // FRED source is daily, but often reported monthly average
+    sourceName: 'EIA via FRED',
+    apiSource: 'FRED',
+    apiIdentifier: 'MHHNGSP', // Daily, often reported as monthly average. Use DHHNGSP for daily if preferred.
+    chartType: 'line',
+    calculation: 'NONE'
+  },
   { id: 'CPI_YOY_PCT', name: 'Consumer Price Index (CPI-U, YoY %)', categoryKey: 'iii', description: 'YoY % change in consumer prices (urban).', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'CPIAUCSL', chartType: 'bar', calculation: 'YOY_PERCENT' },
   { id: 'CORE_CPI_YOY_PCT', name: 'Core CPI (YoY %)', categoryKey: 'iii', description: 'YoY % change in CPI excluding food & energy.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'CPILFESL', chartType: 'bar', calculation: 'YOY_PERCENT' },
   { id: 'PPI_YOY_PCT', name: 'Producer Price Index (Final Demand, YoY %)', categoryKey: 'iii', description: 'YoY % change in prices received by domestic producers.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'PPIACO', chartType: 'bar', calculation: 'YOY_PERCENT' },
@@ -145,6 +158,7 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'CC_DELINQUENCY', name: 'Credit Card Delinquency Rate', categoryKey: 'iv', description: 'Delinquency rate on credit card loans (all commercial banks).', unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DRCCLACBS', chartType: 'line', calculation: 'NONE' },
 
   // == Category V: Business Activity & Investment ==
+
   { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'v', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' },
   { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'v', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
   {
@@ -179,6 +193,32 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'CURRENT_ACCOUNT', name: 'Current Account Balance', categoryKey: 'vii', description: 'Broad measure of trade including goods, services, income, and transfers.', unit: 'Billions of Dollars', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'BOPBCA', chartType: 'bar', calculation: 'NONE' },
 
   // == Category VIII: Financial Conditions & Markets ==
+  {
+    id: 'NASDAQCOM',
+    name: 'Nasdaq Composite Index',
+    categoryKey: 'viii',
+    description: 'Market value-weighted stock market index of common stocks listed on the Nasdaq stock market.',
+    unit: 'Index Value',
+    frequency: 'Daily',
+    sourceName: 'Nasdaq Stock Market via FRED',
+    apiSource: 'FRED',
+    apiIdentifier: 'NASDAQCOM',
+    chartType: 'line',
+    calculation: 'NONE'
+  },
+  {
+    id: 'DXY',
+    name: 'US Dollar Index (DXY)',
+    categoryKey: 'viii',
+    description: 'Trade Weighted U.S. Dollar Index: Broad, Goods and Services.',
+    unit: 'Index Mar 1973=100',
+    frequency: 'Daily', // FRED series is daily, check frequency you want to display
+    sourceName: 'Board of Governors of the Federal Reserve System (US) via FRED',
+    apiSource: 'FRED',
+    apiIdentifier: 'DTWEXBGS', // Broad, Goods and Services. There's also DTWEXAFEGS (Advanced Foreign Economies)
+    chartType: 'line',
+    calculation: 'NONE'
+  },
   {
     id: 'FEDFUNDS', name: 'Federal Funds Effective Rate', categoryKey: 'viii',
     description: 'The interest rate at which commercial banks lend reserves to each other overnight, a key monetary policy tool.',
