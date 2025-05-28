@@ -1,8 +1,8 @@
 // src/components/dashboard/ChartComponent.tsx
 'use client';
-import React, { useRef, useMemo } from 'react'; // ADDED useMemo here
+import React, { useRef, useMemo } from 'react';
 import {
-  ComposedChart, // CHANGED to ComposedChart
+  ComposedChart,
   Line, Bar, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   ReferenceArea, Brush
@@ -11,23 +11,23 @@ import { TimeSeriesDataPoint } from '@/lib/indicators';
 import { format, parseISO, isValid, differenceInDays, differenceInMonths } from 'date-fns';
 import { usRecessionPeriods } from '@/lib/recessionData';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react'; // Added Loader2
 import { useSession } from 'next-auth/react';
 import { AppPlanTier } from '@/app/api/auth/[...nextauth]/route';
 import { canUserAccessFeature, FEATURE_KEYS } from '@/lib/permissions';
 import toast from 'react-hot-toast';
-// import { toPng } from 'html-to-image';
+import { toPng } from 'html-to-image'; // IMPORTED
 
 export interface ChartSeries {
-  data: TimeSeriesDataPoint[]; // This will now be primarily for calculation before merging
-  dataKey: string; // Unique key for this series in the merged dataset
+  data: TimeSeriesDataPoint[]; 
+  dataKey: string; 
   name: string;
   color: string;
   type?: 'line' | 'bar' | 'area';
   yAxisId?: string;
   strokeDasharray?: string;
   unit?: string;
-  originalData?: TimeSeriesDataPoint[]; // Keep original for tooltip if normalized
+  originalData?: TimeSeriesDataPoint[]; 
 }
 
 interface ChartComponentProps {
@@ -47,17 +47,16 @@ export default function ChartComponent({
   const { data: session } = useSession();
   const userTier: AppPlanTier | undefined = (session?.user as any)?.activePlanTier;
   const canDownloadChart = canUserAccessFeature(userTier, FEATURE_KEYS.CHART_DOWNLOAD);
+  const [isDownloading, setIsDownloading] = React.useState(false); // Added state for download
 
-  // --- Data Merging Logic ---
   const mergedAndProcessedData = useMemo(() => {
     if (!series || series.length === 0) return [];
 
     const allDates = new Set<string>();
     series.forEach(s => {
-      // Ensure s.data is an array before trying to iterate
       if (Array.isArray(s.data)) {
         s.data.forEach(dp => {
-          if (dp && dp.date && isValid(parseISO(dp.date))) { // Added check for dp existence
+          if (dp && dp.date && isValid(parseISO(dp.date))) {
             allDates.add(dp.date);
           }
         });
@@ -69,14 +68,12 @@ export default function ChartComponent({
     return sortedDates.map(date => {
       const dataPoint: { date: string; [key: string]: any } = { date };
       series.forEach(s => {
-        // Ensure s.data is an array before trying to find
-        const point = Array.isArray(s.data) ? s.data.find(dp => dp && dp.date === date) : undefined; // Added check for dp existence
+        const point = Array.isArray(s.data) ? s.data.find(dp => dp && dp.date === date) : undefined;
         dataPoint[s.dataKey] = point ? point.value : null;
       });
       return dataPoint;
     });
   }, [series]);
-  // --- End Data Merging Logic ---
 
   const validData = mergedAndProcessedData.filter(d => d.date && isValid(parseISO(d.date)));
 
@@ -150,22 +147,47 @@ export default function ChartComponent({
 
   const yAxisIds = new Set(series.map(s => s.yAxisId || 'left'));
 
-  const handleDownload = () => {
+  const handleDownload = React.useCallback(async () => {
     if (!canDownloadChart) {
       toast.error("Chart download is a Pro feature. Please upgrade your plan.");
       return;
     }
-    toast.success("Chart download initiated (placeholder). Full implementation requires a library like html-to-image.");
-    console.log("Attempting to download chart from ref:", chartRef.current);
-    // if (chartRef.current) {
-    //   const chartElement = chartRef.current.querySelector('.recharts-wrapper');
-    //   if (chartElement) {
-    //     toPng(chartElement as HTMLElement)
-    //       .then((dataUrl) => { /* ... download logic ... */ })
-    //       .catch(/* ... error handling ... */);
-    //   }
-    // }
-  };
+    if (!chartRef.current) {
+      toast.error("Chart element not found. Cannot download.");
+      return;
+    }
+
+    const rechartsWrapper = chartRef.current.querySelector('.recharts-wrapper');
+    const elementToCapture = (rechartsWrapper || chartRef.current) as HTMLElement;
+    
+    if (!elementToCapture) {
+        toast.error("Chart content not found for download.");
+        return;
+    }
+
+    setIsDownloading(true);
+    const toastId = toast.loading('Generating chart image...');
+
+    try {
+      const dataUrl = await toPng(elementToCapture, { 
+          backgroundColor: 'hsl(var(--card))',
+          style: {
+            fontFamily: 'Inter, sans-serif',
+          }
+      });
+      const link = document.createElement('a');
+      const seriesNames = series.map(s => s.name).join('_and_') || 'chart';
+      link.download = `ecodash_${seriesNames.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${format(new Date(), 'yyyyMMdd')}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success('Chart downloaded!', { id: toastId });
+    } catch (err: any) {
+      console.error('Failed to download chart:', err);
+      toast.error(`Failed to download chart: ${err.message || 'Unknown error'}`, { id: toastId });
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [canDownloadChart, series]);
 
   return (
     <div ref={chartRef} className="relative w-full h-full">
@@ -174,10 +196,11 @@ export default function ChartComponent({
             variant="outline"
             size="icon"
             onClick={handleDownload}
+            disabled={isDownloading}
             className="absolute top-1 right-1 z-10 h-7 w-7"
-            title="Download Chart"
+            title="Download Chart as PNG"
           >
-            <Download className="h-3.5 w-3.5" />
+            {isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           </Button>
         )}
       <ResponsiveContainer width="100%" height="100%">
@@ -229,7 +252,7 @@ export default function ChartComponent({
           />
 
           <defs>
-            {series.map((s, i) => (
+            {series.map((s) => ( // Removed index 'i' as it was unused
               s.type === 'area' && (
                 <linearGradient key={`gradient-${s.dataKey}`} id={`${chartId}-grad-${s.dataKey}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={s.color} stopOpacity={0.7}/>
@@ -273,7 +296,7 @@ export default function ChartComponent({
                 key={period.id}
                 x1={period.startDate}
                 x2={period.endDate}
-                yAxisId="left"
+                yAxisId="left" 
                 fill="hsl(var(--muted))"
                 fillOpacity={0.3}
                 stroke="hsl(var(--border))"

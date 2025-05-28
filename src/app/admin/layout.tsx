@@ -5,16 +5,17 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldAlert, Loader2, LayoutDashboard, Users, Settings, BarChart3 } from 'lucide-react';
+import { ShieldAlert, Loader2, LayoutDashboard, Users, Settings, BarChart3, KeyRound } from 'lucide-react'; // <<< ADDED KeyRound
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { UserRole } from '@/app/api/auth/[...nextauth]/route'; // Import UserRole
+import { UserRole } from '@/app/api/auth/[...nextauth]/route'; 
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // ... (existing useEffect and checks remain the same) ...
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -24,7 +25,6 @@ export default function AdminLayout({
       router.replace('/login?callbackUrl=/admin');
       return;
     }
-    // Explicitly cast session.user to include 'role'
     const userRole = (session?.user as { role?: UserRole })?.role;
     if (session && userRole !== 'ADMIN') {
       router.replace('/dashboard?error=unauthorized_admin');
@@ -58,9 +58,11 @@ export default function AdminLayout({
       return null; 
   }
 
+
   return (
     <div className="flex h-screen bg-muted/40 dark:bg-background">
       <aside className="w-60 bg-card border-r border-border/60 p-4 flex flex-col space-y-2">
+        {/* ... (EcoDash link) ... */}
         <Link href="/" className="flex items-center gap-2 mb-4 group pl-2">
             <BarChart3 className="h-7 w-7 text-primary group-hover:opacity-80 transition-opacity" />
             <span className="text-lg font-semibold text-primary">EcoDash</span>
@@ -77,6 +79,11 @@ export default function AdminLayout({
                 <Users className="mr-2 h-4 w-4" /> Users
             </Button>
         </Link>
+       <Link href="/admin/apikeys">
+           <Button variant="ghost" className="w-full justify-start">
+               <KeyRound className="mr-2 h-4 w-4" /> API Keys Status
+           </Button>
+       </Link>
         <Link href="/admin/settings">
             <Button variant="ghost" className="w-full justify-start">
                 <Settings className="mr-2 h-4 w-4" /> Site Settings
@@ -91,6 +98,7 @@ export default function AdminLayout({
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* ... (header and main content) ... */}
         <header className="bg-card h-16 flex items-center px-6 border-b border-border/60">
           <h1 className="text-xl font-semibold text-foreground">Administration</h1>
         </header>
