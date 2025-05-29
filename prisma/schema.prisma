@@ -1,39 +1,11 @@
 // prisma/schema.prisma
-
-datasource db {
-  provider = "postgresql" // Or your chosen provider: "mysql", "sqlite", "sqlserver", "mongodb"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
-enum UserRole {
-  USER
-  ADMIN
-}
-
-model User {
-  id                    String                 @id @default(cuid())
-  name                  String?
-  username              String?                @unique
-  email                 String?                @unique
-  emailVerified         DateTime?
-  image                 String?
-  passwordHash          String?
-  accounts              Account[]
-  sessions              Session[]
-  favoriteIndicators    FavoriteIndicator[]
-  stripeCustomerId      String?                @unique @map("stripe_customer_id")
-  stripeSubscriptionId  String?                @unique @map("stripe_subscription_id")
-  stripePriceId         String?                @map("stripe_price_id")
-  stripeCurrentPeriodEnd DateTime?             @map("stripe_current_period_end")
-  alerts                UserAlert[]
-  role                  UserRole               @default(USER) // <<< ADDED THIS
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+datasource db {
+  provider = "postgresql" // Or your chosen DB: "mysql", "sqlserver", "mongodb", "cockroachdb"
+  url      = env("DATABASE_URL")
 }
 
 model Account {
@@ -63,6 +35,33 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  name                     String?
+  username                 String?   @unique
+  email                    String?   @unique
+  emailVerified            DateTime?
+  image                    String?
+  passwordHash             String?
+  accounts                 Account[]
+  sessions                 Session[]
+  role                     UserRole  @default(USER)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  favoriteIndicators       FavoriteIndicator[]
+  alerts                   UserAlert[]
+  stripeCustomerId         String?   @unique @map(name: "stripe_customer_id")
+  stripeSubscriptionId     String?   @unique @map(name: "stripe_subscription_id")
+  stripePriceId            String?   @map(name: "stripe_price_id")
+  stripeCurrentPeriodEnd   DateTime? @map(name: "stripe_current_period_end")
+  passwordResetTokens      PasswordResetToken[]
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -71,43 +70,41 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model PasswordResetToken {
-  id        String   @id @default(cuid())
-  userId    String
-  email     String   // Storing email here for faster lookup if needed, though userId is primary key
-  token     String   @unique
-  expiresAt DateTime
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@index([userId])
-  @@index([email]) // If you plan to query by email often for tokens
-}
-
 model FavoriteIndicator {
   id          String   @id @default(cuid())
   userId      String
   indicatorId String
   createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, indicatorId])
+}
 
-  @@unique([userId, indicatorId]) // Ensures a user can't favorite the same indicator multiple times
-  @@index([userId])
+enum AlertCondition {
+  ABOVE
+  BELOW
 }
 
 model UserAlert {
-  id          String   @id @default(cuid())
-  userId      String
-  indicatorId String
-  targetValue Float
-  condition   String 
-  triggeredAt DateTime?
-  isEnabled   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String         @id @default(cuid())
+  userId        String
+  indicatorId   String
+  targetValue   Float
+  condition     AlertCondition
+  isEnabled     Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  triggeredAt   DateTime?      // Last time this alert was triggered
+  lastCheckedAt DateTime?      // Last time the system checked this alert's condition
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, indicatorId, targetValue, condition]) 
-  @@index([userId])
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  email     String   // Store email for easier lookup if needed, though userId is primary key
+  token     String   @unique
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
