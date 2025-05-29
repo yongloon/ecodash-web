@@ -1,9 +1,10 @@
 // src/lib/indicators.ts
 import { IconType } from 'react-icons';
 import {
-  FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaPlaneDeparture, FaCar, FaLandmark
+  FaChartLine, FaUsers, FaDollarSign, FaHome, FaIndustry, FaPlaneDeparture, FaCar, FaLandmark, FaGasPump
 } from 'react-icons/fa';
-import { BsBank2 } from "react-icons/bs";
+import { BsBank2, BsCurrencyBitcoin, BsCurrencyExchange } from "react-icons/bs";
+import { SiEthereum } from "react-icons/si";
 
 export const indicatorCategories = {
   'i': { name: 'Economic Output & Growth', slug: 'economic-output', icon: FaChartLine },
@@ -14,16 +15,17 @@ export const indicatorCategories = {
   'vi': { name: 'Housing Market', slug: 'housing-market', icon: FaHome },
   'vii': { name: 'International Trade', slug: 'international-trade', icon: FaPlaneDeparture },
   'viii': { name: 'Financial Conditions & Markets', slug: 'financial-conditions', icon: BsBank2 },
+  'ix': { name: 'Commodities & Currencies', slug: 'commodities-currencies', icon: FaGasPump }
 } as const;
 
 export type IndicatorCategoryKey = keyof typeof indicatorCategories;
 
 export interface TimeSeriesDataPoint {
-  date: string;
+  date: string; // Format: "YYYY-MM-DD"
   value: number | null;
 }
 
-export type CalculationType = 'NONE' | 'YOY_PERCENT' | 'MOM_PERCENT' | 'QOQ_PERCENT' | 'MOM_CHANGE' | 'QOQ_CHANGE';
+export type CalculationType = 'NONE' | 'YOY_PERCENT' | 'MOM_PERCENT' | 'QOQ_PERCENT' | 'MOM_CHANGE' | 'QOQ_CHANGE' | 'DXY_CALCULATION';
 
 export interface IndicatorMetadata {
   id: string;
@@ -31,18 +33,25 @@ export interface IndicatorMetadata {
   categoryKey: IndicatorCategoryKey;
   description: string;
   unit: string;
-  frequency?: string;
+  frequency?: string; // E.g., 'Daily', 'Monthly', 'Quarterly', 'Weekly'
   sourceName: string;
   sourceLink?: string;
-  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas' | 'ApiNinjasHistorical' | 'Tiingo'; // Added Tiingo
-  apiIdentifier?: string;
+  apiSource: 'FRED' | 'AlphaVantage' | 'DBNOMICS' | 'FinnhubQuote' | 'Mock' | 'Other' | 'BLS' | 'BEA' | 'Census' | 'NAR' | 'FRB' | 'Treasury' | 'DOL' | 'ISM' | 'UMich' | 'ConfBoard' | 'CBOE' | 'S&P' | 'FreddieMac' | 'CoinGeckoAPI' | 'AlternativeMeAPI' | 'PolygonIO' | 'ApiNinjas' | 'ApiNinjasHistorical' | 'Tiingo';
+  apiIdentifier?: string | string[]; // Can be a single ID or an array for composite indicators like DXY
   chartType?: 'line' | 'bar' | 'area';
   calculation?: CalculationType;
   notes?: string;
 }
 
-export interface FredObservation { date: string; value: string; }
-export interface FredResponse { observations: FredObservation[]; }
+// For FRED API response structure (if fetched directly, though abstracting is better)
+export interface FredObservation {
+  date: string;
+  value: string; // FRED values are strings, need parsing
+}
+export interface FredResponse {
+  observations: FredObservation[];
+  // other FRED response fields if needed
+}
 
 
 export const indicators: IndicatorMetadata[] = [
@@ -72,8 +81,8 @@ export const indicators: IndicatorMetadata[] = [
     unit: 'Dollars',
     frequency: 'Quarterly',
     sourceName: 'BEA/Census via FRED (Calculated)',
-    apiSource: 'FRED',
-    apiIdentifier: 'GDP/POP', 
+    apiSource: 'FRED', // Still FRED, but components
+    apiIdentifier: 'GDP/POP', // Special identifier handled in mockData/api
     chartType: 'line',
     calculation: 'NONE',
     notes: 'Calculated as Nominal GDP divided by Total Population. Fetch requires two series.'
@@ -93,19 +102,6 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'PRODUCTIVITY', name: 'Productivity (Output Per Hour)', categoryKey: 'ii', description: 'Output per hour in the nonfarm business sector.', unit: 'Index 2012=100', frequency: 'Quarterly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'OPHNFB', chartType: 'line', calculation: 'NONE' },
 
   // == Category III: Inflation & Prices ==
-  {
-    id: 'NATURAL_GAS',
-    name: 'Natural Gas Price (Henry Hub)',
-    categoryKey: 'iii',
-    description: 'Henry Hub Natural Gas Spot Price.',
-    unit: 'USD per Million BTU',
-    frequency: 'Daily', // FRED source is daily, but often reported monthly average
-    sourceName: 'EIA via FRED',
-    apiSource: 'FRED',
-    apiIdentifier: 'MHHNGSP', // Daily, often reported as monthly average. Use DHHNGSP for daily if preferred.
-    chartType: 'line',
-    calculation: 'NONE'
-  },
   { id: 'CPI_YOY_PCT', name: 'Consumer Price Index (CPI-U, YoY %)', categoryKey: 'iii', description: 'YoY % change in consumer prices (urban).', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'CPIAUCSL', chartType: 'bar', calculation: 'YOY_PERCENT' },
   { id: 'CORE_CPI_YOY_PCT', name: 'Core CPI (YoY %)', categoryKey: 'iii', description: 'YoY % change in CPI excluding food & energy.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'CPILFESL', chartType: 'bar', calculation: 'YOY_PERCENT' },
   { id: 'PPI_YOY_PCT', name: 'Producer Price Index (Final Demand, YoY %)', categoryKey: 'iii', description: 'YoY % change in prices received by domestic producers.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'PPIACO', chartType: 'bar', calculation: 'YOY_PERCENT' },
@@ -114,38 +110,51 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'GDPDEF_YOY_PCT', name: 'GDP Deflator (YoY %)', categoryKey: 'iii', description: 'YoY % change in the price level of all new, domestically produced final goods/services.', unit: '% Change YoY', frequency: 'Quarterly', sourceName: 'BEA via FRED', apiSource: 'FRED', apiIdentifier: 'GDPDEF', chartType: 'bar', calculation: 'YOY_PERCENT' },
   { id: 'IMPORT_PRICES_YOY_PCT', name: 'Import Price Index (YoY %)', categoryKey: 'iii', description: 'YoY % change in prices of imported goods.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'IR', chartType: 'bar', calculation: 'YOY_PERCENT' },
   { id: 'EXPORT_PRICES_YOY_PCT', name: 'Export Price Index (YoY %)', categoryKey: 'iii', description: 'YoY % change in prices of exported goods.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'BLS via FRED', apiSource: 'FRED', apiIdentifier: 'IQ', chartType: 'bar', calculation: 'YOY_PERCENT' },
-  { id: 'OIL_WTI', name: 'Crude Oil Price (WTI)', categoryKey: 'iii', description: 'West Texas Intermediate crude oil spot price.', unit: 'USD per Barrel', frequency: 'Daily', sourceName: 'EIA via FRED', apiSource: 'FRED', apiIdentifier: 'WTISPLC', chartType: 'line', calculation: 'NONE' },
+  { id: 'OIL_WTI', name: 'Crude Oil Price (WTI)', categoryKey: 'ix', description: 'West Texas Intermediate crude oil spot price.', unit: 'USD per Barrel', frequency: 'Daily', sourceName: 'EIA via FRED', apiSource: 'FRED', apiIdentifier: 'WTISPLC', chartType: 'line', calculation: 'NONE' },
   { id: 'INFL_EXPECT_UMICH', name: 'Inflation Expectations (UMich 1-Year)', categoryKey: 'iii', description: 'Median expected price change (next 12 months) from UMich Survey.', unit: '%', frequency: 'Monthly', sourceName: 'UMich via FRED', apiSource: 'FRED', apiIdentifier: 'MICH', chartType: 'line', calculation: 'NONE' },
   { id: 'TIPS_BREAKEVEN_5Y', name: 'TIPS Breakeven Inflation Rate (5-Year)', categoryKey: 'iii', description: 'Difference between nominal Treasury yield and TIPS yield of same maturity.', unit: '%', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'T5YIE', chartType: 'line', calculation: 'NONE' },
   {
-    id: 'GOLD_PRICE', // This will now be Tiingo Spot Gold
+    id: 'GOLD_PRICE',
     name: 'Spot Gold Price',
-    categoryKey: 'iii',
+    categoryKey: 'ix',
     description: 'Spot price of gold in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', // Or just USD if Tiingo provides it as XAU/USD
+    unit: 'USD per Ounce',
     frequency: 'Daily',
-    sourceName: 'Tiingo',           // CHANGED
-    apiSource: 'Tiingo',            // CHANGED
-    apiIdentifier: 'XAUUSD',        // ASSUMPTION - VERIFY THIS TICKER ON TIINGO
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'XAUUSD',
     chartType: 'line',
     calculation: 'NONE',
     notes: 'Data sourced from Tiingo. Represents daily closing/spot price.'
   },
   {
-    id: 'SILVER_PRICE', // NEW - Tiingo Spot Silver
+    id: 'SILVER_PRICE',
     name: 'Spot Silver Price',
-    categoryKey: 'iii',
+    categoryKey: 'ix',
     description: 'Spot price of silver in U.S. Dollars per troy ounce.',
-    unit: 'USD per Ounce', // Or just USD
+    unit: 'USD per Ounce',
     frequency: 'Daily',
     sourceName: 'Tiingo',
     apiSource: 'Tiingo',
-    apiIdentifier: 'XAGUSD',        // ASSUMPTION - VERIFY THIS TICKER ON TIINGO
+    apiIdentifier: 'XAGUSD',
     chartType: 'line',
     calculation: 'NONE',
     notes: 'Data sourced from Tiingo. Represents daily closing/spot price.'
   },
- 
+  {
+    id: 'NATURAL_GAS',
+    name: 'Natural Gas Price',
+    categoryKey: 'ix',
+    description: 'Price of Natural Gas, typically Henry Hub spot price.',
+    unit: 'USD per MMBtu',
+    frequency: 'Daily',
+    sourceName: 'Alpha Vantage',
+    apiSource: 'AlphaVantage',
+    apiIdentifier: 'NATURAL_GAS', 
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Alpha Vantage provides this via a specific commodity function (often Henry Hub daily data).'
+  },
 
   // == Category IV: Consumer Activity ==
   { id: 'RETAIL_SALES_MOM_PCT', name: 'Retail Sales (Advance, MoM %)', categoryKey: 'iv', description: 'MoM % change in retail/food services sales.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'RSAFS', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -158,19 +167,18 @@ export const indicators: IndicatorMetadata[] = [
   { id: 'CC_DELINQUENCY', name: 'Credit Card Delinquency Rate', categoryKey: 'iv', description: 'Delinquency rate on credit card loans (all commercial banks).', unit: '% (SA)', frequency: 'Quarterly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DRCCLACBS', chartType: 'line', calculation: 'NONE' },
 
   // == Category V: Business Activity & Investment ==
-
   { id: 'INDPRO', name: 'Industrial Production Index', categoryKey: 'v', description: 'Real output of manufacturing, mining, and utilities.', unit: 'Index 2017=100', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'INDPRO', chartType: 'area', calculation: 'NONE' },
   { id: 'CAPUTIL', name: 'Capacity Utilization', categoryKey: 'v', description: '% of industrial capacity currently in use.', unit: '% of Capacity', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'TCU', chartType: 'line', calculation: 'NONE' },
   {
-  id: 'PMI', name: 'Manufacturing PMI (ISM)', categoryKey: 'v',
-  description: 'Purchasing Managers Index for the manufacturing sector by the Institute for Supply Management. >50 indicates expansion.',
-  unit: 'Index', frequency: 'Monthly',
-  sourceName: 'ISM via DB.nomics', 
-  apiSource: 'DBNOMICS',            
-  apiIdentifier: 'ISM/pmi/pm',     // <<< CORRECTED IDENTIFIER
-  chartType: 'line', calculation: 'NONE',
-  notes: 'A reading above 50 percent indicates that the manufacturing economy is generally expanding; below 50 percent indicates that it is generally contracting.'
-},
+    id: 'PMI', name: 'Manufacturing PMI (ISM)', categoryKey: 'v',
+    description: 'Purchasing Managers Index for the manufacturing sector by the Institute for Supply Management. >50 indicates expansion.',
+    unit: 'Index', frequency: 'Monthly',
+    sourceName: 'ISM via DB.nomics', 
+    apiSource: 'DBNOMICS',            
+    apiIdentifier: 'ISM/pmi/pm',
+    chartType: 'line', calculation: 'NONE',
+    notes: 'A reading above 50 percent indicates that the manufacturing economy is generally expanding; below 50 percent indicates that it is generally contracting.'
+  },
   { id: 'DUR_GOODS_MOM_PCT', name: 'Durable Goods Orders (New Orders, MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for durable goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'DGORDER', chartType: 'bar', calculation: 'MOM_PERCENT', notes: 'Includes transportation.' },
   { id: 'FACTORY_ORDERS_MOM_PCT', name: 'Factory Orders (MoM %)', categoryKey: 'v', description: 'MoM % change in new orders for manufactured goods.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'AMTMNO', chartType: 'bar', calculation: 'MOM_PERCENT' },
   { id: 'BUS_INVENTORIES_MOM_PCT', name: 'Business Inventories (MoM %)', categoryKey: 'v', description: 'MoM % change in total value of business inventories.', unit: '% Change MoM', frequency: 'Monthly', sourceName: 'Census via FRED', apiSource: 'FRED', apiIdentifier: 'BUSINV', chartType: 'bar', calculation: 'MOM_PERCENT' },
@@ -194,32 +202,6 @@ export const indicators: IndicatorMetadata[] = [
 
   // == Category VIII: Financial Conditions & Markets ==
   {
-    id: 'NASDAQCOM',
-    name: 'Nasdaq Composite Index',
-    categoryKey: 'viii',
-    description: 'Market value-weighted stock market index of common stocks listed on the Nasdaq stock market.',
-    unit: 'Index Value',
-    frequency: 'Daily',
-    sourceName: 'Nasdaq Stock Market via FRED',
-    apiSource: 'FRED',
-    apiIdentifier: 'NASDAQCOM',
-    chartType: 'line',
-    calculation: 'NONE'
-  },
-  {
-    id: 'DXY',
-    name: 'US Dollar Index (DXY)',
-    categoryKey: 'viii',
-    description: 'Trade Weighted U.S. Dollar Index: Broad, Goods and Services.',
-    unit: 'Index Mar 1973=100',
-    frequency: 'Daily', // FRED series is daily, check frequency you want to display
-    sourceName: 'Board of Governors of the Federal Reserve System (US) via FRED',
-    apiSource: 'FRED',
-    apiIdentifier: 'DTWEXBGS', // Broad, Goods and Services. There's also DTWEXAFEGS (Advanced Foreign Economies)
-    chartType: 'line',
-    calculation: 'NONE'
-  },
-  {
     id: 'FEDFUNDS', name: 'Federal Funds Effective Rate', categoryKey: 'viii',
     description: 'The interest rate at which commercial banks lend reserves to each other overnight, a key monetary policy tool.',
     unit: '%', frequency: 'Monthly',
@@ -228,40 +210,20 @@ export const indicators: IndicatorMetadata[] = [
     chartType: 'line', calculation: 'NONE',
     notes: 'Monthly average of daily effective federal funds rate.'
   },
-  { id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii', description: 'Tracks stock performance of 500 large U.S. companies.', unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P Dow Jones Indices via FRED', apiSource: 'FRED', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE' },
   { id: 'M2_YOY_PCT', name: 'M2 Money Stock (YoY %)', categoryKey: 'viii', description: 'YoY % change in M2 money stock.', unit: '% Change YoY', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'bar', calculation: 'YOY_PERCENT', notes: 'Calculated from M2SL level data.' },
   { id: 'M2SL', name: 'M2 Money Stock (Level)', categoryKey: 'viii', description: 'Total M2 money supply (SA).', unit: 'Billions of Dollars (SA)', frequency: 'Monthly', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'M2SL', chartType: 'area', calculation: 'NONE' },
   { id: 'US10Y', name: 'US 10-Year Treasury Yield', categoryKey: 'viii', description: 'Yield on U.S. 10-year government debt.', unit: '%', frequency: 'Daily', sourceName: 'U.S. Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'DGS10', chartType: 'line', calculation: 'NONE' },
-  { id: 'USD_EUR', name: 'USD/EUR Exchange Rate', categoryKey: 'viii', description: 'Value of 1 U.S. Dollar in Euros.', unit: 'EUR per USD', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DEXUSEU', chartType: 'line', calculation: 'NONE' },
+  { id: 'USD_EUR', name: 'USD/EUR Exchange Rate', categoryKey: 'ix', description: 'Value of 1 U.S. Dollar in Euros.', unit: 'EUR per USD', frequency: 'Daily', sourceName: 'FRB via FRED', apiSource: 'FRED', apiIdentifier: 'DEXUSEU', chartType: 'line', calculation: 'NONE' },
   { id: 'VIX', name: 'Volatility Index (VIX)', categoryKey: 'viii', description: 'Market expectation of near-term S&P 500 volatility.', unit: 'Index', frequency: 'Daily', sourceName: 'CBOE via FRED', apiSource: 'FRED', apiIdentifier: 'VIXCLS', chartType: 'line', calculation: 'NONE' },
   { id: 'CORP_BOND_SPREAD_BAA', name: 'Corporate Bond Spread (Baa)', categoryKey: 'viii', description: 'Difference between Moody\'s Baa Corp Bond Yield and 10-Yr Treasury.', unit: '%', frequency: 'Daily', sourceName: 'Moody\'s/Treasury via FRED', apiSource: 'FRED', apiIdentifier: 'BAA10Y', chartType: 'line', calculation: 'NONE' },
-   {
-    id: 'BTC_PRICE_USD', name: 'Bitcoin Price (USD)', categoryKey: 'viii',
-    description: 'Daily price of Bitcoin in US Dollars.',
-    unit: 'USD', frequency: 'Daily',
-    sourceName: 'CoinGecko',
-    apiSource: 'CoinGeckoAPI', // <<< MUST BE THIS
-    apiIdentifier: 'bitcoin',   // <<< MUST BE THIS
-    chartType: 'line', calculation: 'NONE',
-  },
   {
-    id: 'ETH_PRICE_USD', name: 'Ethereum Price (USD)', categoryKey: 'viii',
-    description: 'Daily price of Ethereum in US Dollars.',
-    unit: 'USD', frequency: 'Daily',
-    sourceName: 'CoinGecko',
-    apiSource: 'CoinGeckoAPI', // <<< MUST BE THIS
-    apiIdentifier: 'ethereum',  // <<< MUST BE THIS
-    chartType: 'line', calculation: 'NONE',
-  },
-  {
-    id: 'CRYPTO_FEAR_GREED', name: 'Crypto Fear & Greed Index', categoryKey: 'viii',
+    id: 'CRYPTO_FEAR_GREED', name: 'Crypto Fear & Greed Index', categoryKey: 'ix',
     description: 'Measures current sentiment in the Bitcoin and broader cryptocurrency market.',
     unit: 'Index (0-100)', frequency: 'Daily',
     sourceName: 'Alternative.me',
     apiSource: 'AlternativeMeAPI', apiIdentifier: 'fear-and-greed',
     chartType: 'line', calculation: 'NONE',
   },
-  // ETFs now using Tiingo
   {
     id: 'TLT_ETF', name: 'iShares 20+ Year Treasury Bond ETF (TLT)', categoryKey: 'viii',
     description: 'Tracks the performance of U.S. Treasury bonds with remaining maturities greater than twenty years.',
@@ -281,7 +243,7 @@ export const indicators: IndicatorMetadata[] = [
     chartType: 'line', calculation: 'NONE',
   },
   {
-    id: 'VNQ_ETF', name: 'Real Estate ETF (VNQ)', categoryKey: 'viii',
+    id: 'VNQ_ETF', name: 'Real Estate ETF (VNQ)', categoryKey: 'vi',
     description: 'Vanguard Real Estate ETF, tracks a broad U.S. REIT index.',
     unit: 'USD', frequency: 'Daily',
     sourceName: 'Tiingo',
@@ -308,17 +270,68 @@ export const indicators: IndicatorMetadata[] = [
     chartType: 'line', calculation: 'NONE',
     notes: 'Highly volatile leveraged ETF, intended for short-term tactical use.'
   },
+
+  // == New/Modified Indicators from Request ==
+ {
+    id: 'BTC_PRICE_USD', name: 'Bitcoin Price (Tiingo)', categoryKey: 'ix', // Name updated
+    description: 'Daily price of Bitcoin in US Dollars from Tiingo.',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo', // <<< CHANGED
+    apiIdentifier: 'btcusd',   // <<< CHANGED to Tiingo's ticker format
+    chartType: 'line', calculation: 'NONE',
+  },
+  {
+    id: 'ETH_PRICE_USD', name: 'Ethereum Price (Tiingo)', categoryKey: 'ix', // Name updated
+    description: 'Daily price of Ethereum in US Dollars from Tiingo.',
+    unit: 'USD', frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo', // <<< CHANGED
+    apiIdentifier: 'ethusd',  // <<< CHANGED to Tiingo's ticker format
+    chartType: 'line', calculation: 'NONE',
+  },
+  {
+    id: 'DXY_INDEX', 
+    name: 'US Dollar Index (DXY, Calculated)',
+    categoryKey: 'ix', 
+    description: 'Calculated approximation of the U.S. Dollar Index based on a weighted geometric mean of USD against a basket of foreign currencies.',
+    unit: 'Index Value',
+    frequency: 'Daily',
+    sourceName: 'Alpha Vantage (FX Rates)',
+    apiSource: 'AlphaVantage', 
+    apiIdentifier: ['EUR/USD', 'USD/JPY', 'GBP/USD', 'USD/CAD', 'USD/SEK', 'USD/CHF'], 
+    chartType: 'line',
+    calculation: 'DXY_CALCULATION', 
+    notes: 'Calculated from individual FX rates. Weights: EUR 57.6%, JPY 13.6%, GBP 11.9%, CAD 9.1%, SEK 4.2%, CHF 3.6%.'
+  },
+  { id: 'SP500', name: 'S&P 500 Index', categoryKey: 'viii', description: 'Tracks stock performance of 500 large U.S. companies.', unit: 'Index Value', frequency: 'Daily', sourceName: 'S&P Dow Jones Indices via FRED', apiSource: 'FRED', apiIdentifier: 'SP500', chartType: 'line', calculation: 'NONE' },
+  {
+    id: 'NASDAQ_COMPOSITE', 
+    name: 'Nasdaq Composite Index (Tiingo)',
+    categoryKey: 'viii',
+    description: 'Market value-weighted stock market index of common stocks listed on Nasdaq. Data via Tiingo.',
+    unit: 'Index Value',
+    frequency: 'Daily',
+    sourceName: 'Tiingo',
+    apiSource: 'Tiingo',
+    apiIdentifier: 'QQQ', // Using QQQ (Nasdaq 100 ETF). For Composite, Tiingo might use ^IXIC.
+    chartType: 'line',
+    calculation: 'NONE',
+    notes: 'Using QQQ (Nasdaq 100 ETF) as proxy. For Nasdaq Composite, Tiingo ticker might be ^IXIC or similar.'
+  },
 ];
 
 // Helper functions
 export function getIndicatorById(id: string): IndicatorMetadata | undefined {
   return indicators.find(ind => ind.id === id);
 }
+
 export function getIndicatorsByCategorySlug(slug: string): IndicatorMetadata[] {
    const categoryKey = Object.keys(indicatorCategories).find(key => indicatorCategories[key as IndicatorCategoryKey].slug === slug) as IndicatorCategoryKey | undefined;
    if (!categoryKey) return [];
    return indicators.filter(ind => ind.categoryKey === categoryKey);
 }
+
 export function getCategoryBySlug(slug: string): typeof indicatorCategories[IndicatorCategoryKey] | undefined {
     const categoryKey = Object.keys(indicatorCategories).find(key => indicatorCategories[key as IndicatorCategoryKey].slug === slug) as IndicatorCategoryKey | undefined;
     return categoryKey ? indicatorCategories[categoryKey] : undefined;

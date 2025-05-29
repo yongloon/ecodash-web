@@ -43,14 +43,13 @@ const getApiKey = (serviceName: ApiServiceName): string | null => {
     let envVarName: string = '';
     switch(serviceName) {
         case 'FRED': envVarName = 'FRED_API_KEY'; key = process.env.FRED_API_KEY; break;
-        case 'ALPHA_VANTAGE': envVarName = 'ALPHA_VANTAGE_API_KEY'; key = process.env.ALPHA_VANTAGE_API_KEY; break;
+        case 'ALPHA_VANTAGE': envVarName = 'ALPHA_VANTAGE_API_KEY'; key = process.env.ALPHA_VANTage_API_KEY; break;
         case 'NEWSAPI_ORG': envVarName = 'NEWSAPI_ORG_KEY'; key = process.env.NEWSAPI_ORG_KEY; break;
         case 'FINNHUB': envVarName = 'FINNHUB_API_KEY'; key = process.env.FINNHUB_API_KEY; break;
         case 'POLYGON': envVarName = 'POLYGON_API_KEY'; key = process.env.POLYGON_API_KEY; break;
         case 'API_NINJAS': envVarName = 'API_NINJAS_KEY'; key = process.env.API_NINJAS_KEY; break;
         case 'TIINGO': envVarName = 'TIINGO_API_KEY'; key = process.env.TIINGO_API_KEY; break;
         default: 
-            // This case should ideally not be reached if ApiServiceName is used correctly
             const exhaustiveCheck: never = serviceName; 
             console.error(`[API Lib] Unknown service name for API Key: ${exhaustiveCheck}`);
             return null;
@@ -122,14 +121,13 @@ export interface FredReleaseDate { release_id: number; release_name: string; dat
 export interface FredReleasesDatesResponse { release_dates: FredReleaseDate[]; count?: number; offset?: number; limit?: number; }
 
 export async function fetchFredReleaseCalendar(
-  _daysAheadForDisplay: number = 30, // This param is for context now, API fetches a fixed window
+  _daysAheadForDisplay: number = 30,
   includeReleaseDatesWithNoData: boolean = false
 ): Promise<FredReleaseDate[]> {
   const apiKey = process.env.FRED_API_KEY;
   if (!apiKey) { console.error("[API FRED Releases] Key missing."); return []; }
 
   const today = new Date();
-  // Fetch a window: 7 days in the past (for any just-missed updates) to 60 days in the future.
   const queryStartDate = format(subDays(today, 7), 'yyyy-MM-dd');
   const queryEndDate = format(addDays(today, 60), 'yyyy-MM-dd');
 
@@ -138,13 +136,13 @@ export async function fetchFredReleaseCalendar(
     realtime_start: queryStartDate,
     realtime_end: queryEndDate,
     include_release_dates_with_no_data: String(includeReleaseDatesWithNoData),
-    limit: '200', // Fetch a decent number of releases within the window
-    sort_order: 'asc', // Get them sorted by release date
+    limit: '200', 
+    sort_order: 'asc',
   });
   const url = `${FRED_API_RELEASES_URL}/releases/dates?${params.toString()}`;
 
   try {
-    const response = await fetch(url, { next: { revalidate: 43200 } }); // Revalidate every 12 hours
+    const response = await fetch(url, { next: { revalidate: 43200 } }); 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[API FRED Releases] Error: ${response.status} - Body: ${errorText.substring(0,500)}`);
@@ -154,19 +152,14 @@ export async function fetchFredReleaseCalendar(
     if (!data?.release_dates?.length) {
         return [];
     }
-
-    // Deduplicate and ensure validity
     const uniqueReleasesMap = new Map<string, FredReleaseDate>();
     data.release_dates.forEach(current => {
       if (current.date && current.release_name && current.release_id != null && isValid(parseISO(current.date))) {
-        uniqueReleasesMap.set(`${current.release_id}-${current.date}`, current); // Use ID and date for uniqueness
+        uniqueReleasesMap.set(`${current.release_id}-${current.date}`, current);
       }
     });
-    // The API already sorts by date if sort_order=asc is used. If not, sort here.
-    // Sorting again won't hurt if API guarantees it, but good for safety.
     const allUniqueSortedReleases = Array.from(uniqueReleasesMap.values())
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
     return allUniqueSortedReleases;
   } catch (error) {
     console.error(`[API FRED Releases] Error:`, error);
@@ -174,65 +167,162 @@ export async function fetchFredReleaseCalendar(
   }
 }
 
-// --- Alpha Vantage API Fetcher (Stock/ETF/Currency) ---
-export async function fetchAlphaVantageData( apiIdentifier: string, dateRange?: { startDate?: string; endDate?: string } ): Promise<TimeSeriesDataPoint[]> {
+// --- Alpha Vantage API Fetcher (MODIFIED for Stocks/ETF/Currency/Commodity) ---
+export async function fetchAlphaVantageData(
+  apiIdentifier: string, 
+  dateRange?: { startDate?: string; endDate?: string }
+): Promise<TimeSeriesDataPoint[]> {
   const apiKey = getApiKey('ALPHA_VANTAGE');
   if (!apiKey) throw new Error(`[AlphaVantage API Key Missing] Cannot fetch ${apiIdentifier}.`);
 
   const apiDefaults = getApiDefaultDateRange();
   const effStart = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate;
   const effEnd = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
-  let params: URLSearchParams, dataKey: string, valKey: string, isCurrency = false;
+  
+  let params: URLSearchParams;
+  let dataKey: string; 
+  let valKey: string;  
+  let isSingleValueCommodityOrCurrency = false;
+  let isCommodityTimeseries = false;
 
-  if (apiIdentifier.includes('/')) {
+  if (apiIdentifier.includes('/')) { 
     const [from, to] = apiIdentifier.split('/');
     if (!from || !to) { throw new Error(`[AlphaVantage API Error] Invalid currency pair: ${apiIdentifier}`); }
-    params = new URLSearchParams({ function: 'CURRENCY_EXCHANGE_RATE', from_currency: from, to_currency: to, apikey: apiKey });
-    dataKey = 'Realtime Currency Exchange Rate'; valKey = '5. Exchange Rate'; isCurrency = true;
-  } else {
+    
+    const digitalCurrencies = ['BTC', 'ETH']; 
+    if (digitalCurrencies.includes(from.toUpperCase())) {
+        params = new URLSearchParams({ function: 'DIGITAL_CURRENCY_DAILY', symbol: from.toUpperCase(), market: to.toUpperCase(), apikey: apiKey, outputsize: 'full' });
+        dataKey = 'Time Series (Digital Currency Daily)';
+        valKey = `4a. close (${to.toUpperCase()})`; 
+    } else {
+        params = new URLSearchParams({ function: 'CURRENCY_EXCHANGE_RATE', from_currency: from.toUpperCase(), to_currency: to.toUpperCase(), apikey: apiKey });
+        dataKey = 'Realtime Currency Exchange Rate';
+        valKey = '5. Exchange Rate';
+        isSingleValueCommodityOrCurrency = true;
+    }
+  } else if (apiIdentifier.toUpperCase() === 'NATURAL_GAS') { 
+    params = new URLSearchParams({ function: 'NATURAL_GAS', interval: 'daily', apikey: apiKey }); 
+    dataKey = 'data'; 
+    valKey = 'value';
+    isCommodityTimeseries = true; 
+  } else { 
     const output = (isValid(parseISO(effStart)) && isValid(parseISO(effEnd)) && differenceInDays(parseISO(effEnd), parseISO(effStart)) > 90) ? 'full' : 'compact';
     params = new URLSearchParams({ function: 'TIME_SERIES_DAILY_ADJUSTED', symbol: apiIdentifier, apikey: apiKey, outputsize: output });
-    dataKey = 'Time Series (Daily)'; valKey = '5. adjusted close';
+    dataKey = 'Time Series (Daily)';
+    valKey = '5. adjusted close';
   }
+
   const url = `${ALPHA_VANTAGE_API_URL}?${params.toString()}`;
   try {
-    const res = await fetch(url, { next: { revalidate: isCurrency ? 300 : 14400 } });
-    if (!res.ok) { const txt = await res.text(); throw new Error(`[AlphaVantage API Error] (${res.status}) for ${apiIdentifier}. Details: ${txt.substring(0,100)}`); }
+    const res = await fetch(url, { next: { revalidate: isSingleValueCommodityOrCurrency ? 300 : 14400 } });
+    if (!res.ok) { const txt = await res.text(); throw new Error(`[AlphaVantage API Error] (${res.status}) for ${apiIdentifier}. Details: ${txt.substring(0,150)}`); }
     const data = await res.json();
+
     if (data["Error Message"]) throw new Error(`[AlphaVantage API Error] ${data["Error Message"]} for ${apiIdentifier}.`);
-    if (data["Note"]) {
-        console.warn(`[API AlphaVantage] Note for ${apiIdentifier}: ${data["Note"]}. Rate limit likely.`);
-        if (data["Note"].toLowerCase().includes("api call frequency") || data["Note"].toLowerCase().includes("premium endpoint")) {
-            throw new Error(`[AlphaVantage API Limit/Access Error] Note: ${data["Note"]} for ${apiIdentifier}.`);
+    if (data["Information"] || data["Note"]) {
+        const note = data["Information"] || data["Note"];
+        console.warn(`[API AlphaVantage] Note for ${apiIdentifier}: ${note}.`);
+        if (note.toLowerCase().includes("api call frequency") || note.toLowerCase().includes("premium endpoint")) {
+            throw new Error(`[AlphaVantage API Limit/Access Error] Note: ${note} for ${apiIdentifier}.`);
         }
     }
     
     const block = data[dataKey];
-    if (!block || (typeof block === 'object' && !Object.keys(block).length)) { return []; }
+    if (!block || (typeof block === 'object' && !Array.isArray(block) && !Object.keys(block).length) || (Array.isArray(block) && block.length === 0) ) { 
+        console.warn(`[API AlphaVantage] No data block found for key "${dataKey}" or block is empty for ${apiIdentifier}. Response:`, JSON.stringify(data).substring(0,200));
+        return []; 
+    }
     
     let series: TimeSeriesDataPoint[] = [];
-    if (isCurrency) {
-      const rate = block[valKey] ? parseFloat(block[valKey]) : NaN;
+
+    if (isSingleValueCommodityOrCurrency) { 
+      const rateStr = block[valKey];
+      const rate = rateStr ? parseFloat(rateStr) : NaN;
       if (!isNaN(rate)) series = [{ date: format(new Date(), 'yyyy-MM-dd'), value: parseFloat(rate.toFixed(4)) }];
-    } else {
+    } else if (isCommodityTimeseries) { 
+      if (Array.isArray(block)) {
+        series = block.map((item: any) => {
+          if (!item.date || !isValid(parseISO(item.date)) || item[valKey] === '.' || item[valKey] === undefined || item[valKey] === null) return null;
+          const value = parseFloat(item[valKey]);
+          return isNaN(value) ? null : { date: item.date, value: parseFloat(value.toFixed(4)) };
+        }).filter(dp => dp !== null) as TimeSeriesDataPoint[];
+      }
+    } else { 
         series = Object.keys(block).map(dateStr => {
           if (!isValid(parseISO(dateStr))) return null;
-          const dayData = block[dateStr]; const valStr = dayData[valKey] || dayData['4. close'];
-          if (valStr === undefined) return null; const value = parseFloat(valStr);
-          return isNaN(value) ? null : { date: dateStr, value };
+          const dayData = block[dateStr]; 
+          const valStr = dayData[valKey] || dayData['4. close']; 
+          if (valStr === undefined || valStr === null) return null; 
+          const value = parseFloat(valStr);
+          return isNaN(value) ? null : { date: dateStr, value: parseFloat(value.toFixed(4)) };
         }).filter(dp => dp !== null) as TimeSeriesDataPoint[];
     }
-    if (!isCurrency) {
-      series.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      if (isValid(parseISO(effStart))) series = series.filter(dp => parseISO(dp.date) >= parseISO(effStart));
-      if (isValid(parseISO(effEnd))) series = series.filter(dp => parseISO(dp.date) <= parseISO(effEnd));
-    } 
+
+    series.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (!isSingleValueCommodityOrCurrency) {
+        if (isValid(parseISO(effStart))) series = series.filter(dp => parseISO(dp.date) >= parseISO(effStart));
+        if (isValid(parseISO(effEnd))) series = series.filter(dp => parseISO(dp.date) <= parseISO(effEnd));
+    }
     return series;
   } catch (e: any) { 
     if (e.message.startsWith('[AlphaVantage API')) throw e;
     console.error(`[API AlphaVantage] Network/parse error for ${apiIdentifier}:`, e); 
     throw new Error(`[AlphaVantage Network/Parse Error] ${apiIdentifier}. Original: ${e.message?.substring(0,100)}`);
   }
+}
+
+// --- DXY Calculation Function ---
+interface FxRateMap { [pair: string]: number; }
+
+export async function calculateDxyIndex(
+    componentPairs: string[], 
+    _dateRange?: { startDate?: string; endDate?: string } 
+): Promise<TimeSeriesDataPoint[]> {
+    const weights: Record<string, number> = {
+        'EUR/USD': 0.576, 'USD/JPY': 0.136, 'GBP/USD': 0.119,
+        'USD/CAD': 0.091, 'USD/SEK': 0.042, 'USD/CHF': 0.036,
+    };
+    const powers: Record<string, number> = { 
+        'EUR/USD': -0.576, 'USD/JPY': 0.136, 'GBP/USD': -0.119,
+        'USD/CAD': 0.091,  'USD/SEK': 0.042, 'USD/CHF': 0.036,
+    };
+
+    const rates: FxRateMap = {};
+    const fetchPromises = componentPairs.map(async (pair) => {
+        try {
+            const dataPoints = await fetchAlphaVantageData(pair); 
+            if (dataPoints.length > 0 && dataPoints[0].value !== null) {
+                rates[pair] = dataPoints[0].value;
+            } else {
+                console.warn(`[DXY Calc] No rate found for ${pair}`);
+            }
+        } catch (error) {
+            console.error(`[DXY Calc] Error fetching rate for ${pair}:`, error);
+        }
+    });
+
+    await Promise.all(fetchPromises);
+
+    if (Object.keys(rates).length !== componentPairs.length) {
+        const missingPairs = componentPairs.filter(p => !rates[p]);
+        console.error("[DXY Calc] Failed to fetch all required FX rates for DXY calculation. Missing:", missingPairs.join(', '));
+        return []; 
+    }
+
+    let dxyValue = 50.14348112; 
+
+    for (const pair of componentPairs) {
+        if (rates[pair] && powers[pair]) {
+            dxyValue *= Math.pow(rates[pair], powers[pair]);
+        } else {
+            console.warn(`[DXY Calc] Missing rate or power for ${pair}, DXY will be inaccurate.`);
+            return []; 
+        }
+    }
+    return [{
+        date: format(new Date(), 'yyyy-MM-dd'),
+        value: parseFloat(dxyValue.toFixed(4))
+    }];
 }
 
 // --- Alpha Vantage News & Sentiment ---
@@ -304,7 +394,7 @@ export async function fetchAlphaVantageInsiderTransactions( ticker: string, limi
     if (!csvData || csvData.trim() === '' || csvData.toLowerCase().includes("error message")) {
         throw new Error(`[AlphaVantage Insider API Error] Received error message in CSV for ${ticker}: ${csvData.substring(0,100)}`);
     }
-    if (csvData.toLowerCase().includes("thank you for using alpha vantage") && !csvData.toLowerCase().includes("symbol,companyname")) { // Note: AV CSV header is companyName
+    if (csvData.toLowerCase().includes("thank you for using alpha vantage") && !csvData.toLowerCase().includes("symbol,companyname")) { 
        console.warn("[API AlphaVantage Insider] Rate limit or key issue for " + ticker);
        throw new Error(`[AlphaVantage Insider API Limit/Access Error] for ${ticker}. Response: ${csvData.substring(0,100)}`);
     }
@@ -314,14 +404,14 @@ export async function fetchAlphaVantageInsiderTransactions( ticker: string, limi
       symbol: obj.symbol?.toUpperCase() || 'N/A',
       filingDate: obj.filingDate || '', 
       transactionDate: obj.transactionDate || '',
-      reportingCik: obj.reporterCik || '', // Assuming 'reporterCik' from AV CSV
-      reportingName: obj.reporterName || 'Unknown Insider', // Assuming 'reporterName'
-      reportingTitle: obj.relationship || 'N/A', // Assuming 'relationship' for title
-      transactionType: obj.transactionType || 'N/A', // Assuming 'transactionType'
-      transactionCode: obj.transactionCode || 'N/A', // Assuming 'transactionCode'
+      reportingCik: obj.reporterCik || '', 
+      reportingName: obj.reporterName || 'Unknown Insider', 
+      reportingTitle: obj.relationship || 'N/A', 
+      transactionType: obj.transactionType || 'N/A', 
+      transactionCode: obj.transactionCode || 'N/A', 
       shares: obj.shares || '0',
       value: obj.value || '0', 
-      pricePerShare: obj.price || '0', // Assuming 'price' for pricePerShare
+      pricePerShare: obj.price || '0', 
     }))
     .filter(t => t.symbol !== 'N/A' && t.filingDate && isValid(parseISO(t.filingDate)))
     .sort((a,b) => new Date(b.filingDate).getTime() - new Date(a.filingDate).getTime())
@@ -332,7 +422,6 @@ export async function fetchAlphaVantageInsiderTransactions( ticker: string, limi
     throw new Error(`[AlphaVantage Insider Network/Parse Error] ${ticker}. Original: ${error.message?.substring(0,100)}`);
   }
 }
-
 
 // --- DB.nomics API Fetcher ---
 interface DbNomicsSeriesDoc { '@frequency'?: string; dataset_code?: string; dataset_name?: string; dimensions?: any; indexed_at?: string; period: string[]; period_start_day?: string[]; provider_code?: string; series_code?: string; series_name?: string; value: (number | null)[]; }
@@ -485,7 +574,7 @@ export async function fetchCoinGeckoPriceHistory( coinId: string, dateRange?: { 
   const startDateStr = (dateRange?.startDate && isValid(parseISO(dateRange.startDate))) ? dateRange.startDate : apiDefaults.startDate; 
   const endDateStr = (dateRange?.endDate && isValid(parseISO(dateRange.endDate))) ? dateRange.endDate : apiDefaults.endDate;
   let fromTimestamp = Math.floor(parseISO(startDateStr).getTime() / 1000);  
-  let toTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000) + (60 * 60 * 23);
+  let toTimestamp = Math.floor(parseISO(endDateStr).getTime() / 1000) + (60 * 60 * 23); 
   if (fromTimestamp > toTimestamp) [fromTimestamp, toTimestamp] = [toTimestamp, fromTimestamp];
 
   const url = `${COINGECKO_API_URL}/coins/${coinId}/market_chart/range?vs_currency=usd&from=${fromTimestamp}&to=${toTimestamp}`;
@@ -631,7 +720,7 @@ export async function fetchAlphaVantageEarningsCalendar( horizon: '3month' | '6m
        throw new Error(`[AlphaVantage Earnings API Limit/Access Error] Response: ${csvData.substring(0,100)}`);
     }
     
-    const parsedObjects = parseInsiderCSV(csvData); // Using the renamed CSV parser
+    const parsedObjects = parseInsiderCSV(csvData); 
     return parsedObjects.map(obj => { 
         const estimateVal = obj.estimate ? parseFloat(obj.estimate) : null; 
         return { 
@@ -643,7 +732,7 @@ export async function fetchAlphaVantageEarningsCalendar( horizon: '3month' | '6m
             currency: obj.currency || 'USD', 
         }; 
     })
-    .filter(event => event.symbol !== 'N/A' && event.reportDate && isValid(parseISO(event.reportDate))) // Ensure reportDate is present
+    .filter(event => event.symbol !== 'N/A' && event.reportDate && isValid(parseISO(event.reportDate)))
     .sort((a,b) => new Date(a.reportDate).getTime() - new Date(b.reportDate).getTime());
   } catch (error: any) { 
     if (error.message.startsWith('[AlphaVantage')) throw error;

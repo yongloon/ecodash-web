@@ -164,19 +164,7 @@ export default function SidebarNav({ isMobileMenuOpen, toggleMobileMenu }: Sideb
               <span>Provide Feedback</span>
             </Link>
 
-          <div className="flex-grow"></div> 
-
-          {!isLoadingSession && isLoggedIn && (
-               <Link
-                  href="/account/profile"
-                  className={`${navLinkClasses(pathname.startsWith('/account/profile') || pathname === '/account')} mt-2`} // Added startsWith for sub-routes
-                  title="My Account"
-                  onClick={handleLinkClick}
-              >
-                  <AccountIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-                  <span>My Account</span>
-              </Link>
-          )}
+       
         </nav>
       </div>
     </>
